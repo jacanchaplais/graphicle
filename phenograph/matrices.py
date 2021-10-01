@@ -28,20 +28,20 @@ class AffinityMatrix:
             raise TypeError('input 4 momenta array not ndarray or vector')
         return size
 
-    def __deltaR_cols(self):
+    def __delta_R_cols(self):
         array = self.__pcl_array
         size = self.__num_pcls
         # slide the particle lists over all pairs
         for shift in range(size): # 0th shift is trivial as both same
             yield array[shift].deltaR(array[shift:])
 
-    def deltaR_aff(self):
+    def delta_R(self):
         """Returns a symmetric matrix of delta R vals from input
         4-momentum array.
         """
         size = self.__num_pcls
         aff = np.zeros((size, size), dtype=np.float64)
-        dR_cols = self.__deltaR_cols()
+        dR_cols = self.__delta_R_cols()
         for idx, col in enumerate(dR_cols):
             aff[idx:, idx] = col
             aff[idx, idx:] = col
