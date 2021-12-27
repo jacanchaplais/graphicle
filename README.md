@@ -1,4 +1,4 @@
-# phenograph
+# graphicle
 Utilities for representing high energy physics data as graphs / networks.
 
 # Features
@@ -9,7 +9,7 @@ Utilities for representing high energy physics data as graphs / networks.
 
 ## Installation
 ```
-pip install git+https://github.com/jacanchaplais/phenograph.git#egg=phenograph
+pip install git+https://github.com/jacanchaplais/graphicle.git#egg=graphicle
 ```
 
 # Coming soon
