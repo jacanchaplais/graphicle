@@ -9,7 +9,7 @@ Utilities for representing high energy physics data as graphs / networks.
 
 ## Installation
 ```
-pip install git+https://github.com/jacanchaplais/graphicle.git#egg=graphicle
+pip install graphicle
 ```
 
 # Coming soon
