@@ -7,6 +7,7 @@ class ArrayBase(ABC):
     def data(self):
         pass
 
+
 class ParticleBase(ABC):
     @property
     @abstractmethod
@@ -28,6 +29,7 @@ class ParticleBase(ABC):
     def final(self):
         pass
 
+
 class EdgeBase(ABC):
     @property
     @abstractmethod
@@ -38,6 +40,7 @@ class EdgeBase(ABC):
     @abstractmethod
     def nodes(self):
         pass
+
 
 class GraphicleBase(ABC):
     @property
@@ -64,6 +67,7 @@ class GraphicleBase(ABC):
     # @abstractmethod
     # def copy(self):
     #     pass
+
 
 # ---------------------------
 # composite pattern for masks

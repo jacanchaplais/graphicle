@@ -1,5 +1,6 @@
 import numpy as np
 
+
 class AffinityMatrix:
     import vector as __vector
 
@@ -15,8 +16,8 @@ class AffinityMatrix:
         """
         return self.__vector.array(
             [tuple(pcl) for pcl in array],
-            dtype=[("x", float), ("y", float), ("z", float), ("e", float)]
-            )
+            dtype=[("x", float), ("y", float), ("z", float), ("e", float)],
+        )
 
     def __get_array_size(self):
         array = self.__pcl_array
@@ -25,14 +26,14 @@ class AffinityMatrix:
         elif type(array) == np.ndarray:
             size = array.shape[0]
         else:
-            raise TypeError('input 4 momenta array not ndarray or vector')
+            raise TypeError("input 4 momenta array not ndarray or vector")
         return size
 
     def __delta_R_cols(self):
         array = self.__pcl_array
         size = self.__num_pcls
         # slide the particle lists over all pairs
-        for shift in range(size): # 0th shift is trivial as both same
+        for shift in range(size):  # 0th shift is trivial as both same
             yield array[shift].deltaR(array[shift:])
 
     def delta_R(self):
@@ -47,12 +48,14 @@ class AffinityMatrix:
             aff[idx, idx:] = col
         return aff
 
-def knn_adj(matrix, self_loop=False, k=8, weighted=False, row=True,
-            dtype=None):
+
+def knn_adj(
+    matrix, self_loop=False, k=8, weighted=False, row=True, dtype=None
+):
     """Produce a directed adjacency matrix with outward edges
     towards the k nearest neighbours, determined from the input
     affinity matrix.
-    
+
     Keyword arguments:
         matrix (2d numpy array): particle affinities
         self_loop (bool): if False will remove self-edges
@@ -63,9 +66,9 @@ def knn_adj(matrix, self_loop=False, k=8, weighted=False, row=True,
         dtype (numpy): data type: type of the output array
             note: must be floating point if weighted is True
     """
-    axis = 0 # calculate everything row-wise
+    axis = 0  # calculate everything row-wise
     if self_loop == False:
-        k = k + 1 # for when we get rid of self-neighbours
+        k = k + 1  # for when we get rid of self-neighbours
     knn_idxs = np.argpartition(matrix, kth=k, axis=axis)
     near = knn_idxs[:k]
     edge_weights = 1
@@ -77,7 +80,7 @@ def knn_adj(matrix, self_loop=False, k=8, weighted=False, row=True,
                 raise ValueError(
                     "Update the dtype parameter passed to this function "
                     + "to a numpy floating point type for weighted output."
-                    )
+                )
         edge_weights = np.take_along_axis(matrix, near, axis=axis)
     else:
         dtype = np.bool_
@@ -89,9 +92,9 @@ def knn_adj(matrix, self_loop=False, k=8, weighted=False, row=True,
         np.fill_diagonal(adj, 0)
     return adj
 
+
 def fc_adj(num_nodes, self_loop=False, dtype=np.bool_):
-    """Create a fully connected adjacency matrix.
-    """
+    """Create a fully connected adjacency matrix."""
     adj = np.ones((num_nodes, num_nodes), dtype=dtype)
     if self_loop == False:
         np.fill_diagonal(adj, 0)
