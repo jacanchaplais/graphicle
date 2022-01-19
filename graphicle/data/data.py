@@ -1,7 +1,8 @@
 from functools import partial
+from copy import deepcopy
 from typing import List, Dict
 
-from attr import define, field, Factory, cmp_using, setters
+from attr import define, field, Factory, cmp_using, setters, fields
 import numpy as np
 from typicle import Types
 from typicle.convert import cast_array
@@ -189,7 +190,10 @@ class MomentumArray(ArrayBase):
     @property
     def __vector(self):
         from vector import MomentumNumpy4D
-        return self.data.view(MomentumNumpy4D)
+        dtype = deepcopy(self.data.dtype)
+        dtype.names = ('x', 'y', 'z', 't')
+        vec = self.data.view(dtype).view(MomentumNumpy4D)
+        return vec
 
     @property
     def pt(self) -> np.ndarray:
@@ -241,6 +245,13 @@ class ParticleSet(ParticleBase):
             if len(data) > 0:
                 kwargs.update({name: data[key]})
         return self.__class__(**kwargs)
+
+    def __repr__(self):
+        attr_names = tuple(self.__annotations__.keys())
+        attr_repr = (repr(getattr(self, name)) for name in attr_names)
+        attr_str = ',\n'.join(attr_repr)
+        return f'ParticleSet(\n{attr_str}\n)'
+        
 
 @define
 class EdgeList(EdgeBase):
