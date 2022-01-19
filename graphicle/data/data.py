@@ -238,17 +238,20 @@ class ParticleSet(ParticleBase):
                 final=optional(MaskArray, final),
                 )
 
+    @property
+    def __attr_names(self):
+        return tuple(self.__annotations__.keys())
+
     def __getitem__(self, key):
         kwargs = dict()
-        for name in ('pdg', 'pmu', 'color', 'final'):
+        for name in self.__attr_names:
             data = getattr(self, name)
             if len(data) > 0:
                 kwargs.update({name: data[key]})
         return self.__class__(**kwargs)
 
     def __repr__(self):
-        attr_names = tuple(self.__annotations__.keys())
-        attr_repr = (repr(getattr(self, name)) for name in attr_names)
+        attr_repr = (repr(getattr(self, name)) for name in self.__attr_names)
         attr_str = ',\n'.join(attr_repr)
         return f'ParticleSet(\n{attr_str}\n)'
         
@@ -257,6 +260,11 @@ class ParticleSet(ParticleBase):
 class EdgeList(EdgeBase):
     import networkx as __nx
     data: np.ndarray = array_field('edge')
+
+    def __getitem__(self, key):
+        if isinstance(key, MaskBase):
+            key = key.data
+        return self.__class__(self.data[key])
 
     @property
     def nodes(self):
@@ -307,3 +315,30 @@ class Graphicle:
                 pdg=pdg, pmu=pmu, color=color, final=final)
         edges = EdgeList(edges) if edges is not None else EdgeList()
         return cls(particles=particles, edges=edges)
+
+    @property
+    def pdg(self):
+        return self.particles.pdg
+
+    @property
+    def pmu(self):
+        return self.particles.pmu
+
+    @property
+    def color(self):
+        return self.particles.pmu
+
+    @property
+    def final(self):
+        return self.particles.final
+
+    @property
+    def __attr_names(self):
+        return tuple(self.__annotations__.keys())
+
+    def __getitem__(self, key):
+        kwargs = dict()
+        for name in self.__attr_names:
+            data = getattr(self, name)
+            kwargs.update({name: data[key]})
+        return self.__class__(**kwargs)
