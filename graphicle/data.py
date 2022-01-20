@@ -321,7 +321,10 @@ class EdgeList(EdgeBase):
         # generator of dicts, with key/val pairs for each row elem
         edge_dicts = (dict(zip(data_dict.keys(), row)) for row in data_rows)
         # attach data dict to list
-        edges = zip(self.data["in"], self.data["out"], edge_dicts)
+        if data_dict:
+            edges = zip(self.data["in"], self.data["out"], edge_dicts)
+        else:
+            edges = zip(self.data["in"], self.data["out"])
         shower = self.__nx.DiGraph()
         shower.add_edges_from(edges)
         return shower
