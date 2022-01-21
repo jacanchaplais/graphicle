@@ -1,3 +1,4 @@
+from enum import Enum
 from functools import partial
 from copy import deepcopy
 from typing import List, Dict
@@ -330,10 +331,16 @@ class EdgeList(EdgeBase):
         return shower
 
 
+class ParticleState(Enum):
+    EDGES: str = "edges"
+    NODES: str = "nodes"
+
+
 @define
 class Graphicle:
     particles: ParticleSet = ParticleSet()
     edges: EdgeList = EdgeList()
+    _state: ParticleState = ParticleState.EDGES
 
     @classmethod
     def from_numpy(
@@ -349,6 +356,22 @@ class Graphicle:
         )
         edges = EdgeList(edges) if edges is not None else EdgeList()
         return cls(particles=particles, edges=edges)
+
+    @property
+    def state(self):
+        return self._state
+
+    @state.setter
+    def state(self, value):
+        if isinstance(value, str):
+            self._state = ParticleState(value)
+        elif isinstance(value, ParticleState):
+            self._state = value
+        else:
+            raise ValueError(
+                "Attribute 'state' must be set either with a str or "
+                + f"a ParticleState type. Received {type(value)}"
+            )
 
     @property
     def pdg(self):
