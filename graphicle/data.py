@@ -1,14 +1,16 @@
+from itertools import zip_longest
 from functools import partial
 from copy import deepcopy
-from typing import List, Dict
+from typing import Tuple, List, Dict, Optional, Any
 
-from attr import define, field, Factory, cmp_using, setters, fields
+from attr import define, field, Factory, cmp_using, setters  # type: ignore
 import numpy as np
+import numpy.typing as npt
+from numpy.lib import recfunctions as rfn
 from typicle import Types
 from typicle.convert import cast_array
-from mcpid import lookup
 
-from ._base import ParticleBase, EdgeBase, MaskBase, ArrayBase, GraphicleBase
+from ._base import ParticleBase, AdjacencyBase, MaskBase, ArrayBase
 
 
 _types = Types()
@@ -64,7 +66,7 @@ class MaskGroup(MaskBase):
         return f"MaskGroup(mask_arrays=[{keys}])"
 
     @property
-    def children(self) -> list:
+    def children(self) -> List[str]:
         return list(self._mask_arrays.keys())
 
     def add(self, key: str, mask: MaskArray) -> None:
@@ -76,7 +78,7 @@ class MaskGroup(MaskBase):
         self._mask_arrays.pop(key)
 
     @property
-    def data(self) -> np.ndarray:
+    def data(self):
         return np.bitwise_and.reduce(
             [child.data for child in self._mask_arrays.values()]
         )
@@ -102,7 +104,7 @@ class PdgArray(ArrayBase):
 
     def mask(
         self,
-        target: list,
+        target: npt.ArrayLike,
         blacklist: bool = True,
         sign_sensitive: bool = False,
     ) -> MaskArray:
@@ -131,18 +133,20 @@ class PdgArray(ArrayBase):
         """
         target = np.array(target, dtype=_types.int)
         data = self.data
-        if sign_sensitive == False:
+        if sign_sensitive is False:
             data = np.abs(data, dtype=_types.int)
         return MaskArray(
             np.isin(data, target, assume_unique=False, invert=blacklist)
         )
 
-    def __get_prop(self, field: str):
-        return self.__lookup_table.properties(self.data, [field])[field]
+    def __get_prop(self, field: str) -> np.ndarray:
+        props = self.__lookup_table.properties(self.data, [field])[field]
+        return props  # type: ignore
 
-    def __get_prop_range(self, field: str):
-        fields = [field + "lower", field + "upper"]
-        return self.__lookup_table.properties(self.data, fields)
+    def __get_prop_range(self, field: str) -> np.ndarray:
+        field_range = [field + "lower", field + "upper"]
+        props = self.__lookup_table.properties(self.data, field_range)
+        return props  # type: ignore
 
     @property
     def name(self) -> np.ndarray:
@@ -212,15 +216,15 @@ class MomentumArray(ArrayBase):
 
     @property
     def pt(self) -> np.ndarray:
-        return self.__vector.pt
+        return self.__vector.pt  # type: ignore
 
     @property
     def eta(self) -> np.ndarray:
-        return self.__vector.eta
+        return self.__vector.eta  # type: ignore
 
     @property
     def phi(self) -> np.ndarray:
-        return self.__vector.phi
+        return self.__vector.phi  # type: ignore
 
 
 @define
@@ -246,12 +250,12 @@ class ParticleSet(ParticleBase):
     @classmethod
     def from_numpy(
         cls,
-        pdg: np.ndarray = None,
-        pmu: np.ndarray = None,
-        color: np.ndarray = None,
-        final: np.ndarray = None,
+        pdg: Optional[np.ndarray] = None,
+        pmu: Optional[np.ndarray] = None,
+        color: Optional[np.ndarray] = None,
+        final: Optional[np.ndarray] = None,
     ):
-        def optional(data_class, data: np.ndarray):
+        def optional(data_class, data: Optional[np.ndarray]):
             return data_class(data) if data is not None else data_class()
 
         return cls(
@@ -280,72 +284,81 @@ class ParticleSet(ParticleBase):
 
 
 @define
-class EdgeList(EdgeBase):
-    import networkx as __nx
-
-    data: np.ndarray = array_field("edge")
+class AdjacencyList(AdjacencyBase):
+    _data: np.ndarray = array_field("edge")
 
     def __getitem__(self, key):
         if isinstance(key, MaskBase):
             key = key.data
-        return self.__class__(self.data[key])
+        return self.__class__(self._data[key])
+
+    @property
+    def edges(self):
+        return self._data
 
     @property
     def nodes(self):
-        return np.unique(self.edges)
-
-    def to_networkx(self, data_dict: Dict[str, ArrayBase] = None):
-        """Output directed acyclic graph representation of the shower,
-        implemented by NetworkX. Each edge is a particle, and each node
-        is an interaction vertex, except for the terminating leaf nodes.
-
-        Parameters
-        ----------
-        data : dict[str] -> Graphicle.ArrayBase
-            Dict of Particle data arrays which subclass ArrayBase, eg.
-            PdgArray, PmuArray, MaskArray, etc.
-
-        Returns
-        -------
-        shower : networkx.DiGraph
-            Directed NetworkX graph, with embedded edge data.
+        """Nodes are extracted from the edge list, and put in
+        ascending order of magnitude, regardless of sign.
+        Positive sign conventionally means final state particle.
         """
-        if data_dict is None:
-            data_dict = dict()
-        # -------------------------------------------------
+        # extract nodes from edge list
+        unstruc_edges = rfn.structured_to_unstructured(self._data)
+        unsort_nodes = np.unique(unstruc_edges)
+        sort_idxs = np.argsort(np.abs(unsort_nodes))
+        return unsort_nodes[sort_idxs]
+
+    def to_dicts(
+        self,
+        edge_data: Optional[Dict[str, ArrayBase]] = None,
+        node_data: Optional[Dict[str, ArrayBase]] = None,
+    ):
+        if edge_data is None:
+            edge_data = dict()
+        if node_data is None:
+            node_data = dict()
+
+        def make_data_dicts(orig: Tuple[Any, ...], data: Dict[str, ArrayBase]):
+            data_arrays = (array.data for array in data.values())
+            data_rows = zip(*data_arrays)
+            dicts = (dict(zip(data.keys(), row)) for row in data_rows)
+            combo = zip_longest(*orig, dicts, fillvalue=dict())
+            return tuple(combo)
+
         # form edges with data for easier ancestry tracking
-        # -------------------------------------------------
-        data_rows = (array.data for array in data_dict.values())
-        # join elements from each array into rows
-        data_rows = zip(*data_rows)
-        # generator of dicts, with key/val pairs for each row elem
-        edge_dicts = (dict(zip(data_dict.keys(), row)) for row in data_rows)
-        # attach data dict to list
-        edges = zip(self.data["in"], self.data["out"], edge_dicts)
-        shower = self.__nx.DiGraph()
-        shower.add_edges_from(edges)
-        return shower
+        edges = make_data_dicts(
+            orig=(self.edges["in"], self.edges["out"]),
+            data=edge_data,
+        )
+        nodes = make_data_dicts(
+            orig=(self.nodes,),
+            data=node_data,
+        )
+        return dict(
+            edges=edges,
+            nodes=nodes,
+        )
 
 
 @define
 class Graphicle:
     particles: ParticleSet = ParticleSet()
-    edges: EdgeList = EdgeList()
+    adj: AdjacencyList = AdjacencyList()
 
     @classmethod
     def from_numpy(
         cls,
-        pdg: np.ndarray = None,
-        pmu: np.ndarray = None,
-        color: np.ndarray = None,
-        final: np.ndarray = None,
-        edges: np.ndarray = None,
+        pdg: Optional[np.ndarray] = None,
+        pmu: Optional[np.ndarray] = None,
+        color: Optional[np.ndarray] = None,
+        final: Optional[np.ndarray] = None,
+        adj: Optional[np.ndarray] = None,
     ):
         particles = ParticleSet.from_numpy(
             pdg=pdg, pmu=pmu, color=color, final=final
         )
-        edges = EdgeList(edges) if edges is not None else EdgeList()
-        return cls(particles=particles, edges=edges)
+        adj_list = AdjacencyList(adj) if adj is not None else AdjacencyList()
+        return cls(particles=particles, adj=adj_list)
 
     @property
     def pdg(self):

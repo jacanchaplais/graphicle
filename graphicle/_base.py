@@ -30,10 +30,10 @@ class ParticleBase(ABC):
         pass
 
 
-class EdgeBase(ABC):
+class AdjacencyBase(ABC):
     @property
     @abstractmethod
-    def data(self):
+    def edges(self):
         pass
 
     @property

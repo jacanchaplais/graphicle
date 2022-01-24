@@ -5,5 +5,17 @@ from .data import PdgArray
 from .data import MomentumArray
 from .data import ColorArray
 from .data import ParticleSet
-from .data import EdgeList
+from .data import AdjacencyList
 from .data import Graphicle
+
+__all__ = [
+    "matrices",
+    "MaskArray",
+    "MaskGroup",
+    "PdgArray",
+    "MomentumArray",
+    "ColorArray",
+    "ParticleSet",
+    "AdjacencyList",
+    "Graphicle",
+]

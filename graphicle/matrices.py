@@ -2,8 +2,6 @@ import numpy as np
 
 
 class AffinityMatrix:
-    import vector as __vector
-
     def __init__(self, pcl_array):
         self.__pcl_array = self.__array_to_vec(pcl_array)
         self.__num_pcls = self.__get_array_size()
@@ -14,14 +12,18 @@ class AffinityMatrix:
 
         Note: assumes format x, y, z, e.
         """
-        return self.__vector.array(
+        from vector import array as _array
+
+        return _array(
             [tuple(pcl) for pcl in array],
             dtype=[("x", float), ("y", float), ("z", float), ("e", float)],
         )
 
     def __get_array_size(self):
+        from vector import MomentumNumpy4D
+
         array = self.__pcl_array
-        if type(array) == self.__vector.MomentumNumpy4D:
+        if type(array) == MomentumNumpy4D:
             size = array.size
         elif type(array) == np.ndarray:
             size = array.shape[0]
@@ -67,12 +69,12 @@ def knn_adj(
             note: must be floating point if weighted is True
     """
     axis = 0  # calculate everything row-wise
-    if self_loop == False:
+    if self_loop is False:
         k = k + 1  # for when we get rid of self-neighbours
     knn_idxs = np.argpartition(matrix, kth=k, axis=axis)
     near = knn_idxs[:k]
     edge_weights = 1
-    if weighted == True:
+    if weighted is True:
         if dtype is None:
             dtype = matrix.dtype.type
         else:
@@ -86,9 +88,9 @@ def knn_adj(
         dtype = np.bool_
     adj = np.zeros_like(matrix, dtype=dtype)
     np.put_along_axis(adj, near, edge_weights, axis=axis)
-    if row == False:
+    if row is False:
         adj = adj.T
-    if self_loop == False:
+    if self_loop is False:
         np.fill_diagonal(adj, 0)
     return adj
 
@@ -96,6 +98,6 @@ def knn_adj(
 def fc_adj(num_nodes, self_loop=False, dtype=np.bool_):
     """Create a fully connected adjacency matrix."""
     adj = np.ones((num_nodes, num_nodes), dtype=dtype)
-    if self_loop == False:
+    if self_loop is False:
         np.fill_diagonal(adj, 0)
     return adj
