@@ -300,7 +300,7 @@ class AdjacencyList(AdjacencyBase):
     def nodes(self):
         """Nodes are extracted from the edge list, and put in
         ascending order of magnitude, regardless of sign.
-        Negative sign conventionally means final state particle.
+        Positive sign conventionally means final state particle.
         """
         # extract nodes from edge list
         unstruc_edges = rfn.structured_to_unstructured(self._data)

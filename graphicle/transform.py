@@ -47,15 +47,15 @@ def particle_as_node(adj_list: AdjacencyList) -> AdjacencyList:
     def check_sign(x):
         """Returns -1 if x <= 0, and +1 if x > 0."""
         sign = np.sign(x)
-        sign = sign - int(not sign)  # if sign = 0 => sign = -1
+        sign = sign + int(not sign)  # if sign = 0 => sign = +1
         return sign
 
     # node labels set as particle indices in original edge array
     for i, node_triplet in enumerate(edges_as_nodes):
         key = node_triplet["key"]
         node = node_triplet[["in", "out"]]
-        sign = check_sign(node["in"] * node["out"])
-        node_idxs[i] = sign * np.where(edges == node)[0][key]
+        sign = -1 * check_sign(node["in"] * node["out"])
+        node_idxs[i] = sign * (np.where(edges == node)[0][key] + 1)
     nx_node_graph = _nx.relabel_nodes(
         nx_node_graph,
         {n: idx for n, idx in zip(nx_node_graph, node_idxs)},
