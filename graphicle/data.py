@@ -1,9 +1,11 @@
-from functools import partial
+from enum import Enum
+from functools import partial, cached_property
 from copy import deepcopy
 from typing import List, Dict
 
 from attr import define, field, Factory, cmp_using, setters, fields
 import numpy as np
+from numpy.lib import recfunctions as rfn
 from typicle import Types
 from typicle.convert import cast_array
 from mcpid import lookup
@@ -279,11 +281,17 @@ class ParticleSet(ParticleBase):
         return f"ParticleSet(\n{attr_str}\n)"
 
 
+class ParticleState(Enum):
+    EDGES: str = "edges"
+    NODES: str = "nodes"
+
+
 @define
 class EdgeList(EdgeBase):
     import networkx as __nx
 
     data: np.ndarray = array_field("edge")
+    _state: ParticleState = ParticleState.EDGES
 
     def __getitem__(self, key):
         if isinstance(key, MaskBase):
@@ -291,8 +299,63 @@ class EdgeList(EdgeBase):
         return self.__class__(self.data[key])
 
     @property
+    def edges(self):
+        if self._state is ParticleState.EDGES:
+            return self.data
+        else:
+            return self._node_rep["edge"]
+
+    @property
     def nodes(self):
-        return np.unique(self.edges)
+        if self._state is ParticleState.EDGES:
+            unstruc_edges = rfn.structured_to_unstructured(self.data)
+            return np.unique(unstruc_edges)
+        else:
+            return self._node_rep["node"]
+
+    @cached_property
+    def _node_rep(self):
+        edges = self.data
+        nx_node_graph = self.__nx.line_graph(
+            G=self.to_networkx(), create_using=self.__nx.DiGraph
+        )
+        num_edges = len(edges)
+        node_idxs = np.empty(num_edges, dtype=_types.int)
+        edge_node_type = _types.edge.copy()
+        edge_node_type.append(("key", _types.int))
+        edges_as_nodes = cast_array(
+            np.array(tuple(nx_node_graph.nodes)), edge_node_type
+        )
+        for i, node_triplet in enumerate(edges_as_nodes):
+            key = node_triplet["key"]
+            node = node_triplet[["in", "out"]]
+            node_idxs[i] = np.where(edges == node)[0][key]
+        nx_node_graph = self.__nx.relabel_nodes(
+            nx_node_graph,
+            {n: idx for n, idx in zip(nx_node_graph, node_idxs)},
+        )
+        edge_array = cast_array(
+            np.array(nx_node_graph.edges, dtype=_types.int),
+            cast_type=_types.edge,
+        )
+        node_array = np.arange(num_edges)
+        return {"edge": edge_array, "node": node_array}
+
+    @property
+    def state(self):
+        return self._state
+
+    @state.setter
+    def state(self, value):
+        if isinstance(value, str):
+            self._state = ParticleState(value)
+        elif isinstance(value, ParticleState):
+            self._state = value
+        else:
+            raise ValueError(
+                "Attribute 'state' must be set either with a str or "
+                + f"a ParticleState type. Received {type(value)}"
+            )
 
     def to_networkx(self, data_dict: Dict[str, ArrayBase] = None):
         """Output directed acyclic graph representation of the shower,
@@ -325,7 +388,7 @@ class EdgeList(EdgeBase):
             edges = zip(self.data["in"], self.data["out"], edge_dicts)
         else:
             edges = zip(self.data["in"], self.data["out"])
-        shower = self.__nx.DiGraph()
+        shower = self.__nx.MultiDiGraph()
         shower.add_edges_from(edges)
         return shower
 
