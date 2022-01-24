@@ -1,15 +1,16 @@
 from itertools import zip_longest
 from functools import partial
 from copy import deepcopy
-from typing import List, Dict, Optional
+from typing import Tuple, List, Dict, Optional, Any
 
 from attr import define, field, Factory, cmp_using, setters  # type: ignore
 import numpy as np
 import numpy.typing as npt
+from numpy.lib import recfunctions as rfn
 from typicle import Types
 from typicle.convert import cast_array
 
-from ._base import ParticleBase, EdgeBase, MaskBase, ArrayBase
+from ._base import ParticleBase, AdjacencyBase, MaskBase, ArrayBase
 
 
 _types = Types()
@@ -283,59 +284,66 @@ class ParticleSet(ParticleBase):
 
 
 @define
-class EdgeList(EdgeBase):
-    import networkx as __nx  # type: ignore
-
-    data: np.ndarray = array_field("edge")
+class AdjacencyList(AdjacencyBase):
+    _data: np.ndarray = array_field("edge")
 
     def __getitem__(self, key):
         if isinstance(key, MaskBase):
             key = key.data
-        return self.__class__(self.data[key])
+        return self.__class__(self._data[key])
+
+    @property
+    def edges(self):
+        return self._data
 
     @property
     def nodes(self):
-        return np.unique(self.data)
-
-    def to_networkx(self, data_dict: Optional[Dict[str, ArrayBase]] = None):
-        """Output directed acyclic graph representation of the shower,
-        implemented by NetworkX. Each edge is a particle, and each node
-        is an interaction vertex, except for the terminating leaf nodes.
-
-        Parameters
-        ----------
-        data : dict[str] -> Graphicle.ArrayBase
-            Dict of Particle data arrays which subclass ArrayBase, eg.
-            PdgArray, PmuArray, MaskArray, etc.
-
-        Returns
-        -------
-        shower : networkx.DiGraph
-            Directed NetworkX graph, with embedded edge data.
+        """Nodes are extracted from the edge list, and put in
+        ascending order of magnitude, regardless of sign.
+        Negative sign conventionally means final state particle.
         """
-        if data_dict is None:
-            data_dict = dict()
-        # -------------------------------------------------
+        # extract nodes from edge list
+        unstruc_edges = rfn.structured_to_unstructured(self._data)
+        unsort_nodes = np.unique(unstruc_edges)
+        sort_idxs = np.argsort(np.abs(unsort_nodes))
+        return unsort_nodes[sort_idxs]
+
+    def to_dicts(
+        self,
+        edge_data: Optional[Dict[str, ArrayBase]] = None,
+        node_data: Optional[Dict[str, ArrayBase]] = None,
+    ):
+        if edge_data is None:
+            edge_data = dict()
+        if node_data is None:
+            node_data = dict()
+
+        def make_data_dicts(orig: Tuple[Any, ...], data: Dict[str, ArrayBase]):
+            data_arrays = (array.data for array in data.values())
+            data_rows = zip(*data_arrays)
+            dicts = (dict(zip(data.keys(), row)) for row in data_rows)
+            combo = zip_longest(*orig, dicts, fillvalue=dict())
+            return tuple(combo)
+
         # form edges with data for easier ancestry tracking
-        # -------------------------------------------------
-        data_arrays = (array.data for array in data_dict.values())
-        # join elements from each array into rows
-        data_rows = zip(*data_arrays)
-        # generator of dicts, with key/val pairs for each row elem
-        edge_dicts = (dict(zip(data_dict.keys(), row)) for row in data_rows)
-        # attach data dict to list
-        shower = self.__nx.DiGraph()
-        edges = zip_longest(
-            self.data["in"], self.data["out"], edge_dicts, fillvalue=dict()
+        edges = make_data_dicts(
+            orig=(self.edges["in"], self.edges["out"]),
+            data=edge_data,
         )
-        shower.add_edges_from(edges)
-        return shower
+        nodes = make_data_dicts(
+            orig=(self.nodes,),
+            data=node_data,
+        )
+        return dict(
+            edges=edges,
+            nodes=nodes,
+        )
 
 
 @define
 class Graphicle:
     particles: ParticleSet = ParticleSet()
-    edges: EdgeList = EdgeList()
+    adj: AdjacencyList = AdjacencyList()
 
     @classmethod
     def from_numpy(
@@ -344,13 +352,13 @@ class Graphicle:
         pmu: Optional[np.ndarray] = None,
         color: Optional[np.ndarray] = None,
         final: Optional[np.ndarray] = None,
-        edges: Optional[np.ndarray] = None,
+        adj: Optional[np.ndarray] = None,
     ):
         particles = ParticleSet.from_numpy(
             pdg=pdg, pmu=pmu, color=color, final=final
         )
-        edge_list = EdgeList(edges) if edges is not None else EdgeList()
-        return cls(particles=particles, edges=edge_list)
+        adj_list = AdjacencyList(adj) if adj is not None else AdjacencyList()
+        return cls(particles=particles, adj=adj_list)
 
     @property
     def pdg(self):
