@@ -352,12 +352,15 @@ class Graphicle:
         pmu: Optional[np.ndarray] = None,
         color: Optional[np.ndarray] = None,
         final: Optional[np.ndarray] = None,
-        adj: Optional[np.ndarray] = None,
+        edges: Optional[np.ndarray] = None,
     ):
         particles = ParticleSet.from_numpy(
             pdg=pdg, pmu=pmu, color=color, final=final
         )
-        adj_list = AdjacencyList(adj) if adj is not None else AdjacencyList()
+        if edges is not None:
+            adj_list = AdjacencyList(edges)
+        else:
+            adj_list = AdjacencyList()
         return cls(particles=particles, adj=adj_list)
 
     @property
