@@ -17,6 +17,7 @@ _types = Types()
 
 
 def array_field(type_name):
+    """Prepares a field for attrs dataclass with typicle input."""
     types = Types()
     dtype = getattr(types, type_name)
     default = Factory(lambda: np.array([], dtype=dtype))
@@ -32,6 +33,8 @@ def array_field(type_name):
 
 @define
 class MaskArray(MaskBase, ArrayBase):
+    """Data structure for containing masks over particle data."""
+
     data: np.ndarray = array_field("bool")
 
     def __getitem__(self, key):
@@ -86,6 +89,35 @@ class MaskGroup(MaskBase):
 
 @define
 class PdgArray(ArrayBase):
+    """Returns data structure containing PDG integer codes for particle
+    data.
+
+    Attributes
+    ----------
+    name : ndarray
+        String representation of particle names.
+    charge : ndarray
+        Charge for each particle.
+    mass : ndarray
+        Mass for each particle.
+    mass_bounds : ndarray
+        Mass upper and lower bounds for each particle.
+    quarks : ndarray
+        String representation of quark composition for each particle.
+    width : ndarray
+        Width for each particle.
+    width_bounds : ndarray
+        Width upper and lower bounds for each particle.
+    isospin : ndarray
+        Isospin for each particle.
+    g_parity : ndarray
+        G-parity for each particle.
+    space_parity : ndarray
+        Spatial parity for each particle.
+    charge_parity : ndarray
+        Charge parity for each particle.
+    """
+
     from mcpid.lookup import PdgRecords as __PdgRecords
 
     data: np.ndarray = array_field("int")
@@ -195,6 +227,21 @@ class PdgArray(ArrayBase):
 
 @define
 class MomentumArray(ArrayBase):
+    """Returns data structure containing four-momentum of particle
+    list.
+
+    Attributes
+    ----------
+    data : ndarray
+        Structured array containing four momenta.
+    pt : ndarray
+        Transverse component of particle momenta.
+    eta : ndarray
+        Pseudorapidity component of particle momenta.
+    phi : ndarray
+        Azimuthal component of particle momenta.
+    """
+
     data: np.ndarray = array_field("pmu")
 
     def __len__(self):
@@ -229,6 +276,15 @@ class MomentumArray(ArrayBase):
 
 @define
 class ColorArray(ArrayBase):
+    """Returns data structure of color / anti-color pairs for particle
+    shower.
+
+    Attributes
+    ----------
+    data : ndarray
+        Structured array containing color / anti-color pairs.
+    """
+
     data: np.ndarray = array_field("color")
 
     def __getitem__(self, key):
@@ -242,6 +298,14 @@ class ColorArray(ArrayBase):
 
 @define
 class ParticleSet(ParticleBase):
+    """Combines rich particle description.
+
+    Attributes
+    ----------
+    data : ndarray
+        Structured array containing color / anti-color pairs.
+    """
+
     pdg: PdgArray = PdgArray()
     pmu: MomentumArray = MomentumArray()
     color: ColorArray = ColorArray()
@@ -359,6 +423,14 @@ class Graphicle:
         )
         adj_list = AdjacencyList(adj) if adj is not None else AdjacencyList()
         return cls(particles=particles, adj=adj_list)
+
+    @property
+    def edges(self):
+        return self.adj.edges
+
+    @property
+    def nodes(self):
+        return self.adj.nodes
 
     @property
     def pdg(self):
