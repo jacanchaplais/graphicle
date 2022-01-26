@@ -377,7 +377,7 @@ class Graphicle:
 
     @property
     def color(self):
-        return self.particles.pmu
+        return self.particles.color
 
     @property
     def final(self):
