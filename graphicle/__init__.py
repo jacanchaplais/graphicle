@@ -6,7 +6,7 @@ from .data import ColorArray
 from .data import ParticleSet
 from .data import AdjacencyList
 from .data import Graphicle
-from . import matrices
+from . import matrix
 
 __all__ = [
     # "matrices",
@@ -18,5 +18,5 @@ __all__ = [
     "ParticleSet",
     "AdjacencyList",
     "Graphicle",
-    "matrices",
+    "matrix",
 ]

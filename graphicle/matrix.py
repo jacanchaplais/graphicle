@@ -1,24 +1,39 @@
 import numpy as np
+import numpy.typing as npt
 
 import graphicle as gcl
+from typicle import Types
+
+
+_types = Types()
 
 
 def knn_adj(
-    matrix, self_loop=False, k=8, weighted=False, row=True, dtype=None
-):
+    matrix: np.ndarray,
+    k: int,
+    self_loop: bool = False,
+    weighted: bool = False,
+    row: bool = True,
+    dtype: npt.DTypeLike = None,
+) -> np.ndarray:
     """Produce a directed adjacency matrix with outward edges
     towards the k nearest neighbours, determined from the input
     affinity matrix.
 
-    Keyword arguments:
-        matrix (2d numpy array): particle affinities
-        self_loop (bool): if False will remove self-edges
-        k (int): number of nearest neighbours in result
-        weighted (bool): if True edges weighted by affinity,
-            if False edge is binary
-        row (bool): if True outward edges given by rows, if False cols
-        dtype (numpy): data type: type of the output array
-            note: must be floating point if weighted is True
+    Parameters
+    ----------
+    matrix : 2d numpy array
+        Particle affinities.
+    k : int
+        Number of nearest neighbours in result.
+    weighted : bool
+        If True edges weighted by affinity, if False edge is binary.
+    self_loop : bool
+        If False will remove self-edges.
+    row : bool
+        If True outward edges given by rows, if False cols.
+    dtype : dtype-like
+        Type of output. Must be floating point if weighted is True.
     """
     axis = 0  # calculate everything row-wise
     if self_loop is False:
@@ -37,7 +52,7 @@ def knn_adj(
                 )
         edge_weights = np.take_along_axis(matrix, near, axis=axis)
     else:
-        dtype = np.bool_
+        dtype = _types.bool
     adj = np.zeros_like(matrix, dtype=dtype)
     np.put_along_axis(adj, near, edge_weights, axis=axis)
     if row is False:
@@ -47,7 +62,7 @@ def knn_adj(
     return adj
 
 
-def fc_adj(num_nodes, self_loop=False, dtype=np.bool_):
+def fc_adj(num_nodes, self_loop=False, dtype=_types.bool):
     """Create a fully connected adjacency matrix."""
     adj = np.ones((num_nodes, num_nodes), dtype=dtype)
     if self_loop is False:
@@ -55,12 +70,13 @@ def fc_adj(num_nodes, self_loop=False, dtype=np.bool_):
     return adj
 
 
-def delta_R(pmu: gcl.MomentumArray) -> np.ndarray:
+def delta_R_aff(pmu: gcl.MomentumArray) -> np.ndarray:
     """Returns a symmetric matrix of delta R vals from input
-    4-momentum array.
+    MomentumArray.
     """
     size = len(pmu)
-    aff = np.zeros((size, size), dtype=np.float64)
+    dtype = pmu.data.dtype.descr[0][1]
+    aff = np.zeros((size, size), dtype=dtype)
     dR_cols = (pmu[shift].delta_R(pmu[shift:]) for shift in range(size))
     for idx, col in enumerate(dR_cols):
         aff[idx:, idx] = col

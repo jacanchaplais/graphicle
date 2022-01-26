@@ -34,6 +34,9 @@ def array_field(type_name):
 class MaskArray(MaskBase, ArrayBase):
     data: np.ndarray = array_field("bool")
 
+    def copy(self):
+        return deepcopy(self)
+
     def __getitem__(self, key):
         if isinstance(key, MaskBase):
             key = key.data
@@ -64,6 +67,9 @@ class MaskGroup(MaskBase):
     def __repr__(self):
         keys = ", ".join(self.children)
         return f"MaskGroup(mask_arrays=[{keys}])"
+
+    def copy(self):
+        return deepcopy(self)
 
     @property
     def children(self) -> List[str]:
@@ -102,6 +108,9 @@ class PdgArray(ArrayBase):
             key = key.data
         return self.__class__(np.array(self.data[key]))
 
+    def copy(self):
+        return deepcopy(self)
+
     def mask(
         self,
         target: npt.ArrayLike,
@@ -125,9 +134,7 @@ class PdgArray(ArrayBase):
             If False will check for positive and negative pdgs
             simultaenously. Default is False.
 
-        Returns
-        -------
-        mask : MaskArray
+        Returns ------- mask : MaskArray
             Boolean mask over data, with blacklisted pdgs marked as
             False. Same shape as pdg array stored in parent object.
         """
@@ -205,6 +212,9 @@ class MomentumArray(ArrayBase):
             key = key.data
         return self.__class__(np.array(self.data[key]))
 
+    def copy(self):
+        return deepcopy(self)
+
     @property
     def _vector(self):
         from vector import MomentumNumpy4D
@@ -234,6 +244,9 @@ class MomentumArray(ArrayBase):
 class ColorArray(ArrayBase):
     data: np.ndarray = array_field("color")
 
+    def copy(self):
+        return deepcopy(self)
+
     def __getitem__(self, key):
         if isinstance(key, MaskBase):
             key = key.data
@@ -249,6 +262,26 @@ class ParticleSet(ParticleBase):
     pmu: MomentumArray = MomentumArray()
     color: ColorArray = ColorArray()
     final: MaskArray = MaskArray()
+
+    @property
+    def __attr_names(self):
+        return tuple(self.__annotations__.keys())
+
+    def __getitem__(self, key):
+        kwargs = dict()
+        for name in self.__attr_names:
+            data = getattr(self, name)
+            if len(data) > 0:
+                kwargs.update({name: data[key]})
+        return self.__class__(**kwargs)
+
+    def __repr__(self):
+        attr_repr = (repr(getattr(self, name)) for name in self.__attr_names)
+        attr_str = ",\n".join(attr_repr)
+        return f"ParticleSet(\n{attr_str}\n)"
+
+    def copy(self):
+        return deepcopy(self)
 
     @classmethod
     def from_numpy(
@@ -268,23 +301,6 @@ class ParticleSet(ParticleBase):
             final=optional(MaskArray, final),
         )
 
-    @property
-    def __attr_names(self):
-        return tuple(self.__annotations__.keys())
-
-    def __getitem__(self, key):
-        kwargs = dict()
-        for name in self.__attr_names:
-            data = getattr(self, name)
-            if len(data) > 0:
-                kwargs.update({name: data[key]})
-        return self.__class__(**kwargs)
-
-    def __repr__(self):
-        attr_repr = (repr(getattr(self, name)) for name in self.__attr_names)
-        attr_str = ",\n".join(attr_repr)
-        return f"ParticleSet(\n{attr_str}\n)"
-
 
 @define
 class AdjacencyList(AdjacencyBase):
@@ -298,6 +314,30 @@ class AdjacencyList(AdjacencyBase):
         if isinstance(key, MaskBase):
             key = key.data
         return self.__class__(np.array(self._data[key]))
+
+    def copy(self):
+        return deepcopy(self)
+
+    @classmethod
+    def from_matrix(cls, adj_matrix: np.ndarray, weighted: bool = False):
+        """Construct an AdjacencyList object from an optionally weighted
+        adjacency matrix.
+
+        Parameters
+        ----------
+        adj_matrix : array_like
+            2 dimensional numpy array representing the adjacency or
+            affinity matrix of a graph.
+        weighted : bool
+            Whether or not to propogate the numerical values in the
+            elements of the adjacency matrix as the edge weights
+            (default: False).
+        """
+        edges = np.where(adj_matrix)
+        kwargs = {"data": np.array(edges).T}
+        if weighted is True:
+            kwargs["weights"] = adj_matrix[edges]
+        return cls(**kwargs)
 
     @property
     def edges(self):
@@ -352,6 +392,20 @@ class Graphicle:
     particles: ParticleSet = ParticleSet()
     adj: AdjacencyList = AdjacencyList()
 
+    @property
+    def __attr_names(self):
+        return tuple(self.__annotations__.keys())
+
+    def __getitem__(self, key):
+        kwargs = dict()
+        for name in self.__attr_names:
+            data = getattr(self, name)
+            kwargs.update({name: data[key]})
+        return self.__class__(**kwargs)
+
+    def copy(self):
+        return deepcopy(self)
+
     @classmethod
     def from_numpy(
         cls,
@@ -393,14 +447,3 @@ class Graphicle:
     @property
     def nodes(self):
         return self.adj.nodes
-
-    @property
-    def __attr_names(self):
-        return tuple(self.__annotations__.keys())
-
-    def __getitem__(self, key):
-        kwargs = dict()
-        for name in self.__attr_names:
-            data = getattr(self, name)
-            kwargs.update({name: data[key]})
-        return self.__class__(**kwargs)
