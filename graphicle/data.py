@@ -380,6 +380,14 @@ class Graphicle:
         return self.particles.final
 
     @property
+    def edges(self):
+        return self.adj.edges
+
+    @property
+    def nodes(self):
+        return self.adj.nodes
+
+    @property
     def __attr_names(self):
         return tuple(self.__annotations__.keys())
 
