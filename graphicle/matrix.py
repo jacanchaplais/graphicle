@@ -45,7 +45,8 @@ def knn_adj(
         if dtype is None:
             dtype = matrix.dtype.type
         else:
-            if not isinstance(dtype(1), np.floating):
+            type_call = np.dtype(dtype).type
+            if not isinstance(type_call(1), np.floating):
                 raise ValueError(
                     "Update the dtype parameter passed to this function "
                     + "to a numpy floating point type for weighted output."
