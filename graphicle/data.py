@@ -37,7 +37,7 @@ class MaskArray(MaskBase, ArrayBase):
     def __getitem__(self, key):
         if isinstance(key, MaskBase):
             key = key.data
-        return self.__class__(self.data[key])
+        return self.__class__(np.array(self.data[key]))
 
     def __len__(self):
         return len(self.data)
@@ -100,7 +100,7 @@ class PdgArray(ArrayBase):
     def __getitem__(self, key):
         if isinstance(key, MaskBase):
             key = key.data
-        return self.__class__(self.data[key])
+        return self.__class__(np.array(self.data[key]))
 
     def mask(
         self,
@@ -203,10 +203,10 @@ class MomentumArray(ArrayBase):
     def __getitem__(self, key):
         if isinstance(key, MaskBase):
             key = key.data
-        return self.__class__(self.data[key])
+        return self.__class__(np.array(self.data[key]))
 
     @property
-    def __vector(self):
+    def _vector(self):
         from vector import MomentumNumpy4D
 
         dtype = deepcopy(self.data.dtype)
@@ -234,7 +234,7 @@ class ColorArray(ArrayBase):
     def __getitem__(self, key):
         if isinstance(key, MaskBase):
             key = key.data
-        return self.__class__(self.data[key])
+        return self.__class__(np.array(self.data[key]))
 
     def __len__(self):
         return len(self.data)
@@ -294,7 +294,7 @@ class AdjacencyList(AdjacencyBase):
     def __getitem__(self, key):
         if isinstance(key, MaskBase):
             key = key.data
-        return self.__class__(self._data[key])
+        return self.__class__(np.array(self._data[key]))
 
     @property
     def edges(self):
