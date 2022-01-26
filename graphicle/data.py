@@ -286,6 +286,10 @@ class ParticleSet(ParticleBase):
 @define
 class AdjacencyList(AdjacencyBase):
     _data: np.ndarray = array_field("edge")
+    weights: np.ndarray = array_field("double")
+
+    def __len__(self):
+        return len(self._data)
 
     def __getitem__(self, key):
         if isinstance(key, MaskBase):
