@@ -18,4 +18,5 @@ __all__ = [
     "ParticleSet",
     "AdjacencyList",
     "Graphicle",
+    "matrices",
 ]
