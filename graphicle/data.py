@@ -216,15 +216,18 @@ class MomentumArray(ArrayBase):
 
     @property
     def pt(self) -> np.ndarray:
-        return self.__vector.pt  # type: ignore
+        return self._vector.pt  # type: ignore
 
     @property
     def eta(self) -> np.ndarray:
-        return self.__vector.eta  # type: ignore
+        return self._vector.eta  # type: ignore
 
     @property
     def phi(self) -> np.ndarray:
-        return self.__vector.phi  # type: ignore
+        return self._vector.phi  # type: ignore
+
+    def delta_R(self, other_pmu: "MomentumArray") -> np.ndarray:
+        return self._vector.deltaR(other_pmu._vector)  # type: ignore
 
 
 @define

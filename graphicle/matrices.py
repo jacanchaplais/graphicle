@@ -1,54 +1,6 @@
 import numpy as np
 
-
-class AffinityMatrix:
-    def __init__(self, pcl_array):
-        self.__pcl_array = self.__array_to_vec(pcl_array)
-        self.__num_pcls = self.__get_array_size()
-
-    def __array_to_vec(self, array):
-        """Takes input of (n,4)-d array of n particles 4-momenta, and
-        returns an array of Lorentz 4-vectors.
-
-        Note: assumes format x, y, z, e.
-        """
-        from vector import array as _array
-
-        return _array(
-            [tuple(pcl) for pcl in array],
-            dtype=[("x", float), ("y", float), ("z", float), ("e", float)],
-        )
-
-    def __get_array_size(self):
-        from vector import MomentumNumpy4D
-
-        array = self.__pcl_array
-        if type(array) == MomentumNumpy4D:
-            size = array.size
-        elif type(array) == np.ndarray:
-            size = array.shape[0]
-        else:
-            raise TypeError("input 4 momenta array not ndarray or vector")
-        return size
-
-    def __delta_R_cols(self):
-        array = self.__pcl_array
-        size = self.__num_pcls
-        # slide the particle lists over all pairs
-        for shift in range(size):  # 0th shift is trivial as both same
-            yield array[shift].deltaR(array[shift:])
-
-    def delta_R(self):
-        """Returns a symmetric matrix of delta R vals from input
-        4-momentum array.
-        """
-        size = self.__num_pcls
-        aff = np.zeros((size, size), dtype=np.float64)
-        dR_cols = self.__delta_R_cols()
-        for idx, col in enumerate(dR_cols):
-            aff[idx:, idx] = col
-            aff[idx, idx:] = col
-        return aff
+import graphicle as gcl
 
 
 def knn_adj(
@@ -101,3 +53,16 @@ def fc_adj(num_nodes, self_loop=False, dtype=np.bool_):
     if self_loop is False:
         np.fill_diagonal(adj, 0)
     return adj
+
+
+def delta_R(pmu: gcl.MomentumArray) -> np.ndarray:
+    """Returns a symmetric matrix of delta R vals from input
+    4-momentum array.
+    """
+    size = len(pmu)
+    aff = np.zeros((size, size), dtype=np.float64)
+    dR_cols = (pmu[shift].delta_R(pmu[shift:]) for shift in range(size))
+    for idx, col in enumerate(dR_cols):
+        aff[idx:, idx] = col
+        aff[idx, idx:] = col
+    return aff
