@@ -77,8 +77,9 @@ def delta_R_aff(pmu: gcl.MomentumArray) -> np.ndarray:
     """
     size = len(pmu)
     dtype = pmu.data.dtype.descr[0][1]
+    vec = pmu._vector
     aff = np.zeros((size, size), dtype=dtype)
-    dR_cols = (pmu[shift].delta_R(pmu[shift:]) for shift in range(size))
+    dR_cols = (vec[shift].deltaR(vec[shift:]) for shift in range(size))
     for idx, col in enumerate(dR_cols):
         aff[idx:, idx] = col
         aff[idx, idx:] = col
