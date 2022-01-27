@@ -264,21 +264,28 @@ class ParticleSet(ParticleBase):
     final: MaskArray = MaskArray()
 
     @property
-    def __attr_names(self):
-        return tuple(self.__annotations__.keys())
+    def __dsets(self):
+        for dset_name in tuple(self.__annotations__.keys()):
+            yield {"name": dset_name, "data": getattr(self, dset_name)}
 
     def __getitem__(self, key):
         kwargs = dict()
-        for name in self.__attr_names:
-            data = getattr(self, name)
+        for dset in self.__dsets:
+            name = dset["name"]
+            data = dset["data"]
             if len(data) > 0:
                 kwargs.update({name: data[key]})
         return self.__class__(**kwargs)
 
     def __repr__(self):
-        attr_repr = (repr(getattr(self, name)) for name in self.__attr_names)
-        attr_str = ",\n".join(attr_repr)
-        return f"ParticleSet(\n{attr_str}\n)"
+        dset_repr = (repr(dset["data"]) for dset in self.__dsets)
+        dset_str = ",\n".join(dset_repr)
+        return f"ParticleSet(\n{dset_str}\n)"
+
+    def __len__(self):
+        filled_dsets = filter(lambda dset: len(dset["data"]) > 0, self.__dsets)
+        dset = next(filled_dsets)
+        return len(dset)
 
     def copy(self):
         return deepcopy(self)
@@ -338,6 +345,19 @@ class AdjacencyList(AdjacencyBase):
         if weighted is True:
             kwargs["weights"] = adj_matrix[edges]
         return cls(**kwargs)
+
+    @property
+    def matrix(self):
+        size = len(self.nodes)
+        if len(self.weights) > 0:
+            weights = self.weights
+            dtype = self.weights.dtype
+        else:
+            weights = np.array(1)
+            dtype = _types.int
+        adj = np.zeros((size, size), dtype=dtype)
+        adj[self.edges["in"], self.edges["out"]] = weights
+        return adj
 
     @property
     def edges(self):
@@ -414,12 +434,16 @@ class Graphicle:
         color: Optional[np.ndarray] = None,
         final: Optional[np.ndarray] = None,
         edges: Optional[np.ndarray] = None,
+        weights: Optional[np.ndarray] = None,
     ):
         particles = ParticleSet.from_numpy(
             pdg=pdg, pmu=pmu, color=color, final=final
         )
         if edges is not None:
-            adj_list = AdjacencyList(edges)
+            kwargs = {"data": edges}
+            if weights is not None:
+                kwargs["weights"] = weights
+            adj_list = AdjacencyList(**kwargs)
         else:
             adj_list = AdjacencyList()
         return cls(particles=particles, adj=adj_list)
