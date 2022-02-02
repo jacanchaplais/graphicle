@@ -65,29 +65,49 @@ class MaskGroup(MaskBase):
     _mask_arrays: Dict[str, MaskArray] = field(repr=False, factory=dict)
 
     def __repr__(self):
-        keys = ", ".join(self.children)
+        keys = ", ".join(self.names)
         return f"MaskGroup(mask_arrays=[{keys}])"
+
+    def __getitem__(self, key):
+        if not isinstance(key, str):
+            raise KeyError("Key must be string.")
+        return self._mask_arrays[key]
+
+    def __setitem__(self, key, mask):
+        """Add a new MaskArray to the group, with given key."""
+        if not isinstance(key, str):
+            raise KeyError("Key must be string.")
+        if not isinstance(mask, MaskArray):
+            mask = MaskArray(mask)
+        self._mask_arrays.update({key: mask})
+
+    def __delitem__(self, key):
+        """Remove a MaskArray from the group, using given key."""
+        self._mask_arrays.pop(key)
 
     def copy(self):
         return deepcopy(self)
 
     @property
-    def children(self) -> List[str]:
+    def names(self) -> List[str]:
         return list(self._mask_arrays.keys())
 
-    def add(self, key: str, mask: MaskArray) -> None:
-        """Add a new MaskArray to the group, with given key."""
-        self._mask_arrays.update({key: mask})
-
-    def remove(self, key: str) -> None:
-        """Remove a MaskArray from the group, using given key."""
-        self._mask_arrays.pop(key)
-
     @property
-    def data(self):
-        return np.bitwise_and.reduce(
+    def bitwise_or(self) -> np.ndarray:
+        return np.bitwise_or.reduce(  # type: ignore
             [child.data for child in self._mask_arrays.values()]
         )
+
+    @property
+    def bitwise_and(self) -> np.ndarray:
+        return np.bitwise_and.reduce(  # type: ignore
+            [child.data for child in self._mask_arrays.values()]
+        )
+
+    @property
+    def data(self) -> np.ndarray:
+        """Same as MaskGroup.bitwise_and."""
+        return self.bitwise_and
 
 
 @define
