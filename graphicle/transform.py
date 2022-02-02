@@ -1,4 +1,4 @@
-from typing import Set
+from typing import Set, Optional
 
 import numpy as np
 import pandas as pd
@@ -68,8 +68,8 @@ def particle_as_node(adj_list: gcl.AdjacencyList) -> gcl.AdjacencyList:
 
 def find_vertex(
     graph: gcl.Graphicle,
-    pdgs_in: Set[int],
-    pdgs_out: Set[int],
+    pdgs_in: Optional[Set[int]] = None,
+    pdgs_out: Optional[Set[int]] = None,
 ) -> np.ndarray:
     """Locate vertices with the inward and outward particles of the
     passed pdg codes.
@@ -89,6 +89,17 @@ def find_vertex(
         List the vertex ids which match the passed incoming and outgoing
         pdg codes.
     """
+    # preparing the search sets
+    search = dict()
+    if (pdgs_in is None) and (pdgs_out is None):
+        raise ValueError(
+            "Must pass at least one of pdgs_in or pdgs_out a set of integers."
+        )
+    if pdgs_in is None:
+        pdgs_in = set()
+    if pdgs_out is None:
+        pdgs_out = set()
+    search = {"pdg_in": pdgs_in, "pdg_out": pdgs_out}
     # construct dataframe
     df = pd.DataFrame(graph.edges)
     df["pdg"] = graph.pdg.data
@@ -120,7 +131,6 @@ def find_vertex(
 
     # search the vertices for the ingoing / outgoing particles
     vertices = vtx_pdgs(df)
-    search = {"pdg_in": pdgs_in, "pdg_out": pdgs_out}
     # boolean mask if over vertices if user in / out pdgs is subset
     masks = vertices.pivot_table(
         index="vertex",
