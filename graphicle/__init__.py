@@ -7,9 +7,9 @@ from .data import ParticleSet
 from .data import AdjacencyList
 from .data import Graphicle
 from . import matrix
+from . import transform
 
 __all__ = [
-    # "matrices",
     "MaskArray",
     "MaskGroup",
     "PdgArray",
@@ -19,4 +19,5 @@ __all__ = [
     "AdjacencyList",
     "Graphicle",
     "matrix",
+    "transform",
 ]
