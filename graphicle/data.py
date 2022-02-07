@@ -1,7 +1,7 @@
 from itertools import zip_longest
 from functools import partial
 from copy import deepcopy
-from typing import Tuple, List, Dict, Optional, Any
+from typing import Tuple, List, Dict, Optional, Any, TypedDict, Union
 
 from attr import define, field, Factory, cmp_using, setters  # type: ignore
 import numpy as np
@@ -277,10 +277,79 @@ class ColorArray(ArrayBase):
 
 
 @define
+class HelicityArray(ArrayBase):
+    data: np.ndarray = array_field("helicity")
+
+    def copy(self):
+        return deepcopy(self)
+
+    def __getitem__(self, key):
+        if isinstance(key, MaskBase):
+            key = key.data
+        return self.__class__(np.array(self.data[key]))
+
+    def __len__(self):
+        return len(self.data)
+
+
+@define
+class StatusArray(ArrayBase):
+    data: np.ndarray = array_field("h_int")
+
+    def copy(self):
+        return deepcopy(self)
+
+    def __getitem__(self, key):
+        if isinstance(key, MaskBase):
+            key = key.data
+        return self.__class__(np.array(self.data[key]))
+
+    def __len__(self):
+        return len(self.data)
+
+    def in_range(
+        self, min_status: int, max_status: int, sign_sensitive: bool = False
+    ) -> MaskArray:
+        """Returns a boolean mask over particles with status codes
+        sitting within passed (inclusive) range.
+
+        Parameters
+        ----------
+        min_status : int
+            Minimum value for status codes.
+        max_status : int
+            Maximum value for status codes.
+        sign_sensitive : bool
+            Whether or not to take signs into account during the
+            comparison. (Default is False.)
+
+        Returns
+        -------
+        mask_out : MaskArray
+            Boolean mask over the particle dataset which selects
+            data where min_status <= status <= max_status.
+        """
+        array = self.data
+        if sign_sensitive is False:
+            array = np.abs(array)
+        elif sign_sensitive is not True:
+            raise ValueError("sign_sensitive must be boolean valued.")
+        more_than = array >= min_status  # type: ignore
+        less_than = array <= max_status  # type: ignore
+        return MaskArray(np.bitwise_and(more_than, less_than))
+
+    @property
+    def hard_mask(self) -> MaskArray:
+        return self.in_range(21, 29)  # Pythia specific range
+
+
+@define
 class ParticleSet(ParticleBase):
     pdg: PdgArray = PdgArray()
     pmu: MomentumArray = MomentumArray()
     color: ColorArray = ColorArray()
+    helicity: HelicityArray = HelicityArray()
+    status: StatusArray = StatusArray()
     final: MaskArray = MaskArray()
 
     @property
@@ -316,6 +385,8 @@ class ParticleSet(ParticleBase):
         pdg: Optional[np.ndarray] = None,
         pmu: Optional[np.ndarray] = None,
         color: Optional[np.ndarray] = None,
+        helicity: Optional[np.ndarray] = None,
+        status: Optional[np.ndarray] = None,
         final: Optional[np.ndarray] = None,
     ):
         def optional(data_class, data: Optional[np.ndarray]):
@@ -325,8 +396,15 @@ class ParticleSet(ParticleBase):
             pdg=optional(PdgArray, pdg),
             pmu=optional(MomentumArray, pmu),
             color=optional(ColorArray, color),
+            helicity=optional(HelicityArray, helicity),
+            status=optional(StatusArray, status),
             final=optional(MaskArray, final),
         )
+
+
+class _AdjDict(TypedDict):
+    edges: Tuple[int, int, Dict[str, Any]]
+    nodes: Tuple[int, Dict[str, Any]]
 
 
 @define
@@ -367,7 +445,7 @@ class AdjacencyList(AdjacencyBase):
         return cls(**kwargs)
 
     @property
-    def matrix(self):
+    def matrix(self) -> np.ndarray:
         size = len(self.nodes)
         if len(self.weights) > 0:
             weights = self.weights
@@ -380,11 +458,11 @@ class AdjacencyList(AdjacencyBase):
         return adj
 
     @property
-    def edges(self):
+    def edges(self) -> np.ndarray:
         return self._data
 
     @property
-    def nodes(self):
+    def nodes(self) -> np.ndarray:
         """Nodes are extracted from the edge list, and put in
         ascending order of magnitude, regardless of sign.
         Positive sign conventionally means final state particle.
@@ -393,13 +471,13 @@ class AdjacencyList(AdjacencyBase):
         unstruc_edges = rfn.structured_to_unstructured(self._data)
         unsort_nodes = np.unique(unstruc_edges)
         sort_idxs = np.argsort(np.abs(unsort_nodes))
-        return unsort_nodes[sort_idxs]
+        return unsort_nodes[sort_idxs]  # type: ignore
 
     def to_dicts(
         self,
         edge_data: Optional[Dict[str, ArrayBase]] = None,
         node_data: Optional[Dict[str, ArrayBase]] = None,
-    ):
+    ) -> _AdjDict:
         if edge_data is None:
             edge_data = dict()
         if node_data is None:
@@ -410,7 +488,7 @@ class AdjacencyList(AdjacencyBase):
             data_rows = zip(*data_arrays)
             dicts = (dict(zip(data.keys(), row)) for row in data_rows)
             combo = zip_longest(*orig, dicts, fillvalue=dict())
-            return tuple(combo)
+            return tuple(combo)  # type: ignore
 
         # form edges with data for easier ancestry tracking
         edges = make_data_dicts(
@@ -452,12 +530,19 @@ class Graphicle:
         pdg: Optional[np.ndarray] = None,
         pmu: Optional[np.ndarray] = None,
         color: Optional[np.ndarray] = None,
+        helicity: Optional[np.ndarray] = None,
+        status: Optional[np.ndarray] = None,
         final: Optional[np.ndarray] = None,
         edges: Optional[np.ndarray] = None,
         weights: Optional[np.ndarray] = None,
     ):
         particles = ParticleSet.from_numpy(
-            pdg=pdg, pmu=pmu, color=color, final=final
+            pdg=pdg,
+            pmu=pmu,
+            color=color,
+            helicity=helicity,
+            status=status,
+            final=final,
         )
         if edges is not None:
             kwargs = {"data": edges}
@@ -469,25 +554,53 @@ class Graphicle:
         return cls(particles=particles, adj=adj_list)
 
     @property
-    def pdg(self):
+    def pdg(self) -> PdgArray:
         return self.particles.pdg
 
     @property
-    def pmu(self):
+    def pmu(self) -> MomentumArray:
         return self.particles.pmu
 
     @property
-    def color(self):
+    def color(self) -> ColorArray:
         return self.particles.color
 
     @property
-    def final(self):
+    def helicity(self) -> HelicityArray:
+        return self.particles.helicity
+
+    @property
+    def status(self) -> StatusArray:
+        return self.particles.status
+
+    @property
+    def hard_mask(self) -> MaskArray:
+        return self.particles.status.hard_mask
+
+    @property
+    def final(self) -> MaskArray:
         return self.particles.final
 
     @property
-    def edges(self):
+    def edges(self) -> np.ndarray:
         return self.adj.edges
 
     @property
-    def nodes(self):
+    def nodes(self) -> np.ndarray:
         return self.adj.nodes
+
+    def _need_attr(self, attr_name: str, task: str) -> None:
+        if len(getattr(self, attr_name)) == 0:
+            raise AttributeError(
+                f"Graphicle object needs '{attr_name}' attribute to {task}."
+            )
+
+    @property
+    def hard_vertex(self) -> int:
+        """Id of vertex at which hard interaction occurs."""
+        for prop in ("status", "edges"):
+            self._need_attr(attr_name=prop, task="infer hard vertex")
+        hard_edges = self.edges[self.status.hard_mask.data]
+        vertex_array = np.intersect1d(hard_edges["in"], hard_edges["out"])
+        central = vertex_array[np.argmin(np.abs(vertex_array))]
+        return int(central)
