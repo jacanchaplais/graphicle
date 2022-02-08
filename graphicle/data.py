@@ -93,19 +93,23 @@ class MaskGroup(MaskBase):
         return list(self._mask_arrays.keys())
 
     @property
-    def bitwise_or(self) -> np.ndarray:
-        return np.bitwise_or.reduce(  # type: ignore
-            [child.data for child in self._mask_arrays.values()]
+    def bitwise_or(self) -> MaskArray:
+        return MaskArray(
+            np.bitwise_or.reduce(
+                [child.data for child in self._mask_arrays.values()]
+            )
         )
 
     @property
-    def bitwise_and(self) -> np.ndarray:
-        return np.bitwise_and.reduce(  # type: ignore
-            [child.data for child in self._mask_arrays.values()]
+    def bitwise_and(self) -> MaskArray:
+        return MaskArray(
+            np.bitwise_and.reduce(
+                [child.data for child in self._mask_arrays.values()]
+            )
         )
 
     @property
-    def data(self) -> np.ndarray:
+    def data(self) -> MaskArray:
         """Same as MaskGroup.bitwise_and."""
         return self.bitwise_and
 
@@ -583,11 +587,11 @@ class Graphicle:
         return self.particles.status
 
     @property
-    def hard_mask(self) -> MaskArray:
+    def hard_mask(self) -> MaskBase:
         return self.particles.status.hard_mask
 
     @property
-    def final(self) -> MaskArray:
+    def final(self) -> MaskBase:
         return self.particles.final
 
     @property
