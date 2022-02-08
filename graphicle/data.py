@@ -339,8 +339,17 @@ class StatusArray(ArrayBase):
         return MaskArray(np.bitwise_and(more_than, less_than))
 
     @property
-    def hard_mask(self) -> MaskArray:
-        return self.in_range(21, 29)  # Pythia specific range
+    def hard_mask(self) -> MaskGroup:
+        data = np.abs(self.data)
+        masks = MaskGroup(
+            {
+                "incoming": data == 21,
+                "intermediate": data == 22,
+                "outgoing": data == 23,
+                "outgoing_nonperturbative_diffraction": data == 24,
+            }
+        )
+        return masks
 
 
 @define
