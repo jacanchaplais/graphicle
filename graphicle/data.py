@@ -111,7 +111,7 @@ class MaskGroup(MaskBase):
     @property
     def data(self) -> MaskArray:
         """Same as MaskGroup.bitwise_and."""
-        return self.bitwise_and
+        return self.bitwise_and.data
 
 
 @define
