@@ -1,3 +1,42 @@
+"""
+``graphicle.data``
+==================
+
+Data structures to encapsulate particle physics data, and provide
+convenient methods to aid in analysis.
+
+Classes for storing and manipulating data are listed in the table below.
+
+|---------------+----------------------------------+-----------|
+| Name          | Used for                         | Composite |
+|---------------+----------------------------------+-----------|
+| MaskArray     | Masking                          | No        |
+| MaskGroup     | Masking                          | Yes       |
+| PdgArray      | HEP data manipulation            | No        |
+| MomentumArray | HEP data manipulation            | No        |
+| ColorArray    | HEP data manipulation            | No        |
+| HelicityArray | HEP data manipulation            | No        |
+| StatusArray   | HEP data manipulation            | No        |
+| ParticleSet   | HEP data manipulation            | Yes       |
+| AdjacencyList | Graph connectivity               | No        |
+| Graphicle     | Graph representation of HEP data | Yes       |
+|---------------+----------------------------------+-----------|
+
+All data structures are subscriptable, and may be masked and sliced,
+using Python native methods, numpy arrays, or the MaskArray / MaskGroup
+objects.
+
+The composite data structures wrap one or more of the data structures
+in this module to bring their behaviour together in useful ways.
+These components are accessible via object attributes.
+
+The most generically useful object, which encapsulates all others, is
+the Graphicle. This brings together all particle physics data and
+connectivity into a single graph representation of HEP data.
+
+For more details, see individual docstrings.
+"""
+
 from itertools import zip_longest
 from functools import partial
 from copy import deepcopy
@@ -13,6 +52,9 @@ from typicle.convert import cast_array
 from ._base import ParticleBase, AdjacencyBase, MaskBase, ArrayBase
 
 
+###########################################
+# SET UP ARRAY ATTRIBUTES FOR DATACLASSES #
+###########################################
 _types = Types()
 
 
@@ -30,6 +72,9 @@ def array_field(type_name):
     )
 
 
+##################################
+# COMPOSITE MASK DATA STRUCTURES #
+##################################
 @define
 class MaskArray(MaskBase, ArrayBase):
     data: np.ndarray = array_field("bool")
@@ -224,6 +269,9 @@ class PdgArray(ArrayBase):
         return self.__get_prop("c")
 
 
+########################################
+# MOMENTUM STORAGE AND TRANSFORMATIONS #
+########################################
 @define
 class MomentumArray(ArrayBase):
     data: np.ndarray = array_field("pmu")
@@ -264,6 +312,9 @@ class MomentumArray(ArrayBase):
         return self._vector.deltaR(other_pmu._vector)  # type: ignore
 
 
+#################
+# COLOR STORAGE #
+#################
 @define
 class ColorArray(ArrayBase):
     data: np.ndarray = array_field("color")
@@ -280,6 +331,9 @@ class ColorArray(ArrayBase):
         return len(self.data)
 
 
+####################
+# HELICITY STORAGE #
+####################
 @define
 class HelicityArray(ArrayBase):
     data: np.ndarray = array_field("helicity")
@@ -296,6 +350,9 @@ class HelicityArray(ArrayBase):
         return len(self.data)
 
 
+####################################
+# STATUS CODE STORAGE AND QUERYING #
+####################################
 @define
 class StatusArray(ArrayBase):
     data: np.ndarray = array_field("h_int")
@@ -356,6 +413,9 @@ class StatusArray(ArrayBase):
         return masks
 
 
+#########################################
+# COMPOSITE OF PARTICLE DATA STRUCTURES #
+#########################################
 @define
 class ParticleSet(ParticleBase):
     pdg: PdgArray = PdgArray()
@@ -420,6 +480,9 @@ class _AdjDict(TypedDict):
     nodes: Tuple[int, Dict[str, Any]]
 
 
+#############################################
+# CONNECTIVITY INFORMATION AS COO EDGE LIST #
+#############################################
 @define
 class AdjacencyList(AdjacencyBase):
     _data: np.ndarray = array_field("edge")
@@ -518,6 +581,9 @@ class AdjacencyList(AdjacencyBase):
         )
 
 
+#####################################################
+# COMPOSITE OF GRAPH CONNECTIVITY AND PARTICLE DATA #
+#####################################################
 @define
 class Graphicle:
     particles: ParticleSet = ParticleSet()
