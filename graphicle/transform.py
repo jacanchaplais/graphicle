@@ -160,6 +160,7 @@ def vertex_descendants(adj: gcl.AdjacencyList, vertex: int) -> gcl.MaskArray:
         passed AdjacencyList.
     """
     graph_dict = adj.to_dicts()
+    vertex = int(vertex)
     nx_graph = _nx.MultiDiGraph()
     _ = nx_graph.add_edges_from(graph_dict["edges"])
     desc_nodes = np.array(list(_nx.descendants(nx_graph, vertex)), dtype="<i4")
