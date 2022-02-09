@@ -91,11 +91,19 @@ class MaskArray(MaskBase, ArrayBase):
         return len(self.data)
 
 
+_IN_MASK_DICT = Dict[str, Union[MaskArray, np.ndarray]]
 _MASK_DICT = Dict[str, MaskArray]
 
 
-def _mask_dict_convert(masks: Dict[str, np.ndarray]) -> _MASK_DICT:
-    return {key: MaskArray(val) for key, val in masks.items()}
+def _mask_dict_convert(masks: _IN_MASK_DICT) -> _MASK_DICT:
+    out_masks = dict()
+    for key, val in masks.items():
+        if isinstance(val, MaskArray):
+            mask = val
+        else:
+            mask = MaskArray(val)
+        out_masks[key] = mask
+    return out_masks
 
 
 @define
