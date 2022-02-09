@@ -91,6 +91,13 @@ class MaskArray(MaskBase, ArrayBase):
         return len(self.data)
 
 
+_MASK_DICT = Dict[str, MaskArray]
+
+
+def _mask_dict_convert(masks: Dict[str, np.ndarray]) -> _MASK_DICT:
+    return {key: MaskArray(val) for key, val in masks.items()}
+
+
 @define
 class MaskGroup(MaskBase):
     """Data structure to compose groups of masks over particle arrays.
@@ -107,7 +114,9 @@ class MaskGroup(MaskBase):
         Combination of all masks in group via bitwise AND reduction.
     """
 
-    _mask_arrays: Dict[str, MaskArray] = field(repr=False, factory=dict)
+    _mask_arrays: _MASK_DICT = field(
+        repr=False, factory=dict, converter=_mask_dict_convert
+    )
 
     def __repr__(self):
         keys = ", ".join(self.names)
@@ -122,7 +131,7 @@ class MaskGroup(MaskBase):
         """Add a new MaskArray to the group, with given key."""
         if not isinstance(key, str):
             raise KeyError("Key must be string.")
-        if not isinstance(mask, MaskArray):
+        if not isinstance(mask, MaskBase):
             mask = MaskArray(mask)
         self._mask_arrays.update({key: mask})
 
@@ -138,27 +147,30 @@ class MaskGroup(MaskBase):
         return list(self._mask_arrays.keys())
 
     @property
-    def bitwise_or(self) -> MaskArray:
-        return MaskArray(
-            np.bitwise_or.reduce(
-                [child.data for child in self._mask_arrays.values()]
-            )
+    def bitwise_or(self) -> np.ndarray:
+        return np.bitwise_or.reduce(  # type: ignore
+            [child.data for child in self._mask_arrays.values()]
         )
 
     @property
-    def bitwise_and(self) -> MaskArray:
-        return MaskArray(
-            np.bitwise_and.reduce(
-                [child.data for child in self._mask_arrays.values()]
-            )
+    def bitwise_and(self) -> np.ndarray:
+        return np.bitwise_and.reduce(  # type: ignore
+            [child.data for child in self._mask_arrays.values()]
         )
 
     @property
-    def data(self) -> MaskArray:
+    def data(self) -> np.ndarray:
         """Same as MaskGroup.bitwise_and."""
-        return self.bitwise_and.data
+        return self.bitwise_and
+
+    @property
+    def dict(self) -> Dict[str, np.ndarray]:
+        return {key: val.data for key, val in self._mask_arrays.items()}
 
 
+############################
+# PDG STORAGE AND QUERYING #
+############################
 @define
 class PdgArray(ArrayBase):
     from mcpid.lookup import PdgRecords as __PdgRecords
@@ -679,7 +691,7 @@ class Graphicle:
         """Id of vertex at which hard interaction occurs."""
         for prop in ("status", "edges"):
             self._need_attr(attr_name=prop, task="infer hard vertex")
-        hard_edges = self.edges[self.status.hard_mask.data]
+        hard_edges = self.edges[self.status.hard_mask.bitwise_or]
         vertex_array = np.intersect1d(hard_edges["in"], hard_edges["out"])
         central = vertex_array[np.argmin(np.abs(vertex_array))]
         return int(central)
