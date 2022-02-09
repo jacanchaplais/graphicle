@@ -1,4 +1,3 @@
-from . import matrices
 from .data import MaskArray
 from .data import MaskGroup
 from .data import PdgArray
@@ -7,9 +6,10 @@ from .data import ColorArray
 from .data import ParticleSet
 from .data import AdjacencyList
 from .data import Graphicle
+from . import matrix
+from . import transform
 
 __all__ = [
-    "matrices",
     "MaskArray",
     "MaskGroup",
     "PdgArray",
@@ -18,4 +18,6 @@ __all__ = [
     "ParticleSet",
     "AdjacencyList",
     "Graphicle",
+    "matrix",
+    "transform",
 ]
