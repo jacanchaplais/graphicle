@@ -215,7 +215,9 @@ class PdgArray(ArrayBase):
             If False will check for positive and negative pdgs
             simultaenously. Default is False.
 
-        Returns ------- mask : MaskArray
+        Returns
+        -------
+        mask : MaskArray
             Boolean mask over data, with blacklisted pdgs marked as
             False. Same shape as pdg array stored in parent object.
         """
@@ -487,14 +489,14 @@ class ParticleSet(ParticleBase):
         )
 
 
+#############################################
+# CONNECTIVITY INFORMATION AS COO EDGE LIST #
+#############################################
 class _AdjDict(TypedDict):
     edges: Tuple[int, int, Dict[str, Any]]
     nodes: Tuple[int, Dict[str, Any]]
 
 
-#############################################
-# CONNECTIVITY INFORMATION AS COO EDGE LIST #
-#############################################
 @define
 class AdjacencyList(AdjacencyBase):
     _data: np.ndarray = array_field("edge")
