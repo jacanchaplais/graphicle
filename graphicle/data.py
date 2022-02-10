@@ -506,9 +506,11 @@ class ParticleSet(ParticleBase):
 #############################################
 # CONNECTIVITY INFORMATION AS COO EDGE LIST #
 #############################################
-class _AdjDict(TypedDict):
-    edges: Tuple[int, int, Dict[str, Any]]
-    nodes: Tuple[int, Dict[str, Any]]
+if TYPE_CHECKING:
+
+    class _AdjDict(TypedDict):
+        edges: Tuple[int, int, Dict[str, Any]]
+        nodes: Tuple[int, Dict[str, Any]]
 
 
 @define
