@@ -727,14 +727,6 @@ class Graphicle:
         return cls(particles=particles, adj=adj_list)
 
     @property
-    def edges(self):
-        return self.adj.edges
-
-    @property
-    def nodes(self):
-        return self.adj.nodes
-
-    @property
     def pdg(self) -> PdgArray:
         return self.particles.pdg
 
