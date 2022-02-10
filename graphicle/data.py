@@ -96,8 +96,9 @@ class MaskArray(MaskBase, ArrayBase):
         return len(self.data)
 
 
-_IN_MASK_DICT = Dict[str, Union[MaskArray, np.ndarray]]
-_MASK_DICT = Dict[str, MaskArray]
+if TYPE_CHECKING:
+    _IN_MASK_DICT = Dict[str, Union[MaskArray, np.ndarray]]
+    _MASK_DICT = Dict[str, MaskArray]
 
 
 def _mask_dict_convert(masks: _IN_MASK_DICT) -> _MASK_DICT:
