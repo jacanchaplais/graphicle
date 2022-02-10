@@ -37,10 +37,15 @@ connectivity into a single graph representation of HEP data.
 For more details, see individual docstrings.
 """
 
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from typing import Tuple, List, Dict, Optional, Any, TypedDict, Union
+
 from itertools import zip_longest
 from functools import partial
 from copy import deepcopy
-from typing import Tuple, List, Dict, Optional, Any, TypedDict, Union
 
 from attr import define, field, Factory, cmp_using, setters  # type: ignore
 import numpy as np
