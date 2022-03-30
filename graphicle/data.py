@@ -44,7 +44,7 @@ if TYPE_CHECKING:
     from typing import Tuple, List, Dict, Optional, Any, TypedDict, Union
 
 from itertools import zip_longest
-from functools import partial
+from functools import partial, cached_property
 from copy import deepcopy
 
 from attr import define, field, Factory, cmp_using, setters  # type: ignore
@@ -204,17 +204,17 @@ class PdgArray(ArrayBase):
     name : ndarray
         String representation of particle names.
     charge : ndarray
-        Charge for each particle.
+        Charge for each particle in elementary units.
     mass : ndarray
-        Mass for each particle.
+        Mass for each particle in GeV.
     mass_bounds : ndarray
-        Mass upper and lower bounds for each particle.
+        Mass upper and lower bounds for each particle in GeV.
     quarks : ndarray
         String representation of quark composition for each particle.
     width : ndarray
-        Width for each particle.
+        Width for each particle in GeV.
     width_bounds : ndarray
-        Width upper and lower bounds for each particle.
+        Width upper and lower bounds for each particle in GeV.
     isospin : ndarray
         Isospin for each particle.
     g_parity : ndarray
@@ -229,6 +229,7 @@ class PdgArray(ArrayBase):
 
     data: np.ndarray = array_field("int")
     __lookup_table: __PdgRecords = field(init=False, repr=False)
+    __mega_to_giga: float = 1.0e-3
 
     def __attrs_post_init__(self):
         self.__lookup_table = self.__PdgRecords()
@@ -303,11 +304,14 @@ class PdgArray(ArrayBase):
 
     @property
     def mass(self) -> np.ndarray:
-        return self.__get_prop("mass")
+        return self.__get_prop("mass") * self.__mega_to_giga
 
     @property
     def mass_bounds(self) -> np.ndarray:
-        return self.__get_prop_range("mass")
+        range_arr = self.__get_prop_range("mass")
+        for name in range_arr.dtype.names:
+            range_arr[name] *= self.__mega_to_giga
+        return range_arr
 
     @property
     def quarks(self) -> np.ndarray:
@@ -315,11 +319,14 @@ class PdgArray(ArrayBase):
 
     @property
     def width(self) -> np.ndarray:
-        return self.__get_prop("width")
+        return self.__get_prop("width") * self.__mega_to_giga
 
     @property
     def width_bounds(self) -> np.ndarray:
-        return self.__get_prop_range("width")
+        range_arr = self.__get_prop_range("width")
+        for name in range_arr.dtype.names:
+            range_arr[name] *= self.__mega_to_giga
+        return range_arr
 
     @property
     def isospin(self) -> np.ndarray:
@@ -385,15 +392,30 @@ class MomentumArray(ArrayBase):
 
     @property
     def pt(self) -> np.ndarray:
+        """Momentum component transverse to the beam-axis."""
         return self._vector.pt  # type: ignore
 
     @property
     def eta(self) -> np.ndarray:
+        """Pseudorapidity of particles."""
         return self._vector.eta  # type: ignore
 
     @property
     def phi(self) -> np.ndarray:
+        """Angular displacement of particles about the beam-axis."""
         return self._vector.phi  # type: ignore
+
+    @property
+    def theta(self) -> np.ndarray:
+        """Spherical angular displacement of particles from the positive
+        beam-axis.
+        """
+        return self._vector.theta  # type: ignore
+
+    @property
+    def mass(self) -> np.ndarray:
+        """Mass of the particles."""
+        return self._vector.mass  # type: ignore
 
     def delta_R(self, other_pmu: "MomentumArray") -> np.ndarray:
         return self._vector.deltaR(other_pmu._vector)  # type: ignore
