@@ -98,6 +98,9 @@ class MaskArray(MaskBase, ArrayBase):
     def __len__(self):
         return len(self.data)
 
+    def __array__(self):
+        return self.data
+
 
 if TYPE_CHECKING:
     _IN_MASK_DICT = Dict[str, Union[MaskArray, np.ndarray]]
@@ -155,6 +158,9 @@ class MaskGroup(MaskBase):
     def __delitem__(self, key):
         """Remove a MaskArray from the group, using given key."""
         self._mask_arrays.pop(key)
+
+    def __array__(self):
+        return self.data
 
     def copy(self):
         return deepcopy(self)
@@ -229,6 +235,9 @@ class PdgArray(ArrayBase):
 
     def __len__(self):
         return len(self.data)
+
+    def __array__(self):
+        return self.data
 
     def __getitem__(self, key):
         if isinstance(key, MaskBase):
@@ -354,6 +363,9 @@ class MomentumArray(ArrayBase):
     def __len__(self):
         return len(self.data)
 
+    def __array__(self):
+        return self.data
+
     def __getitem__(self, key):
         if isinstance(key, MaskBase):
             key = key.data
@@ -414,6 +426,9 @@ class ColorArray(ArrayBase):
     def __len__(self):
         return len(self.data)
 
+    def __array__(self):
+        return self.data
+
 
 ####################
 # HELICITY STORAGE #
@@ -433,6 +448,9 @@ class HelicityArray(ArrayBase):
     def __len__(self):
         return len(self.data)
 
+    def __array__(self):
+        return self.data
+
 
 ####################################
 # STATUS CODE STORAGE AND QUERYING #
@@ -451,6 +469,9 @@ class StatusArray(ArrayBase):
 
     def __len__(self):
         return len(self.data)
+
+    def __array__(self):
+        return self.data
 
     def in_range(
         self, min_status: int, max_status: int, sign_sensitive: bool = False
@@ -584,6 +605,9 @@ class AdjacencyList(AdjacencyBase):
 
     def __len__(self):
         return len(self._data)
+
+    def __array__(self):
+        return self._data
 
     def __getitem__(self, key):
         if isinstance(key, MaskBase):
