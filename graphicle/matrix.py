@@ -1,3 +1,5 @@
+from typing import Optional
+
 import numpy as np
 import numpy.typing as npt
 
@@ -8,13 +10,75 @@ from typicle import Types
 _types = Types()
 
 
+def cut_adj(
+    matrix: np.ndarray,
+    cut: float,
+    mode: str = "max",
+    self_loop: bool = False,
+    weighted: bool = False,
+) -> np.ndarray:
+    """Produce a directed adjacency matrix with outward edges
+    towards the neighbours within a cut range, determined from the input
+    affinity matrix.
+
+    The cut represents the limiting value of the affinity matrix for
+    elements to form edges in the adjacency matrix.
+
+    Parameters
+    ----------
+    matrix : array
+        Particle affinities.
+    cut : float
+        Value beyond which affinities are not sufficient to form edges.
+    mode : str
+        Sets whether affinities should be above or below cut.
+        'max' implies matrix < cut, 'min' implies matrix > cut.
+        Default is 'max'.
+    self_loop : bool
+        If False will remove self-edges. Default is False.
+    weighted : bool
+        If True edges weighted by affinity, if False edge is binary.
+        Default is False.
+
+    Returns
+    -------
+    adj : array
+        Adjacency matrix representing particle connectivity.
+
+    Notes
+    -----
+    If weighted is False, the returned adjacency matrix will be boolean.
+    """
+    # form the cut mask
+    if mode == "max":
+        mask = matrix < cut
+    elif mode == "min":
+        mask = matrix > cut
+    else:
+        raise ValueError("mode keyword argument must take either max or min.")
+    # set the weights
+    if weighted is True:
+        weights = matrix
+    elif weighted is False:
+        weights = np.array(1.0)
+    else:
+        raise ValueError("weighted keyword argument must take a boolean.")
+    # apply the cuts
+    adj = np.where(mask, weights, 0.0)
+    if self_loop is False:
+        np.fill_diagonal(adj, 0.0)
+    if weighted is False:
+        adj = adj.astype(_types.bool)
+    return adj
+
+
 def knn_adj(
     matrix: np.ndarray,
     k: int,
     self_loop: bool = False,
     weighted: bool = False,
     row: bool = True,
-    dtype: npt.DTypeLike = None,
+    dtype: Optional[npt.DTypeLike] = None,
 ) -> np.ndarray:
     """Produce a directed adjacency matrix with outward edges
     towards the k nearest neighbours, determined from the input
@@ -28,12 +92,23 @@ def knn_adj(
         Number of nearest neighbours in result.
     weighted : bool
         If True edges weighted by affinity, if False edge is binary.
+        Default is False.
     self_loop : bool
-        If False will remove self-edges.
+        If False will remove self-edges. Default is False.
     row : bool
-        If True outward edges given by rows, if False cols.
-    dtype : dtype-like
+        If True outward edges given by rows, if False cols. Default is
+        True.
+    dtype : dtype-like, optional
         Type of output. Must be floating point if weighted is True.
+
+    Returns
+    -------
+    adj : array
+        Adjacency matrix representing particle connectivity.
+
+    Notes
+    -----
+    If weighted is False, the returned adjacency matrix will be boolean.
     """
     axis = 0  # calculate everything row-wise
     if self_loop is False:
