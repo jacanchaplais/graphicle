@@ -168,3 +168,36 @@ def vertex_descendants(adj: gcl.AdjacencyList, vertex: int) -> gcl.MaskArray:
     masks["in"] = np.isin(adj.edges["in"], desc_nodes)
     masks["out"] = np.isin(adj.edges["out"], desc_nodes)
     return gcl.MaskArray(masks.bitwise_or)
+
+
+def centre_angle(angle: np.ndarray, pt: np.ndarray) -> np.ndarray:
+    """Shifts angles so transverse momentum weighted centroid is at 0.
+
+    Parameters
+    ----------
+    angle : array
+        Angular displacements.
+    pt : array
+        Transverse momenta.
+
+    Returns
+    -------
+    centred_angle : array
+        Shifted angular displacements, with centroid at 0.
+    """
+    # convert angles into complex polar positions
+    pos = np.exp(1.0j * angle)
+    # obtain weighted sum positions ie. un-normalised midpoint
+    pos_wt_mid = (pos * pt).sum()
+    # convert to U(1) rotation operator e^(-i delta x)
+    rot_op = (pos_wt_mid / np.abs(pos_wt_mid)).conjugate()
+    # rotate positions so midpoint is at 0
+    pos_centred = rot_op * pos
+    return np.angle(pos_centred)
+
+
+def centre_pseudorapidity(eta: np.ndarray, pt: np.ndarray) -> np.ndarray:
+    """Shifts pseudorapidities so pt weighted midpoint is at 0."""
+    pt_norm = pt / pt.sum()
+    eta_wt_mid = (eta * pt_norm).sum()
+    return eta - eta_wt_mid
