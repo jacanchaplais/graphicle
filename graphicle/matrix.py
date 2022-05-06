@@ -2,9 +2,10 @@ from typing import Optional
 
 import numpy as np
 import numpy.typing as npt
+from typicle import Types
 
 import graphicle as gcl
-from typicle import Types
+from . import _matrix
 
 
 _types = Types()
@@ -150,12 +151,4 @@ def delta_R_aff(pmu: gcl.MomentumArray) -> np.ndarray:
     """Returns a symmetric matrix of delta R vals from input
     MomentumArray.
     """
-    size = len(pmu)
-    dtype = pmu.data.dtype.descr[0][1]
-    vec = pmu._vector
-    aff = np.zeros((size, size), dtype=dtype)
-    dR_cols = (vec[shift].deltaR(vec[shift:]) for shift in range(size))
-    for idx, col in enumerate(dR_cols):
-        aff[idx:, idx] = col
-        aff[idx, idx:] = col
-    return aff
+    return _matrix.delta_R_aff(pmu.eta, pmu.phi)
