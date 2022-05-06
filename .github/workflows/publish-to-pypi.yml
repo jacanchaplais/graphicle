@@ -27,7 +27,7 @@ jobs:
         python -m
         build
         --sdist
-        --wheel
+        # --wheel
         --outdir dist/
         .
     # - name: Publish distributiono Test PyPI
