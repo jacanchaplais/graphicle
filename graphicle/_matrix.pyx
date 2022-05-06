@@ -28,6 +28,5 @@ def delta_R_aff(double[:] eta, double[:] phi):
     for y in range(1, length):
         for x in range(y):
             result_view[y, x] = hypot(eta[y] - eta[x], phi[y] - phi[x])
-
-    result = result + result.T
+            result_view[x, y] = result_view[y, x]
     return result
