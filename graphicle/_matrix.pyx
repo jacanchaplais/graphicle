@@ -23,7 +23,7 @@ def delta_R_aff(double[:] eta, double[:] phi):
     """
     cdef Py_ssize_t length = eta.shape[0]
 
-    assert tuple(eta.shape) == tuple(eta.shape)
+    assert tuple(eta.shape) == tuple(phi.shape)
 
     result = np.zeros((length, length), dtype=DTYPE)
     cdef double[:, ::1] result_view = result
