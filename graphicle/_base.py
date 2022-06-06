@@ -77,3 +77,7 @@ class MaskBase(ABC):
     @abstractmethod
     def data(self):
         pass
+
+    @abstractmethod
+    def __getitem__(self, key):
+        pass

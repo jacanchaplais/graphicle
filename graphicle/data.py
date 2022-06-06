@@ -57,6 +57,10 @@ from typicle.convert import cast_array
 from ._base import ParticleBase, AdjacencyBase, MaskBase, ArrayBase
 
 
+def _is_np_structured(array: np.ndarray) -> bool:
+    return array.dtype.names is not None
+
+
 ###########################################
 # SET UP ARRAY ATTRIBUTES FOR DATACLASSES #
 ###########################################
@@ -968,7 +972,7 @@ class Graphicle:
         return self.particles.status
 
     @property
-    def hard_mask(self) -> MaskBase:
+    def hard_mask(self) -> MaskGroup:
         return self.particles.status.hard_mask
 
     @property

@@ -8,6 +8,8 @@ from .data import AdjacencyList
 from .data import Graphicle
 from . import matrix
 from . import transform
+from . import select
+from . import calculate
 
 __all__ = [
     "MaskArray",
@@ -20,4 +22,6 @@ __all__ = [
     "Graphicle",
     "matrix",
     "transform",
+    "select",
+    "calculate",
 ]
