@@ -42,12 +42,12 @@ def jet_mass(
     This does not mask the MomentumArray for you. All filters and cuts
     must be applied before passing to this function.
     """
-    eps = 1e-8
+    eps = 1e-10
     data = structured_to_unstructured(pmu.data)
     if weight is not None:
-        data = weight[:, np.newaxis] * data
+        data = structured_to_unstructured(weight) * data
     minkowski = np.array([-1.0, -1.0, -1.0, 1.0])
-    return np.sqrt((data.sum(axis=0) ** 2 @ minkowski) + eps)  # type: ignore
+    return np.sqrt(((data.sum(axis=0) ** 2) @ minkowski) + eps)  # type: ignore
 
 
 def _diffuse(colors: List[np.ndarray], feats: List[np.ndarray]):
@@ -117,8 +117,10 @@ def hard_trace(
         Boolean mask identifying which particles should have their
         ancestry traced.
     prop : array
-        Property to trace back, eg. energy.
+        Property to trace back, eg. 4-momentum, charge.
         Must be the same shape as arrays stored in graph.
+        Can be structured, unstructured, or a graphicle array, though
+        unstructured arrays must be 1d.
     exclusive : bool
         If True, double counting from descendant particles in the hard
         event will be switched off.
@@ -133,10 +135,10 @@ def hard_trace(
 
     Returns
     -------
-    trace_array : array
-        Structured array representing the contributions of hard partons
-        traced down to the properties of the selected subset of
-        particles specified by mask.
+    trace_array : Dict of arrays
+        Dictionary of arrays. Keys are parton names, arrays represent
+        the contributions of hard partons traced down to the properties
+        of the selected subset of particles specified by mask.
     """
     # encoding graph features onto NetworkX
     nx_graph = nx.DiGraph()
