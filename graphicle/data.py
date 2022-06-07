@@ -805,8 +805,8 @@ class AdjacencyList(AdjacencyBase):
 
     def to_dicts(
         self,
-        edge_data: Optional[Dict[str, ArrayBase]] = None,
-        node_data: Optional[Dict[str, ArrayBase]] = None,
+        edge_data: Optional[Dict[str, Union[ArrayBase, np.ndarray]]] = None,
+        node_data: Optional[Dict[str, Union[ArrayBase, np.ndarray]]] = None,
     ) -> _AdjDict:
         """Returns data in dictionary format, which is more easily
         parsed by external libraries, such as NetworkX.
@@ -816,9 +816,20 @@ class AdjacencyList(AdjacencyBase):
         if node_data is None:
             node_data = dict()
 
-        def make_data_dicts(orig: Tuple[Any, ...], data: Dict[str, ArrayBase]):
-            data_arrays = (array.data for array in data.values())
-            data_rows = zip(*data_arrays)
+        def make_data_dicts(
+            orig: Tuple[Any, ...],
+            data: Dict[str, Union[ArrayBase, np.ndarray]],
+        ):
+            def array_iterator(array_dict):
+                for array in data.values():
+                    if isinstance(array, ArrayBase):
+                        yield array.data
+                    elif isinstance(array, np.ndarray):
+                        yield array
+                    else:
+                        raise TypeError("Data structure not supported.")
+
+            data_rows = zip(*array_iterator(data))
             dicts = (dict(zip(data.keys(), row)) for row in data_rows)
             combo = zip_longest(*orig, dicts, fillvalue=dict())
             return tuple(combo)  # type: ignore
