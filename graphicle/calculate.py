@@ -5,17 +5,19 @@
 Algorithms for performing common HEP calculations using graphicle data
 structures.
 """
-from typing import Tuple, Optional, Set, List, Dict
+from typing import Tuple, Optional, Set, List, Dict, Callable
 from functools import lru_cache, partial
+import warnings
 
 import numpy as np
+import numpy.typing as npt
 from numpy.lib.recfunctions import (
     unstructured_to_structured,
     structured_to_unstructured,
 )
 from typicle import Types
 import networkx as nx
-import pandas as pd
+from scipy.stats import cauchy
 
 import graphicle as gcl
 
@@ -41,13 +43,22 @@ def jet_mass(
     -----
     This does not mask the MomentumArray for you. All filters and cuts
     must be applied before passing to this function.
+
+    In the event of a squared mass below zero (due to numerical
+    fluctuations for very low mass reconstructions), this function will
+    simply return 0.0.
     """
-    eps = 1e-10
     data = structured_to_unstructured(pmu.data)
     if weight is not None:
         data = structured_to_unstructured(weight) * data
     minkowski = np.array([-1.0, -1.0, -1.0, 1.0])
-    return np.sqrt(((data.sum(axis=0) ** 2) @ minkowski) + eps)  # type: ignore
+    with warnings.catch_warnings():
+        warnings.filterwarnings("error")
+        try:
+            mass: float = np.sqrt(((data.sum(axis=0) ** 2) @ minkowski))
+        except RuntimeWarning:
+            mass = 0.0
+    return mass
 
 
 def _diffuse(colors: List[np.ndarray], feats: List[np.ndarray]):
@@ -164,17 +175,18 @@ def hard_trace(
     names, vtxs = tuple(hard_graph.pdg.name), tuple(hard_graph.edges["out"])
     # out vertices of user specified particles
     focus_pcls = graph.edges[mask]["out"]
-    # struc_dtype = np.dtype(list(zip(names, ("<f8",) * len(names))))
     trc = np.array(
         [
-            _trace_vector(nx_graph, pcl, vtxs, feat_dim, is_structured)
+            _trace_vector(
+                nx_graph, pcl, vtxs, feat_dim, is_structured, exclusive
+            )
             for pcl in focus_pcls
         ]
     )
     _trace_vector.cache_clear()
     traces = dict()
-    array_fmt = (
-        partial(unstructured_to_structured, dtype=dtype)
+    array_fmt: Callable[[np.ndarray], np.ndarray] = (
+        partial(unstructured_to_structured, dtype=dtype)  # type: ignore
         if is_structured
         else lambda x: x.squeeze()
     )
