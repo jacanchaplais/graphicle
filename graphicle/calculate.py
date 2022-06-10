@@ -5,19 +5,17 @@
 Algorithms for performing common HEP calculations using graphicle data
 structures.
 """
-from typing import Tuple, Optional, Set, List, Dict, Callable
+from typing import Tuple, Optional, Set, List, Dict, Callable, Union
 from functools import lru_cache, partial
 import warnings
 
 import numpy as np
-import numpy.typing as npt
 from numpy.lib.recfunctions import (
     unstructured_to_structured,
     structured_to_unstructured,
 )
 from typicle import Types
 import networkx as nx
-from scipy.stats import cauchy
 
 import graphicle as gcl
 
@@ -25,19 +23,27 @@ import graphicle as gcl
 _types = Types()
 
 
-def jet_mass(
-    pmu: gcl.MomentumArray, weight: Optional[np.ndarray] = None
+def combined_mass(
+    pmu: Union[gcl.MomentumArray, np.ndarray],
+    weight: Optional[np.ndarray] = None,
 ) -> float:
-    """Returns the combined jet mass of the particles represented in
-    the provided MomentumArray.
+    """Returns the combined mass of the particles represented in the
+    provided MomentumArray.
+
+    This is done by summing the four momenta, optionally weighting the
+    components, and then taking the inner product of the result with
+    itself in Minkowski space.
 
     Parameters
     ----------
-    pmu : MomentumArray
+    pmu : MomentumArray, ndarray
         Momenta of particles comprising a jet, or an analagous combined
-        object.
+        object. If a numpy array is passed, it must be structured with
+        fields (x, y, z, e).
     weight : array, optional
         Weights for each particle when reconstructing the jet momentum.
+        May be either structured or unstructured. If unstructured,
+        ensure the columns are in the order (x, y, z, e).
 
     Notes
     -----
@@ -48,16 +54,25 @@ def jet_mass(
     fluctuations for very low mass reconstructions), this function will
     simply return 0.0.
     """
-    data = structured_to_unstructured(pmu.data)
+    # sanitizing and combining the inputs
+    if isinstance(pmu, gcl.MomentumArray):
+        pmu = pmu.data
+    data = structured_to_unstructured(pmu)
     if weight is not None:
-        data = structured_to_unstructured(weight) * data
+        if not isinstance(weight, np.ndarray):
+            raise ValueError("Weights must be provided as a numpy array.")
+        if weight.dtype.names is not None:
+            weight = structured_to_unstructured(weight)
+        data = weight * data
+    # mass given as minkowski norm of (weighted) momenta
     minkowski = np.array([-1.0, -1.0, -1.0, 1.0])
-    with warnings.catch_warnings():
+    mass: float
+    with warnings.catch_warnings():  # catch when np.sqrt warns < 0 input
         warnings.filterwarnings("error")
         try:
-            mass: float = np.sqrt(((data.sum(axis=0) ** 2) @ minkowski))
+            mass = np.sqrt((data.sum(axis=0) ** 2) @ minkowski)
         except RuntimeWarning:
-            mass = 0.0
+            mass = 0.0  # if sqrt(pmu^2) < 0, return mass as 0.0
     return mass
 
 
@@ -109,10 +124,10 @@ def _trace_vector(
     return color
 
 
-def hard_trace(
+def flow_trace(
     graph: gcl.Graphicle,
-    mask: gcl.MaskArray,
-    prop: np.ndarray,
+    mask: Union[gcl._base.MaskBase, np.ndarray],
+    prop: Union[gcl._base.ArrayBase, np.ndarray],
     exclusive: bool = False,
     target: Optional[Set[int]] = None,
 ) -> Dict[str, np.ndarray]:
@@ -124,7 +139,7 @@ def hard_trace(
     graph : Graphicle
         Full particle event, containing hard partons, showering and
         hadronisation.
-    mask : MaskArray or MaskGroup
+    mask : MaskArray, MaskGroup, ndarray
         Boolean mask identifying which particles should have their
         ancestry traced.
     prop : array
@@ -151,6 +166,8 @@ def hard_trace(
         the contributions of hard partons traced down to the properties
         of the selected subset of particles specified by mask.
     """
+    if isinstance(prop, gcl._base.ArrayBase):
+        prop = prop.data
     # encoding graph features onto NetworkX
     nx_graph = nx.DiGraph()
     graph_dict = graph.adj.to_dicts(edge_data={"feat": prop})

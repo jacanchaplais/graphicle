@@ -10,6 +10,7 @@ from . import matrix
 from . import transform
 from . import select
 from . import calculate
+from . import _base
 
 __all__ = [
     "MaskArray",
@@ -24,4 +25,5 @@ __all__ = [
     "transform",
     "select",
     "calculate",
+    "_base",
 ]

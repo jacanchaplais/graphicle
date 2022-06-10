@@ -1,51 +1,53 @@
 from abc import ABC, abstractmethod
 
+import numpy as np
+
 
 class ArrayBase(ABC):
     @property
     @abstractmethod
-    def data(self):
+    def data(self) -> np.ndarray:
         pass
 
 
 class ParticleBase(ABC):
     @property
     @abstractmethod
-    def pdg(self):
+    def pdg(self) -> ArrayBase:
         pass
 
     @property
     @abstractmethod
-    def pmu(self):
+    def pmu(self) -> ArrayBase:
         pass
 
     @property
     @abstractmethod
-    def color(self):
+    def color(self) -> ArrayBase:
         pass
 
     @property
     @abstractmethod
-    def final(self):
+    def final(self) -> ArrayBase:
         pass
 
 
 class AdjacencyBase(ABC):
     @property
     @abstractmethod
-    def edges(self):
+    def edges(self) -> np.ndarray:
         pass
 
     @property
     @abstractmethod
-    def nodes(self):
+    def nodes(self) -> np.ndarray:
         pass
 
 
 class GraphicleBase(ABC):
     @property
     @abstractmethod
-    def edges(self):
+    def edges(self) -> np.ndarray:
         pass
 
     # @abstractmethod
@@ -75,9 +77,9 @@ class GraphicleBase(ABC):
 class MaskBase(ABC):
     @property
     @abstractmethod
-    def data(self):
+    def data(self) -> np.ndarray:
         pass
 
     @abstractmethod
-    def __getitem__(self, key):
+    def __getitem__(self, key) -> "MaskBase":
         pass
