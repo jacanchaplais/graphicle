@@ -142,7 +142,7 @@ def flow_trace(
     mask : MaskArray, MaskGroup, ndarray
         Boolean mask identifying which particles should have their
         ancestry traced.
-    prop : array
+    prop : ArrayBase, ndarray
         Property to trace back, eg. 4-momentum, charge.
         Must be the same shape as arrays stored in graph.
         Can be structured, unstructured, or a graphicle array, though
