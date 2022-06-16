@@ -105,6 +105,33 @@ class MaskArray(MaskBase, ArrayBase):
     def __array__(self):
         return self.data
 
+    def __and__(self, other: Union[MaskBase, np.ndarray]) -> MaskArray:
+        if isinstance(other, MaskBase):
+            other_data = other.data
+        elif isinstance(other, np.ndarray):
+            other_data = other
+        else:
+            raise ValueError(
+                "Bitwise operation only supported for graphicle "
+                "or numpy arrays."
+            )
+        return self.__class__(np.bitwise_and(self.data, other_data))
+
+    def __or__(self, other: Union[MaskBase, np.ndarray]) -> MaskArray:
+        if isinstance(other, MaskBase):
+            other_data = other.data
+        elif isinstance(other, np.ndarray):
+            other_data = other
+        else:
+            raise ValueError(
+                "Bitwise operation only supported for graphicle "
+                "or numpy arrays."
+            )
+        return self.__class__(np.bitwise_or(self.data, other_data))
+
+    def __invert__(self) -> MaskArray:
+        return self.__class__(~self.data)
+
 
 if TYPE_CHECKING:
     _IN_MASK_DICT = Dict[str, Union[MaskArray, np.ndarray]]
