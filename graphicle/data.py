@@ -162,8 +162,12 @@ class MaskGroup(MaskBase):
 
     Parameters
     ----------
-    mask_arrays : dict[str] -> MaskArray
+    mask_arrays : dict of MaskArrays or array-like objects
         Dictionary of MaskArray objects to be composed.
+    agg_op : str or MaskAggOp
+        Defines the aggregation operation when accessing the `data`
+        attribute. Options include "and" and "or".
+        Default is "and".
 
     Attributes
     ----------
@@ -212,6 +216,33 @@ class MaskGroup(MaskBase):
     def __array__(self):
         return self.data
 
+    def __and__(self, other: Union[MaskBase, np.ndarray]) -> MaskArray:
+        if isinstance(other, MaskBase):
+            other_data = other.data
+        elif isinstance(other, np.ndarray):
+            other_data = other
+        else:
+            raise ValueError(
+                "Bitwise operation only supported for graphicle "
+                "or numpy arrays."
+            )
+        return MaskArray(np.bitwise_and(self.data, other_data))
+
+    def __or__(self, other: Union[MaskBase, np.ndarray]) -> MaskArray:
+        if isinstance(other, MaskBase):
+            other_data = other.data
+        elif isinstance(other, np.ndarray):
+            other_data = other
+        else:
+            raise ValueError(
+                "Bitwise operation only supported for graphicle "
+                "or numpy arrays."
+            )
+        return MaskArray(np.bitwise_or(self.data, other_data))
+
+    def __invert__(self) -> MaskArray:
+        return MaskArray(~self.data)
+
     def copy(self):
         return deepcopy(self)
 
@@ -234,7 +265,15 @@ class MaskGroup(MaskBase):
     @property
     def data(self) -> np.ndarray:
         """Same as MaskGroup.bitwise_and."""
-        return self.bitwise_and
+        if self.agg_op is MaskAggOp.AND:
+            return self.bitwise_and
+        elif self.agg_op is MaskAggOp.OR:
+            return self.bitwise_or
+        else:
+            raise NotImplementedError(
+                "Aggregation operation over MaskGroup not implemented. "
+                "Please contact developers with a bug report."
+            )
 
     @property
     def dict(self) -> Dict[str, np.ndarray]:
@@ -610,7 +649,8 @@ class StatusArray(ArrayBase):
                 "intermediate": data == 22,
                 "outgoing": data == 23,
                 "outgoing_nonperturbative_diffraction": data == 24,
-            }
+            },
+            agg_op=MaskAggOp.OR,
         )
         return masks
 
@@ -1043,7 +1083,7 @@ class Graphicle:
         """Id of vertex at which hard interaction occurs."""
         for prop in ("status", "edges"):
             self._need_attr(attr_name=prop, task="infer hard vertex")
-        hard_edges = self.edges[self.status.hard_mask.bitwise_or]
+        hard_edges = self.edges[self.status.hard_mask]
         vertex_array = np.intersect1d(hard_edges["in"], hard_edges["out"])
         central = vertex_array[np.argmin(np.abs(vertex_array))]
         return int(central)

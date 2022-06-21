@@ -111,10 +111,10 @@ def vertex_descendants(adj: gcl.AdjacencyList, vertex: int) -> gcl.MaskArray:
     nx_graph = _nx.MultiDiGraph()
     _ = nx_graph.add_edges_from(graph_dict["edges"])
     desc_nodes = np.array(list(_nx.descendants(nx_graph, vertex)), dtype="<i4")
-    masks = gcl.MaskGroup()
+    masks = gcl.MaskGroup(agg_op=gcl.data.MaskAggOp.OR)
     masks["in"] = np.isin(adj.edges["in"], desc_nodes)
     masks["out"] = np.isin(adj.edges["out"], desc_nodes)
-    return gcl.MaskArray(masks.bitwise_or)
+    return gcl.MaskArray(masks.data)
 
 
 def hard_descendants(
@@ -151,7 +151,7 @@ def hard_descendants(
             dict(zip(tuple(hard_pcls.pdg.name), tuple(hard_pcls.edges["out"])))
         )
     # find the descendants of those vertices
-    masks = gcl.MaskGroup()
+    masks = gcl.MaskGroup(agg_op=gcl.data.MaskAggOp.OR)
     for pcl_name, vtx in hard_vtxs.items():
         masks[pcl_name] = vertex_descendants(graph.adj, vtx)
     return masks
