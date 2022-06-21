@@ -89,6 +89,7 @@ def array_field(type_name):
 class MaskAggOp(Enum):
     AND = "and"
     OR = "or"
+    NONE = None
 
 
 @define
@@ -269,6 +270,10 @@ class MaskGroup(MaskBase):
             return self.bitwise_and
         elif self.agg_op is MaskAggOp.OR:
             return self.bitwise_or
+        elif self.agg_op is MaskAggOp.NONE:
+            raise ValueError(
+                "No bitwise aggregation operation set for this MaskGroup."
+            )
         else:
             raise NotImplementedError(
                 "Aggregation operation over MaskGroup not implemented. "
