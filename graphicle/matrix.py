@@ -68,6 +68,8 @@ def cut_adj(
     adj = np.where(mask, weights, 0.0)
     if self_loop is False:
         np.fill_diagonal(adj, 0.0)
+    else:
+        np.fill_diagonal(adj, 1.0)
     if weighted is False:
         adj = adj.astype(_types.bool)
     return adj
