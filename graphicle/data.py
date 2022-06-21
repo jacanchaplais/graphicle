@@ -46,6 +46,7 @@ if TYPE_CHECKING:
 from itertools import zip_longest
 from functools import partial, cached_property
 from copy import deepcopy
+from enum import Enum
 
 from attr import define, field, Factory, cmp_using, setters  # type: ignore
 import numpy as np
@@ -85,6 +86,11 @@ def array_field(type_name):
 ##################################
 # COMPOSITE MASK DATA STRUCTURES #
 ##################################
+class MaskAggOp(Enum):
+    AND = "and"
+    OR = "or"
+
+
 @define
 class MaskArray(MaskBase, ArrayBase):
     """Data structure for containing masks over particle data."""
@@ -168,14 +174,15 @@ class MaskGroup(MaskBase):
     _mask_arrays: _MASK_DICT = field(
         repr=False, factory=dict, converter=_mask_dict_convert
     )
+    agg_op: MaskAggOp = field(converter=MaskAggOp, default=MaskAggOp.AND)
 
     @classmethod
     def from_numpy_structured(cls, arr: np.ndarray):
         return cls(dict(map(lambda name: (name, arr[name]), arr.dtype.names)))
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         keys = ", ".join(self.names)
-        return f"MaskGroup(mask_arrays=[{keys}])"
+        return f"MaskGroup(mask_arrays=[{keys}], agg_op={self.agg_op.name})"
 
     def __getitem__(self, key):
         if not isinstance(key, str):
