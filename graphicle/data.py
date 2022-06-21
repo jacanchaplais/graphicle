@@ -67,13 +67,18 @@ def _is_np_structured(array: np.ndarray) -> bool:
 _types = Types()
 
 
-def array_field(type_name):
+def array_field(type_name: str):
     """Prepares a field for attrs dataclass with typicle input."""
     types = Types()
     dtype = getattr(types, type_name)
     default = Factory(lambda: np.array([], dtype=dtype))
     equality_comparison = cmp_using(np.array_equal)
-    converter = partial(cast_array, cast_type=dtype)
+
+    def converter(values: npt.ArrayLike) -> np.ndarray:
+        data = np.array(values)
+        out_array: np.ndarray = cast_array(data, cast_type=dtype)
+        return out_array
+
     return field(
         default=default,
         eq=equality_comparison,
