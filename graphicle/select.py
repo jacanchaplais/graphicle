@@ -183,5 +183,5 @@ def any_overlap(masks: gcl.MaskGroup) -> bool:
     """
     combos = combinations(masks.dict.values(), 2)
     pair_checks = map(np.bitwise_and, *zip(*combos))
-    overlaps = np.any(np.bitwise_or.reduce((tuple(pair_checks))))
+    overlaps = np.any(np.bitwise_or.reduce(tuple(pair_checks)))
     return bool(overlaps)
