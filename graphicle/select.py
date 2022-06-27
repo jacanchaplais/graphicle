@@ -5,6 +5,7 @@
 Utilities for selecting elements from graph structured particle data.
 """
 from typing import Set, Optional, Tuple
+from itertools import combinations
 
 import numpy as np
 import pandas as pd
@@ -163,3 +164,24 @@ def hard_edge(graph: gcl.Graphicle, pdg: int) -> Tuple[int, int]:
         hard_graph.pdg.mask(target=[pdg], blacklist=False, sign_sensitive=True)
     ]
     return tuple(parton.edges[0])  # type: ignore
+
+
+def any_overlap(masks: gcl.MaskGroup) -> bool:
+    """Given a MaskGroup object, checks if any of the masks overlap
+    with each other.
+
+    Parameters
+    ----------
+    masks : MaskGroup
+        Collection of boolean masks to check.
+
+    Returns
+    -------
+    any_overlap : bool
+        True if at least two MaskArrays in MaskGroup have at least one
+        True element in the same location.
+    """
+    combos = combinations(masks.dict.values(), 2)
+    pair_checks = map(np.bitwise_and, *zip(*combos))
+    overlaps = np.any(np.bitwise_or.reduce((tuple(pair_checks))))
+    return bool(overlaps)
