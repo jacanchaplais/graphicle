@@ -8,6 +8,7 @@ structures.
 from typing import Tuple, Optional, Set, List, Dict, Callable, Union
 from functools import lru_cache, partial
 import warnings
+from itertools import combinations
 
 import numpy as np
 from numpy.lib.recfunctions import (
@@ -80,14 +81,12 @@ def _diffuse(colors: List[np.ndarray], feats: List[np.ndarray]):
     color_shape = colors[0].shape
     av_color = np.zeros((color_shape[0], color_shape[1]), dtype="<f8")
     color_stack = np.dstack(colors)  # len_basis x feat_dim x num_in
-    feat_stack = np.vstack(feats).T  # feat_dim x num_in
+    feat_stack = np.abs(np.vstack(feats).T)  # feat_dim x num_in
     feat_sum = np.sum(feat_stack, axis=1)
-    nonzero_mask = feat_sum != 0.0
-    av_color[:, nonzero_mask] = (
-        np.sum(
-            color_stack[:, nonzero_mask, :] * feat_stack[nonzero_mask], axis=2
-        )
-        / feat_sum[nonzero_mask]
+    zero_mask = feat_sum == 0.0
+    feat_stack[zero_mask] = 1.0
+    av_color[...] = np.sum(color_stack * feat_stack, axis=2) / np.sum(
+        feat_stack, axis=1
     )
     return av_color
 
