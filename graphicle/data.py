@@ -46,6 +46,7 @@ if TYPE_CHECKING:
 from itertools import zip_longest
 from functools import partial, cached_property
 from copy import deepcopy
+from enum import Enum
 
 from attr import define, field, Factory, cmp_using, setters  # type: ignore
 import numpy as np
@@ -90,25 +91,58 @@ def array_field(type_name: str):
 ##################################
 # COMPOSITE MASK DATA STRUCTURES #
 ##################################
+class MaskAggOp(Enum):
+    AND = "and"
+    OR = "or"
+    NONE = None
+
+
 @define
 class MaskArray(MaskBase, ArrayBase):
     """Data structure for containing masks over particle data."""
 
     data: np.ndarray = array_field("bool")
 
-    def copy(self):
+    def copy(self) -> "MaskArray":
         return deepcopy(self)
 
-    def __getitem__(self, key):
+    def __getitem__(self, key) -> "MaskArray":
         if isinstance(key, MaskBase):
             key = key.data
         return self.__class__(np.array(self.data[key]))
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self.data)
 
-    def __array__(self):
+    def __array__(self) -> np.ndarray:
         return self.data
+
+    def __and__(self, other: Union[MaskBase, np.ndarray]) -> MaskArray:
+        if isinstance(other, MaskBase):
+            other_data = other.data
+        elif isinstance(other, np.ndarray):
+            other_data = other
+        else:
+            raise ValueError(
+                "Bitwise operation only supported for graphicle "
+                "or numpy arrays."
+            )
+        return self.__class__(np.bitwise_and(self.data, other_data))
+
+    def __or__(self, other: Union[MaskBase, np.ndarray]) -> MaskArray:
+        if isinstance(other, MaskBase):
+            other_data = other.data
+        elif isinstance(other, np.ndarray):
+            other_data = other
+        else:
+            raise ValueError(
+                "Bitwise operation only supported for graphicle "
+                "or numpy arrays."
+            )
+        return self.__class__(np.bitwise_or(self.data, other_data))
+
+    def __invert__(self) -> MaskArray:
+        return self.__class__(~self.data)
 
 
 if TYPE_CHECKING:
@@ -134,8 +168,12 @@ class MaskGroup(MaskBase):
 
     Parameters
     ----------
-    mask_arrays : dict[str] -> MaskArray
+    mask_arrays : dict of MaskArrays or array-like objects
         Dictionary of MaskArray objects to be composed.
+    agg_op : str or MaskAggOp
+        Defines the aggregation operation when accessing the `data`
+        attribute. Options include "and" and "or".
+        Default is "and".
 
     Attributes
     ----------
@@ -146,16 +184,17 @@ class MaskGroup(MaskBase):
     _mask_arrays: _MASK_DICT = field(
         repr=False, factory=dict, converter=_mask_dict_convert
     )
+    agg_op: MaskAggOp = field(converter=MaskAggOp, default=MaskAggOp.AND)
 
     @classmethod
-    def from_numpy_structured(cls, arr: np.ndarray):
+    def from_numpy_structured(cls, arr: np.ndarray) -> "MaskGroup":
         return cls(dict(map(lambda name: (name, arr[name]), arr.dtype.names)))
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         keys = ", ".join(self.names)
-        return f"MaskGroup(mask_arrays=[{keys}])"
+        return f"MaskGroup(mask_arrays=[{keys}], agg_op={self.agg_op.name})"
 
-    def __getitem__(self, key):
+    def __getitem__(self, key) -> Union[MaskArray, "MaskGroup"]:
         if not isinstance(key, str):
             return self.__class__(
                 dict(
@@ -168,7 +207,7 @@ class MaskGroup(MaskBase):
 
         return self._mask_arrays[key]
 
-    def __setitem__(self, key, mask):
+    def __setitem__(self, key, mask) -> None:
         """Add a new MaskArray to the group, with given key."""
         if not isinstance(key, str):
             raise KeyError("Key must be string.")
@@ -176,12 +215,39 @@ class MaskGroup(MaskBase):
             mask = MaskArray(mask)
         self._mask_arrays.update({key: mask})
 
-    def __delitem__(self, key):
+    def __delitem__(self, key) -> None:
         """Remove a MaskArray from the group, using given key."""
         self._mask_arrays.pop(key)
 
-    def __array__(self):
+    def __array__(self) -> np.ndarray:
         return self.data
+
+    def __and__(self, other: Union[MaskBase, np.ndarray]) -> MaskArray:
+        if isinstance(other, MaskBase):
+            other_data = other.data
+        elif isinstance(other, np.ndarray):
+            other_data = other
+        else:
+            raise ValueError(
+                "Bitwise operation only supported for graphicle "
+                "or numpy arrays."
+            )
+        return MaskArray(np.bitwise_and(self.data, other_data))
+
+    def __or__(self, other: Union[MaskBase, np.ndarray]) -> MaskArray:
+        if isinstance(other, MaskBase):
+            other_data = other.data
+        elif isinstance(other, np.ndarray):
+            other_data = other
+        else:
+            raise ValueError(
+                "Bitwise operation only supported for graphicle "
+                "or numpy arrays."
+            )
+        return MaskArray(np.bitwise_or(self.data, other_data))
+
+    def __invert__(self) -> MaskArray:
+        return MaskArray(~self.data)
 
     def copy(self):
         return deepcopy(self)
@@ -205,7 +271,19 @@ class MaskGroup(MaskBase):
     @property
     def data(self) -> np.ndarray:
         """Same as MaskGroup.bitwise_and."""
-        return self.bitwise_and
+        if self.agg_op is MaskAggOp.AND:
+            return self.bitwise_and
+        elif self.agg_op is MaskAggOp.OR:
+            return self.bitwise_or
+        elif self.agg_op is MaskAggOp.NONE:
+            raise ValueError(
+                "No bitwise aggregation operation set for this MaskGroup."
+            )
+        else:
+            raise NotImplementedError(
+                "Aggregation operation over MaskGroup not implemented. "
+                "Please contact developers with a bug report."
+            )
 
     @property
     def dict(self) -> Dict[str, np.ndarray]:
@@ -252,22 +330,22 @@ class PdgArray(ArrayBase):
     __lookup_table: __PdgRecords = field(init=False, repr=False)
     __mega_to_giga: float = field(init=False, repr=False)
 
-    def __attrs_post_init__(self):
+    def __attrs_post_init__(self) -> None:
         self.__lookup_table = self.__PdgRecords()
         self.__mega_to_giga: float = 1.0e-3
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self.data)
 
-    def __array__(self):
+    def __array__(self) -> np.ndarray:
         return self.data
 
-    def __getitem__(self, key):
+    def __getitem__(self, key) -> "PdgArray":
         if isinstance(key, MaskBase):
             key = key.data
         return self.__class__(np.array(self.data[key]))
 
-    def copy(self):
+    def copy(self) -> "PdgArray":
         return deepcopy(self)
 
     def mask(
@@ -326,7 +404,8 @@ class PdgArray(ArrayBase):
 
     @property
     def mass(self) -> np.ndarray:
-        return self.__get_prop("mass") * self.__mega_to_giga
+        out: np.ndarray = self.__get_prop("mass") * self.__mega_to_giga
+        return out
 
     @property
     def mass_bounds(self) -> np.ndarray:
@@ -341,7 +420,8 @@ class PdgArray(ArrayBase):
 
     @property
     def width(self) -> np.ndarray:
-        return self.__get_prop("width") * self.__mega_to_giga
+        out: np.ndarray = self.__get_prop("width") * self.__mega_to_giga
+        return out
 
     @property
     def width_bounds(self) -> np.ndarray:
@@ -389,18 +469,18 @@ class MomentumArray(ArrayBase):
 
     data: np.ndarray = array_field("pmu")
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self.data)
 
-    def __array__(self):
+    def __array__(self) -> np.ndarray:
         return self.data
 
-    def __getitem__(self, key):
+    def __getitem__(self, key) -> "MomentumArray":
         if isinstance(key, MaskBase):
             key = key.data
         return self.__class__(np.array(self.data[key]))
 
-    def copy(self):
+    def copy(self) -> "MomentumArray":
         return deepcopy(self)
 
     @property
@@ -462,15 +542,15 @@ class ColorArray(ArrayBase):
     def copy(self):
         return deepcopy(self)
 
-    def __getitem__(self, key):
+    def __getitem__(self, key) -> "ColorArray":
         if isinstance(key, MaskBase):
             key = key.data
         return self.__class__(np.array(self.data[key]))
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self.data)
 
-    def __array__(self):
+    def __array__(self) -> np.ndarray:
         return self.data
 
 
@@ -490,19 +570,19 @@ class HelicityArray(ArrayBase):
 
     data: np.ndarray = array_field("helicity")
 
-    def copy(self):
+    def copy(self) -> "HelicityArray":
         """Returns a new StatusArray instance with same data."""
         return deepcopy(self)
 
-    def __getitem__(self, key):
+    def __getitem__(self, key) -> "HelicityArray":
         if isinstance(key, MaskBase):
             key = key.data
         return self.__class__(np.array(self.data[key]))
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self.data)
 
-    def __array__(self):
+    def __array__(self) -> np.ndarray:
         return self.data
 
 
@@ -526,19 +606,19 @@ class StatusArray(ArrayBase):
 
     data: np.ndarray = array_field("h_int")
 
-    def copy(self):
+    def copy(self) -> "StatusArray":
         """Returns a new StatusArray instance with same data."""
         return deepcopy(self)
 
-    def __getitem__(self, key):
+    def __getitem__(self, key) -> "StatusArray":
         if isinstance(key, MaskBase):
             key = key.data
         return self.__class__(np.array(self.data[key]))
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self.data)
 
-    def __array__(self):
+    def __array__(self) -> np.ndarray:
         return self.data
 
     def in_range(
@@ -581,7 +661,8 @@ class StatusArray(ArrayBase):
                 "intermediate": data == 22,
                 "outgoing": data == 23,
                 "outgoing_nonperturbative_diffraction": data == 24,
-            }
+            },
+            agg_op=MaskAggOp.OR,
         )
         return masks
 
@@ -621,7 +702,7 @@ class ParticleSet(ParticleBase):
         for dset_name in tuple(self.__annotations__.keys()):
             yield {"name": dset_name, "data": getattr(self, dset_name)}
 
-    def __getitem__(self, key):
+    def __getitem__(self, key) -> "ParticleSet":
         kwargs = dict()
         for dset in self.__dsets:
             name = dset["name"]
@@ -630,17 +711,17 @@ class ParticleSet(ParticleBase):
                 kwargs.update({name: data[key]})
         return self.__class__(**kwargs)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         dset_repr = (repr(dset["data"]) for dset in self.__dsets)
         dset_str = ",\n".join(dset_repr)
         return f"ParticleSet(\n{dset_str}\n)"
 
-    def __len__(self):
+    def __len__(self) -> int:
         filled_dsets = filter(lambda dset: len(dset["data"]) > 0, self.__dsets)
         dset = next(filled_dsets)
         return len(dset)
 
-    def copy(self):
+    def copy(self) -> "ParticleSet":
         return deepcopy(self)
 
     @classmethod
@@ -652,7 +733,7 @@ class ParticleSet(ParticleBase):
         helicity: Optional[np.ndarray] = None,
         status: Optional[np.ndarray] = None,
         final: Optional[np.ndarray] = None,
-    ):
+    ) -> "ParticleSet":
         """Creates a ParticleSet instance directly from numpy arrays.
 
         Parameters
@@ -722,13 +803,13 @@ class AdjacencyList(AdjacencyBase):
     _data: np.ndarray = array_field("edge")
     weights: np.ndarray = array_field("double")
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self._data)
 
-    def __array__(self):
+    def __array__(self) -> np.ndarray:
         return self._data
 
-    def __getitem__(self, key):
+    def __getitem__(self, key) -> "AdjacencyList":
         if isinstance(key, MaskBase):
             key = key.data
         return self.__class__(np.array(self._data[key]))
@@ -755,11 +836,13 @@ class AdjacencyList(AdjacencyBase):
             weights=np.concatenate([self.weights, other_array.weights]),
         )
 
-    def copy(self):
+    def copy(self) -> "AdjacencyList":
         return deepcopy(self)
 
     @classmethod
-    def from_matrix(cls, adj_matrix: np.ndarray, weighted: bool = False):
+    def from_matrix(
+        cls, adj_matrix: np.ndarray, weighted: bool = False
+    ) -> "AdjacencyList":
         """Construct an AdjacencyList object from an optionally weighted
         adjacency matrix.
 
@@ -896,17 +979,17 @@ class Graphicle:
     adj: AdjacencyList = AdjacencyList()
 
     @property
-    def __attr_names(self):
+    def __attr_names(self) -> Tuple[str, ...]:
         return tuple(self.__annotations__.keys())
 
-    def __getitem__(self, key):
+    def __getitem__(self, key) -> "Graphicle":
         kwargs = dict()
         for name in self.__attr_names:
             data = getattr(self, name)
             kwargs.update({name: data[key]})
         return self.__class__(**kwargs)
 
-    def copy(self):
+    def copy(self) -> "Graphicle":
         return deepcopy(self)
 
     @classmethod
@@ -920,7 +1003,7 @@ class Graphicle:
         final: Optional[np.ndarray] = None,
         edges: Optional[np.ndarray] = None,
         weights: Optional[np.ndarray] = None,
-    ):
+    ) -> "Graphicle":
         """Instantiates a Graphicle object from an optional collection
         of numpy arrays.
 
@@ -1014,7 +1097,7 @@ class Graphicle:
         """Id of vertex at which hard interaction occurs."""
         for prop in ("status", "edges"):
             self._need_attr(attr_name=prop, task="infer hard vertex")
-        hard_edges = self.edges[self.status.hard_mask.bitwise_or]
+        hard_edges = self.edges[self.status.hard_mask]
         vertex_array = np.intersect1d(hard_edges["in"], hard_edges["out"])
         central = vertex_array[np.argmin(np.abs(vertex_array))]
         return int(central)

@@ -83,3 +83,11 @@ class MaskBase(ABC):
     @abstractmethod
     def __getitem__(self, key) -> "MaskBase":
         pass
+
+    # @abstractmethod
+    # def __and__(self, other) -> "MaskBase":
+    #     pass
+
+    # @abstractmethod
+    # def __or__(self, other) -> "MaskBase":
+    #     pass
