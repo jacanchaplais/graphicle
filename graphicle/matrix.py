@@ -5,7 +5,6 @@ import numpy.typing as npt
 from typicle import Types
 
 import graphicle as gcl
-from . import _matrix
 
 
 _types = Types()
@@ -153,4 +152,6 @@ def delta_R_aff(pmu: gcl.MomentumArray) -> np.ndarray:
     """Returns a symmetric matrix of delta R vals from input
     MomentumArray.
     """
-    return _matrix.delta_R_aff(pmu.eta, pmu.phi)
+    diffs = map(lambda x: np.subtract.outer(x, x), (pmu.eta, pmu.phi))
+    dR: np.ndarray = np.hypot(*diffs)
+    return dR
