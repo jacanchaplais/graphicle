@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from typing import Union
 
 import numpy as np
 
@@ -84,10 +85,10 @@ class MaskBase(ABC):
     def __getitem__(self, key) -> "MaskBase":
         pass
 
-    # @abstractmethod
-    # def __and__(self, other) -> "MaskBase":
-    #     pass
+    @abstractmethod
+    def __and__(self, other: Union["MaskBase", np.ndarray]) -> "MaskBase":
+        pass
 
-    # @abstractmethod
-    # def __or__(self, other) -> "MaskBase":
-    #     pass
+    @abstractmethod
+    def __or__(self, other: Union["MaskBase", np.ndarray]) -> "MaskBase":
+        pass
