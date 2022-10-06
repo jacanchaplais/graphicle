@@ -5,11 +5,13 @@
 Algorithms for performing common HEP calculations using graphicle data
 structures.
 """
+from __future__ import annotations
 from typing import Tuple, Optional, Set, List, Dict, Callable, Union
 from functools import lru_cache, partial
 import warnings
 
 import numpy as np
+import numpy.typing as npt
 from numpy.lib.recfunctions import (
     unstructured_to_structured,
     structured_to_unstructured,
@@ -21,6 +23,26 @@ import graphicle as gcl
 
 
 _types = Types()
+
+
+def eta(pmu: gcl.MomentumArray) -> npt.NDArray[np.float64]:
+    px, py, pz = map(lambda key: pmu.data[key], "xyz")
+    return np.arctanh(np.divide(pz, np.hypot(px, np.hypot(py, pz))))
+
+
+def phi_pol(
+    pmu: gcl.MomentumArray, normalize: bool = True
+) -> npt.NDArray[np.complex128]:
+    """Returns the azimuthal angle of the momentum as a complex polar."""
+    px, py, pz = map(lambda key: pmu.data[key], "xyz")
+    pol_vec: npt.NDArray[np.complex128] = px + 1.0j * py
+    if normalize is False:
+        return pol_vec
+    return np.divide(pol_vec, np.hypot(px, py))
+
+
+def phi(pmu: gcl.MomentumArray) -> npt.NDArray[np.float64]:
+    return np.angle(phi_pol(pmu))
 
 
 def combined_mass(

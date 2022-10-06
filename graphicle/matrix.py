@@ -152,6 +152,9 @@ def delta_R_aff(pmu: gcl.MomentumArray) -> np.ndarray:
     """Returns a symmetric matrix of delta R vals from input
     MomentumArray.
     """
-    diffs = map(lambda x: np.subtract.outer(x, x), (pmu.eta, pmu.phi))
-    dR: np.ndarray = np.hypot(*diffs)
+    eta = pmu.eta
+    deta = eta[:, np.newaxis] - eta
+    phi_pol = gcl.calculate.phi_pol(pmu, normalize=False)
+    dphi = np.angle(phi_pol[:, np.newaxis] * phi_pol.conjugate())
+    dR: np.ndarray = np.hypot(deta, dphi)
     return dR
