@@ -34,7 +34,7 @@ def phi_pol(
     pmu: gcl.MomentumArray, normalize: bool = True
 ) -> npt.NDArray[np.complex128]:
     """Returns the azimuthal angle of the momentum as a complex polar."""
-    px, py, pz = map(lambda key: pmu.data[key], "xyz")
+    px, py = map(lambda key: pmu.data[key], "xy")
     pol_vec: npt.NDArray[np.complex128] = px + 1.0j * py
     if normalize is False:
         return pol_vec
