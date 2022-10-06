@@ -148,7 +148,7 @@ def fc_adj(num_nodes, self_loop=False, dtype=_types.bool):
     return adj
 
 
-def delta_R_aff(pmu: gcl.MomentumArray) -> np.ndarray:
+def delta_R_aff(pmu: gcl.MomentumArray) -> npt.NDArray[np.float64]:
     """Returns a symmetric matrix of delta R vals from input
     MomentumArray.
     """
@@ -156,5 +156,4 @@ def delta_R_aff(pmu: gcl.MomentumArray) -> np.ndarray:
     deta = eta[:, np.newaxis] - eta
     phi_pol = gcl.calculate.phi_pol(pmu, normalize=False)
     dphi = np.angle(phi_pol[:, np.newaxis] * phi_pol.conjugate())
-    dR: np.ndarray = np.hypot(deta, dphi)
-    return dR
+    return np.hypot(deta, dphi)
