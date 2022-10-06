@@ -56,6 +56,7 @@ from typicle import Types
 from typicle.convert import cast_array
 
 from ._base import ParticleBase, AdjacencyBase, MaskBase, ArrayBase
+from .calculate import eta, phi_pol, phi
 
 
 def _is_np_structured(array: np.ndarray) -> bool:
@@ -493,33 +494,35 @@ class MomentumArray(ArrayBase):
         return vec
 
     @property
-    def pt(self) -> np.ndarray:
+    def pt(self) -> npt.NDArray[np.float64]:
         """Momentum component transverse to the beam-axis."""
         return self._vector.pt  # type: ignore
 
     @property
-    def eta(self) -> np.ndarray:
+    def eta(self) -> npt.NDArray[np.float64]:
         """Pseudorapidity of particles."""
-        return self._vector.eta  # type: ignore
+        return eta(self)
 
     @property
-    def phi(self) -> np.ndarray:
-        """Angular displacement of particles about the beam-axis."""
-        return self._vector.phi  # type: ignore
+    def phi(self) -> npt.NDArray[np.float64]:
+        """Azimuthal angular displacement of particles about the
+        beam-axis.
+        """
+        return phi(self)
 
     @property
-    def theta(self) -> np.ndarray:
+    def theta(self) -> npt.NDArray[np.float64]:
         """Spherical angular displacement of particles from the positive
         beam-axis.
         """
         return self._vector.theta  # type: ignore
 
     @property
-    def mass(self) -> np.ndarray:
+    def mass(self) -> npt.NDArray[np.float64]:
         """Mass of the particles."""
         return self._vector.mass  # type: ignore
 
-    def delta_R(self, other_pmu: "MomentumArray") -> np.ndarray:
+    def delta_R(self, other_pmu: "MomentumArray") -> npt.NDArray[np.float64]:
         return self._vector.deltaR(other_pmu._vector)  # type: ignore
 
 
