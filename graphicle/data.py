@@ -44,7 +44,6 @@ if TYPE_CHECKING:
     from typing import Tuple, List, Dict, Optional, Any, TypedDict, Union
 
 from itertools import zip_longest
-from functools import partial, cached_property
 from copy import deepcopy
 from enum import Enum
 
@@ -56,7 +55,7 @@ from typicle import Types
 from typicle.convert import cast_array
 
 from ._base import ParticleBase, AdjacencyBase, MaskBase, ArrayBase
-from .calculate import eta, phi_pol, phi
+from .calculate import eta, phi
 
 
 def _is_np_structured(array: np.ndarray) -> bool:
