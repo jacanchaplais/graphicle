@@ -66,6 +66,11 @@ def _is_np_structured(array: np.ndarray) -> bool:
 # SET UP ARRAY ATTRIBUTES FOR DATACLASSES #
 ###########################################
 _types = Types()
+DoubleVector = npt.NDArray[np.float64]
+BoolVector = npt.NDArray[np.bool_]
+IntVector = npt.NDArray[np.int32]
+HalfIntVector = npt.NDArray[np.int16]
+ObjVector = npt.NDArray[np.object_]
 
 
 def array_field(type_name: str):
@@ -101,7 +106,7 @@ class MaskAggOp(Enum):
 class MaskArray(MaskBase, ArrayBase):
     """Data structure for containing masks over particle data."""
 
-    data: np.ndarray = array_field("bool")
+    data: BoolVector = array_field("bool")
 
     def copy(self) -> "MaskArray":
         return deepcopy(self)
@@ -114,10 +119,10 @@ class MaskArray(MaskBase, ArrayBase):
     def __len__(self) -> int:
         return len(self.data)
 
-    def __array__(self) -> np.ndarray:
+    def __array__(self) -> BoolVector:
         return self.data
 
-    def __and__(self, other: Union[MaskBase, np.ndarray]) -> MaskArray:
+    def __and__(self, other: Union[MaskBase, BoolVector]) -> MaskArray:
         if isinstance(other, MaskBase):
             other_data = other.data
         elif isinstance(other, np.ndarray):
@@ -129,7 +134,7 @@ class MaskArray(MaskBase, ArrayBase):
             )
         return self.__class__(np.bitwise_and(self.data, other_data))
 
-    def __or__(self, other: Union[MaskBase, np.ndarray]) -> MaskArray:
+    def __or__(self, other: Union[MaskBase, BoolVector]) -> MaskArray:
         if isinstance(other, MaskBase):
             other_data = other.data
         elif isinstance(other, np.ndarray):
@@ -146,7 +151,7 @@ class MaskArray(MaskBase, ArrayBase):
 
 
 if TYPE_CHECKING:
-    _IN_MASK_DICT = Dict[str, Union[MaskArray, np.ndarray]]
+    _IN_MASK_DICT = Dict[str, Union[MaskArray, BoolVector]]
     _MASK_DICT = Dict[str, MaskArray]
 
 
@@ -219,10 +224,10 @@ class MaskGroup(MaskBase):
         """Remove a MaskArray from the group, using given key."""
         self._mask_arrays.pop(key)
 
-    def __array__(self) -> np.ndarray:
+    def __array__(self) -> BoolVector:
         return self.data
 
-    def __and__(self, other: Union[MaskBase, np.ndarray]) -> MaskArray:
+    def __and__(self, other: Union[MaskBase, BoolVector]) -> MaskArray:
         if isinstance(other, MaskBase):
             other_data = other.data
         elif isinstance(other, np.ndarray):
@@ -234,7 +239,7 @@ class MaskGroup(MaskBase):
             )
         return MaskArray(np.bitwise_and(self.data, other_data))
 
-    def __or__(self, other: Union[MaskBase, np.ndarray]) -> MaskArray:
+    def __or__(self, other: Union[MaskBase, BoolVector]) -> MaskArray:
         if isinstance(other, MaskBase):
             other_data = other.data
         elif isinstance(other, np.ndarray):
@@ -257,19 +262,19 @@ class MaskGroup(MaskBase):
         return list(self._mask_arrays.keys())
 
     @property
-    def bitwise_or(self) -> np.ndarray:
+    def bitwise_or(self) -> BoolVector:
         return np.bitwise_or.reduce(  # type: ignore
             [child.data for child in self._mask_arrays.values()]
         )
 
     @property
-    def bitwise_and(self) -> np.ndarray:
+    def bitwise_and(self) -> BoolVector:
         return np.bitwise_and.reduce(  # type: ignore
             [child.data for child in self._mask_arrays.values()]
         )
 
     @property
-    def data(self) -> np.ndarray:
+    def data(self) -> BoolVector:
         """Same as MaskGroup.bitwise_and."""
         if self.agg_op is MaskAggOp.AND:
             return self.bitwise_and
@@ -286,7 +291,7 @@ class MaskGroup(MaskBase):
             )
 
     @property
-    def dict(self) -> Dict[str, np.ndarray]:
+    def dict(self) -> Dict[str, BoolVector]:
         return {key: val.data for key, val in self._mask_arrays.items()}
 
 
@@ -326,7 +331,7 @@ class PdgArray(ArrayBase):
 
     from mcpid.lookup import PdgRecords as __PdgRecords
 
-    data: np.ndarray = array_field("int")
+    data: IntVector = array_field("int")
     __lookup_table: __PdgRecords = field(init=False, repr=False)
     __mega_to_giga: float = field(init=False, repr=False)
 
@@ -337,7 +342,7 @@ class PdgArray(ArrayBase):
     def __len__(self) -> int:
         return len(self.data)
 
-    def __array__(self) -> np.ndarray:
+    def __array__(self) -> IntVector:
         return self.data
 
     def __getitem__(self, key) -> "PdgArray":
@@ -395,15 +400,15 @@ class PdgArray(ArrayBase):
         return props  # type: ignore
 
     @property
-    def name(self) -> np.ndarray:
+    def name(self) -> ObjVector:
         return self.__get_prop("name")
 
     @property
-    def charge(self) -> np.ndarray:
+    def charge(self) -> DoubleVector:
         return self.__get_prop("charge")
 
     @property
-    def mass(self) -> np.ndarray:
+    def mass(self) -> DoubleVector:
         out: np.ndarray = self.__get_prop("mass") * self.__mega_to_giga
         return out
 
@@ -415,11 +420,11 @@ class PdgArray(ArrayBase):
         return range_arr
 
     @property
-    def quarks(self) -> np.ndarray:
+    def quarks(self) -> ObjVector:
         return self.__get_prop("quarks")
 
     @property
-    def width(self) -> np.ndarray:
+    def width(self) -> DoubleVector:
         out: np.ndarray = self.__get_prop("width") * self.__mega_to_giga
         return out
 
@@ -431,19 +436,19 @@ class PdgArray(ArrayBase):
         return range_arr
 
     @property
-    def isospin(self) -> np.ndarray:
+    def isospin(self) -> DoubleVector:
         return self.__get_prop("i")
 
     @property
-    def g_parity(self) -> np.ndarray:
+    def g_parity(self) -> DoubleVector:
         return self.__get_prop("g")
 
     @property
-    def space_parity(self) -> np.ndarray:
+    def space_parity(self) -> DoubleVector:
         return self.__get_prop("p")
 
     @property
-    def charge_parity(self) -> np.ndarray:
+    def charge_parity(self) -> DoubleVector:
         return self.__get_prop("c")
 
 
@@ -493,35 +498,35 @@ class MomentumArray(ArrayBase):
         return vec
 
     @property
-    def pt(self) -> npt.NDArray[np.float64]:
+    def pt(self) -> DoubleVector:
         """Momentum component transverse to the beam-axis."""
         return self._vector.pt  # type: ignore
 
     @property
-    def eta(self) -> npt.NDArray[np.float64]:
+    def eta(self) -> DoubleVector:
         """Pseudorapidity of particles."""
         return eta(self)
 
     @property
-    def phi(self) -> npt.NDArray[np.float64]:
+    def phi(self) -> DoubleVector:
         """Azimuthal angular displacement of particles about the
         beam-axis.
         """
         return phi(self)
 
     @property
-    def theta(self) -> npt.NDArray[np.float64]:
+    def theta(self) -> DoubleVector:
         """Spherical angular displacement of particles from the positive
         beam-axis.
         """
         return self._vector.theta  # type: ignore
 
     @property
-    def mass(self) -> npt.NDArray[np.float64]:
+    def mass(self) -> DoubleVector:
         """Mass of the particles."""
         return self._vector.mass  # type: ignore
 
-    def delta_R(self, other_pmu: "MomentumArray") -> npt.NDArray[np.float64]:
+    def delta_R(self, other_pmu: "MomentumArray") -> DoubleVector:
         return self._vector.deltaR(other_pmu._vector)  # type: ignore
 
 
@@ -570,7 +575,7 @@ class HelicityArray(ArrayBase):
         Helicity values.
     """
 
-    data: np.ndarray = array_field("helicity")
+    data: HalfIntVector = array_field("helicity")
 
     def copy(self) -> "HelicityArray":
         """Returns a new StatusArray instance with same data."""
@@ -584,7 +589,7 @@ class HelicityArray(ArrayBase):
     def __len__(self) -> int:
         return len(self.data)
 
-    def __array__(self) -> np.ndarray:
+    def __array__(self) -> HalfIntVector:
         return self.data
 
 
@@ -606,7 +611,7 @@ class StatusArray(ArrayBase):
     produced the data.
     """
 
-    data: np.ndarray = array_field("h_int")
+    data: HalfIntVector = array_field("h_int")
 
     def copy(self) -> "StatusArray":
         """Returns a new StatusArray instance with same data."""
@@ -620,7 +625,7 @@ class StatusArray(ArrayBase):
     def __len__(self) -> int:
         return len(self.data)
 
-    def __array__(self) -> np.ndarray:
+    def __array__(self) -> HalfIntVector:
         return self.data
 
     def in_range(
@@ -803,7 +808,7 @@ class AdjacencyList(AdjacencyBase):
     """
 
     _data: np.ndarray = array_field("edge")
-    weights: np.ndarray = array_field("double")
+    weights: DoubleVector = array_field("double")
 
     def __len__(self) -> int:
         return len(self._data)
@@ -843,7 +848,9 @@ class AdjacencyList(AdjacencyBase):
 
     @classmethod
     def from_matrix(
-        cls, adj_matrix: np.ndarray, weighted: bool = False
+        cls,
+        adj_matrix: Union[DoubleVector, BoolVector, IntVector],
+        weighted: bool = False,
     ) -> "AdjacencyList":
         """Construct an AdjacencyList object from an optionally weighted
         adjacency matrix.
@@ -865,7 +872,7 @@ class AdjacencyList(AdjacencyBase):
         return cls(**kwargs)
 
     @property
-    def matrix(self) -> np.ndarray:
+    def matrix(self) -> Union[DoubleVector, IntVector]:
         size = len(self.nodes)
         if len(self.weights) > 0:
             weights = self.weights
@@ -882,7 +889,7 @@ class AdjacencyList(AdjacencyBase):
         return self._data
 
     @property
-    def nodes(self) -> np.ndarray:
+    def nodes(self) -> IntVector:
         """Nodes are extracted from the edge list, and put in
         ascending order of magnitude, regardless of sign.
         Positive sign conventionally means final state particle.
@@ -1085,7 +1092,7 @@ class Graphicle:
         return self.adj.edges
 
     @property
-    def nodes(self) -> np.ndarray:
+    def nodes(self) -> IntVector:
         return self.adj.nodes
 
     def _need_attr(self, attr_name: str, task: str) -> None:

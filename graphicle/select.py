@@ -8,6 +8,7 @@ from typing import Set, Optional, Tuple
 from itertools import combinations
 
 import numpy as np
+import numpy.typing as npt
 import pandas as pd
 import networkx as _nx
 
@@ -18,7 +19,7 @@ def find_vertex(
     graph: gcl.Graphicle,
     pdgs_in: Optional[Set[int]] = None,
     pdgs_out: Optional[Set[int]] = None,
-) -> np.ndarray:
+) -> npt.NDArray[np.int32]:
     """Locate vertices with the inward and outward particles of the
     passed pdg codes.
 

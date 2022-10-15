@@ -8,15 +8,16 @@ import graphicle as gcl
 
 
 _types = Types()
+Vector = npt.NDArray[np.float64]
 
 
 def cut_adj(
-    matrix: np.ndarray,
+    matrix: Vector,
     cut: float,
     mode: str = "max",
     self_loop: bool = False,
     weighted: bool = False,
-) -> np.ndarray:
+) -> Vector:
     """Produce a directed adjacency matrix with outward edges
     towards the neighbours within a cut range, determined from the input
     affinity matrix.
@@ -75,13 +76,13 @@ def cut_adj(
 
 
 def knn_adj(
-    matrix: np.ndarray,
+    matrix: Vector,
     k: int,
     self_loop: bool = False,
     weighted: bool = False,
     row: bool = True,
     dtype: Optional[npt.DTypeLike] = None,
-) -> np.ndarray:
+) -> Vector:
     """Produce a directed adjacency matrix with outward edges
     towards the k nearest neighbours, determined from the input
     affinity matrix.
@@ -140,7 +141,9 @@ def knn_adj(
     return adj
 
 
-def fc_adj(num_nodes, self_loop=False, dtype=_types.bool):
+def fc_adj(
+    num_nodes: int, self_loop: bool = False, dtype: npt.DTypeLike = _types.bool
+) -> Vector:
     """Create a fully connected adjacency matrix."""
     adj = np.ones((num_nodes, num_nodes), dtype=dtype)
     if self_loop is False:
@@ -148,7 +151,7 @@ def fc_adj(num_nodes, self_loop=False, dtype=_types.bool):
     return adj
 
 
-def delta_R_aff(pmu: gcl.MomentumArray) -> npt.NDArray[np.float64]:
+def delta_R_aff(pmu: gcl.MomentumArray) -> Vector:
     """Returns a symmetric matrix of delta R vals from input
     MomentumArray.
     """
