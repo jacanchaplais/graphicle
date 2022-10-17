@@ -42,7 +42,7 @@ def phi_pol(pmu: gcl.MomentumArray, normalize: bool = True) -> ComplexVector:
 
 
 def phi(pmu: gcl.MomentumArray) -> DoubleVector:
-    return np.angle(phi_pol(pmu), normalize=False)  # type: ignore
+    return np.angle(phi_pol(pmu, normalize=False))  # type: ignore
 
 
 def combined_mass(
