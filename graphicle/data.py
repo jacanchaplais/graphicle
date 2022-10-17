@@ -39,9 +39,17 @@ For more details, see individual docstrings.
 
 from __future__ import annotations
 from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from typing import Tuple, List, Dict, Optional, Any, TypedDict, Union
+from typing import (
+    Tuple,
+    List,
+    Dict,
+    Optional,
+    Any,
+    TypedDict,
+    Union,
+    TypeVar,
+    Type,
+)
 
 from itertools import zip_longest
 from copy import deepcopy
@@ -58,10 +66,6 @@ from ._base import ParticleBase, AdjacencyBase, MaskBase, ArrayBase
 from .calculate import eta, phi
 
 
-def _is_np_structured(array: np.ndarray) -> bool:
-    return array.dtype.names is not None
-
-
 ###########################################
 # SET UP ARRAY ATTRIBUTES FOR DATACLASSES #
 ###########################################
@@ -71,6 +75,12 @@ BoolVector = npt.NDArray[np.bool_]
 IntVector = npt.NDArray[np.int32]
 HalfIntVector = npt.NDArray[np.int16]
 ObjVector = npt.NDArray[np.object_]
+AnyVector = npt.NDArray[Any]
+DataType = TypeVar("DataType", bound=ArrayBase)
+
+
+def _is_np_structured(array: AnyVector) -> bool:
+    return array.dtype.names is not None
 
 
 def array_field(type_name: str):
@@ -80,9 +90,9 @@ def array_field(type_name: str):
     default = Factory(lambda: np.array([], dtype=dtype))
     equality_comparison = cmp_using(np.array_equal)
 
-    def converter(values: npt.ArrayLike) -> np.ndarray:
+    def converter(values: npt.ArrayLike) -> AnyVector:
         data = np.array(values)
-        out_array: np.ndarray = cast_array(data, cast_type=dtype)
+        out_array: AnyVector = cast_array(data, cast_type=dtype)
         return out_array
 
     return field(
@@ -390,11 +400,11 @@ class PdgArray(ArrayBase):
             np.isin(data, target, assume_unique=False, invert=blacklist)
         )
 
-    def __get_prop(self, field: str) -> np.ndarray:
+    def __get_prop(self, field: str) -> AnyVector:
         props = self.__lookup_table.properties(self.data, [field])[field]
         return props  # type: ignore
 
-    def __get_prop_range(self, field: str) -> np.ndarray:
+    def __get_prop_range(self, field: str) -> AnyVector:
         field_range = [field + "lower", field + "upper"]
         props = self.__lookup_table.properties(self.data, field_range)
         return props  # type: ignore
@@ -409,11 +419,11 @@ class PdgArray(ArrayBase):
 
     @property
     def mass(self) -> DoubleVector:
-        out: np.ndarray = self.__get_prop("mass") * self.__mega_to_giga
+        out: DoubleVector = self.__get_prop("mass") * self.__mega_to_giga
         return out
 
     @property
-    def mass_bounds(self) -> np.ndarray:
+    def mass_bounds(self) -> AnyVector:
         range_arr = self.__get_prop_range("mass")
         for name in range_arr.dtype.names:
             range_arr[name] *= self.__mega_to_giga
@@ -425,11 +435,11 @@ class PdgArray(ArrayBase):
 
     @property
     def width(self) -> DoubleVector:
-        out: np.ndarray = self.__get_prop("width") * self.__mega_to_giga
+        out: DoubleVector = self.__get_prop("width") * self.__mega_to_giga
         return out
 
     @property
-    def width_bounds(self) -> np.ndarray:
+    def width_bounds(self) -> AnyVector:
         range_arr = self.__get_prop_range("width")
         for name in range_arr.dtype.names:
             range_arr[name] *= self.__mega_to_giga
@@ -472,12 +482,12 @@ class MomentumArray(ArrayBase):
         Azimuthal component of particle momenta.
     """
 
-    data: np.ndarray = array_field("pmu")
+    data: AnyVector = array_field("pmu")
 
     def __len__(self) -> int:
         return len(self.data)
 
-    def __array__(self) -> np.ndarray:
+    def __array__(self) -> AnyVector:
         return self.data
 
     def __getitem__(self, key) -> "MomentumArray":
@@ -544,7 +554,7 @@ class ColorArray(ArrayBase):
         Structured array containing color / anti-color pairs.
     """
 
-    data: np.ndarray = array_field("color")
+    data: AnyVector = array_field("color")
 
     def copy(self):
         return deepcopy(self)
@@ -557,7 +567,7 @@ class ColorArray(ArrayBase):
     def __len__(self) -> int:
         return len(self.data)
 
-    def __array__(self) -> np.ndarray:
+    def __array__(self) -> AnyVector:
         return self.data
 
 
@@ -734,12 +744,12 @@ class ParticleSet(ParticleBase):
     @classmethod
     def from_numpy(
         cls,
-        pdg: Optional[np.ndarray] = None,
-        pmu: Optional[np.ndarray] = None,
-        color: Optional[np.ndarray] = None,
-        helicity: Optional[np.ndarray] = None,
-        status: Optional[np.ndarray] = None,
-        final: Optional[np.ndarray] = None,
+        pdg: Optional[IntVector] = None,
+        pmu: Optional[AnyVector] = None,
+        color: Optional[AnyVector] = None,
+        helicity: Optional[HalfIntVector] = None,
+        status: Optional[HalfIntVector] = None,
+        final: Optional[BoolVector] = None,
     ) -> "ParticleSet":
         """Creates a ParticleSet instance directly from numpy arrays.
 
@@ -767,7 +777,9 @@ class ParticleSet(ParticleBase):
             objects, and providing a unified interface to them.
         """
 
-        def optional(data_class, data: Optional[np.ndarray]):
+        def optional(
+            data_class: Type[DataType], data: Optional[AnyVector]
+        ) -> DataType:
             return data_class(data) if data is not None else data_class()
 
         return cls(
@@ -807,13 +819,13 @@ class AdjacencyList(AdjacencyBase):
         Adjacency matrix representation.
     """
 
-    _data: np.ndarray = array_field("edge")
+    _data: AnyVector = array_field("edge")
     weights: DoubleVector = array_field("double")
 
     def __len__(self) -> int:
         return len(self._data)
 
-    def __array__(self) -> np.ndarray:
+    def __array__(self) -> AnyVector:
         return self._data
 
     def __getitem__(self, key) -> "AdjacencyList":
@@ -885,7 +897,7 @@ class AdjacencyList(AdjacencyBase):
         return adj
 
     @property
-    def edges(self) -> np.ndarray:
+    def edges(self) -> AnyVector:
         return self._data
 
     @property
@@ -902,8 +914,8 @@ class AdjacencyList(AdjacencyBase):
 
     def to_dicts(
         self,
-        edge_data: Optional[Dict[str, Union[ArrayBase, np.ndarray]]] = None,
-        node_data: Optional[Dict[str, Union[ArrayBase, np.ndarray]]] = None,
+        edge_data: Optional[Dict[str, Union[ArrayBase, AnyVector]]] = None,
+        node_data: Optional[Dict[str, Union[ArrayBase, AnyVector]]] = None,
     ) -> _AdjDict:
         """Returns data in dictionary format, which is more easily
         parsed by external libraries, such as NetworkX.
@@ -915,10 +927,10 @@ class AdjacencyList(AdjacencyBase):
 
         def make_data_dicts(
             orig: Tuple[Any, ...],
-            data: Dict[str, Union[ArrayBase, np.ndarray]],
+            data: Dict[str, Union[ArrayBase, AnyVector]],
         ):
             def array_iterator(array_dict):
-                for array in data.values():
+                for array in array_dict.values():
                     if isinstance(array, ArrayBase):
                         yield array.data
                     elif isinstance(array, np.ndarray):
@@ -1004,14 +1016,14 @@ class Graphicle:
     @classmethod
     def from_numpy(
         cls,
-        pdg: Optional[np.ndarray] = None,
-        pmu: Optional[np.ndarray] = None,
-        color: Optional[np.ndarray] = None,
-        helicity: Optional[np.ndarray] = None,
-        status: Optional[np.ndarray] = None,
-        final: Optional[np.ndarray] = None,
-        edges: Optional[np.ndarray] = None,
-        weights: Optional[np.ndarray] = None,
+        pdg: Optional[IntVector] = None,
+        pmu: Optional[AnyVector] = None,
+        color: Optional[AnyVector] = None,
+        helicity: Optional[HalfIntVector] = None,
+        status: Optional[HalfIntVector] = None,
+        final: Optional[BoolVector] = None,
+        edges: Optional[AnyVector] = None,
+        weights: Optional[DoubleVector] = None,
     ) -> "Graphicle":
         """Instantiates a Graphicle object from an optional collection
         of numpy arrays.
@@ -1088,7 +1100,7 @@ class Graphicle:
         return self.particles.final
 
     @property
-    def edges(self) -> np.ndarray:
+    def edges(self) -> AnyVector:
         return self.adj.edges
 
     @property

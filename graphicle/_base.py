@@ -1,13 +1,22 @@
 from abc import ABC, abstractmethod
-from typing import Union
+from typing import Union, Any, Optional
 
 import numpy as np
+import numpy.typing as npt
+
+
+AnyVector = npt.NDArray[Any]
+BoolVector = npt.NDArray[np.bool_]
 
 
 class ArrayBase(ABC):
+    @abstractmethod
+    def __init__(self, data: Optional[AnyVector] = None) -> None:
+        pass
+
     @property
     @abstractmethod
-    def data(self) -> np.ndarray:
+    def data(self) -> AnyVector:
         pass
 
 
@@ -36,19 +45,19 @@ class ParticleBase(ABC):
 class AdjacencyBase(ABC):
     @property
     @abstractmethod
-    def edges(self) -> np.ndarray:
+    def edges(self) -> AnyVector:
         pass
 
     @property
     @abstractmethod
-    def nodes(self) -> np.ndarray:
+    def nodes(self) -> npt.NDArray[np.int32]:
         pass
 
 
 class GraphicleBase(ABC):
     @property
     @abstractmethod
-    def edges(self) -> np.ndarray:
+    def edges(self) -> AnyVector:
         pass
 
     # @abstractmethod
@@ -78,7 +87,7 @@ class GraphicleBase(ABC):
 class MaskBase(ABC):
     @property
     @abstractmethod
-    def data(self) -> np.ndarray:
+    def data(self) -> BoolVector:
         pass
 
     @abstractmethod
@@ -86,9 +95,9 @@ class MaskBase(ABC):
         pass
 
     @abstractmethod
-    def __and__(self, other: Union["MaskBase", np.ndarray]) -> "MaskBase":
+    def __and__(self, other: Union["MaskBase", BoolVector]) -> "MaskBase":
         pass
 
     @abstractmethod
-    def __or__(self, other: Union["MaskBase", np.ndarray]) -> "MaskBase":
+    def __or__(self, other: Union["MaskBase", BoolVector]) -> "MaskBase":
         pass
