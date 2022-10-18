@@ -58,6 +58,7 @@ from enum import Enum
 from attr import define, field, Factory, cmp_using, setters  # type: ignore
 import numpy as np
 import numpy.typing as npt
+from scipy.sparse import coo_array
 from numpy.lib import recfunctions as rfn
 from typicle import Types
 from typicle.convert import cast_array
@@ -229,6 +230,9 @@ class MaskGroup(MaskBase):
         if not isinstance(mask, MaskBase):
             mask = MaskArray(mask)
         self._mask_arrays.update({key: mask})
+
+    def __len__(self) -> int:
+        return len(self.data)
 
     def __delitem__(self, key) -> None:
         """Remove a MaskArray from the group, using given key."""
@@ -863,6 +867,7 @@ class AdjacencyList(AdjacencyBase):
         cls,
         adj_matrix: Union[DoubleVector, BoolVector, IntVector],
         weighted: bool = False,
+        self_loop: bool = False,
     ) -> "AdjacencyList":
         """Construct an AdjacencyList object from an optionally weighted
         adjacency matrix.
@@ -876,11 +881,16 @@ class AdjacencyList(AdjacencyBase):
             Whether or not to propogate the numerical values in the
             elements of the adjacency matrix as the edge weights
             (default: False).
+        self_loop : bool
+            If True will add edges from nodes to themselves, with weight
+            0 (if applicable). (default: True)
         """
-        edges = np.where(adj_matrix)
-        kwargs = {"data": np.array(edges).T}
+        sps_adj = coo_array(adj_matrix)
+        if self_loop is True:
+            sps_adj.setdiag(0.0)
+        kwargs = {"data": np.vstack((sps_adj.row, sps_adj.col)).T}
         if weighted is True:
-            kwargs["weights"] = adj_matrix[edges]
+            kwargs["weights"] = sps_adj.data
         return cls(**kwargs)
 
     @property
@@ -1007,7 +1017,8 @@ class Graphicle:
         kwargs = dict()
         for name in self.__attr_names:
             data = getattr(self, name)
-            kwargs.update({name: data[key]})
+            if len(data) != 0:
+                kwargs.update({name: data[key]})
         return self.__class__(**kwargs)
 
     def copy(self) -> "Graphicle":
