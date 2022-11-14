@@ -155,8 +155,8 @@ def delta_R_aff(
     pmu_a: gcl.MomentumArray,
     pmu_b: Optional[gcl.MomentumArray] = None,
 ) -> Vector:
-    """Returns a symmetric matrix of delta R vals from one or two
-    particle sets' four-momenta.
+    """Returns a square matrix of delta R vals from one or two particle
+    sets' four-momenta.
 
     Parameters
     ----------
@@ -170,8 +170,10 @@ def delta_R_aff(
     Returns
     -------
     delta_R_matrix : np.ndarray[double]
-        Square symmetric matrix representing the Euclidean distance
-        between the two sets of particles in the eta-phi plane.
+        Square matrix representing the Euclidean distance between the
+        two sets of particles in the eta-phi plane. If only one set of
+        particles is provided, calculates internal distances within
+        particle set, thus the result is also symmetric.
     """
     if pmu_b is None:
         pmu_b = pmu_a
