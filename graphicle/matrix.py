@@ -155,7 +155,7 @@ def delta_R_aff(
     pmu_a: gcl.MomentumArray,
     pmu_b: Optional[gcl.MomentumArray] = None,
 ) -> Vector:
-    """Returns a square matrix of delta R vals from one or two particle
+    """Returns a matrix of delta R vals from one or two particle
     sets' four-momenta.
 
     Parameters
@@ -163,22 +163,20 @@ def delta_R_aff(
     pmu_a : gcl.MomentumArray
         Four-momenta of first particle set.
     pmu_b : gcl.MomentumArray, optional
-        Four-momenta of second particle set. Must be same number of
-        particles as in pmu_a. If not set, will use pmu_a, and calculate
-        internal particle distances within this set.
+        Four-momenta of second particle set. If not set, will use pmu_a,
+        and calculate internal particle distances within this set.
 
     Returns
     -------
     delta_R_matrix : np.ndarray[double]
-        Square matrix representing the Euclidean distance between the
-        two sets of particles in the eta-phi plane. If only one set of
+        Matrix representing the Euclidean distance between the two sets
+        of particles in the eta-phi plane. Rows represent particles in
+        pmu_a, and columns particles in pmu_b. If only one set of
         particles is provided, calculates internal distances within
-        particle set, thus the result is also symmetric.
+        particle set, thus the result is a square symmetric matrix.
     """
     if pmu_b is None:
         pmu_b = pmu_a
-    elif len(pmu_a) != len(pmu_b):
-        raise ValueError("MomentumArrays must have some number of particles")
     deta = pmu_a.eta[:, np.newaxis] - pmu_b.eta
     phi_pol_a = gcl.calculate.phi_pol(pmu_a, normalize=False)
     phi_pol_b = gcl.calculate.phi_pol(pmu_b, normalize=False)
