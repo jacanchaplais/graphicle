@@ -6,18 +6,28 @@ Algorithms for performing common HEP calculations using graphicle data
 structures.
 """
 from __future__ import annotations
-from typing import Tuple, Optional, Set, List, Dict, Callable, Union
+from typing import (
+    Tuple,
+    Optional,
+    Set,
+    List,
+    Dict,
+    Callable,
+    Union,
+    TypeVar,
+    Any,
+    Iterable,
+)
 from functools import lru_cache, partial
 import warnings
 
 import numpy as np
 import numpy.typing as npt
-from numpy.lib.recfunctions import (
-    unstructured_to_structured,
-    structured_to_unstructured,
-)
+import numpy.lib.recfunctions as rfn
 from typicle import Types
 import networkx as nx
+import pyjet
+from pyjet import ClusterSequence, PseudoJet
 
 import graphicle as gcl
 
@@ -79,12 +89,12 @@ def combined_mass(
     # sanitizing and combining the inputs
     if isinstance(pmu, gcl.MomentumArray):
         pmu = pmu.data
-    data = structured_to_unstructured(pmu)
+    data = rfn.structured_to_unstructured(pmu)
     if weight is not None:
         if not isinstance(weight, np.ndarray):
             raise ValueError("Weights must be provided as a numpy array.")
         if weight.dtype.names is not None:
-            weight = structured_to_unstructured(weight)
+            weight = rfn.structured_to_unstructured(weight)
         data = weight * data
     # mass given as minkowski norm of (weighted) momenta
     minkowski = np.array([-1.0, -1.0, -1.0, 1.0])
@@ -124,7 +134,7 @@ def _trace_vector(
     exclusive: bool = False,
 ) -> np.ndarray:
     len_basis = len(basis)
-    feat_fmt = structured_to_unstructured if is_structured else lambda x: x
+    feat_fmt = rfn.structured_to_unstructured if is_structured else lambda x: x
     color = np.zeros((len_basis, feat_dim), dtype=_types.double)
     if vertex in basis:
         color[basis.index(vertex)] = 1.0
@@ -225,7 +235,7 @@ def flow_trace(
     _trace_vector.cache_clear()
     traces = dict()
     array_fmt: Callable[[np.ndarray], np.ndarray] = (
-        partial(unstructured_to_structured, dtype=dtype)  # type: ignore
+        partial(rfn.unstructured_to_structured, dtype=dtype)  # type: ignore
         if is_structured
         else lambda x: x.squeeze()
     )
@@ -233,3 +243,70 @@ def flow_trace(
     for i, name in enumerate(names):
         traces[name] = array_fmt(trc[:, i, :])
     return traces
+
+
+def cluster_pmu(
+    pmu: gcl.MomentumArray,
+    radius: float,
+    p_val: float,
+    pt_cut: Optional[float] = None,
+    eta_cut: Optional[float] = None,
+) -> gcl.MaskGroup:
+    """Clusters particles using the generalised-kt algorithm.
+
+    :group: calculations
+
+    Parameters
+    ----------
+    pmu: gcl.MomentumArray
+        The momenta of each particle in the point cloud.
+    radius : float
+        The radius of the clusters to be produced.
+    p_val : float
+        The exponent parameter determining the transverse momentum (pt)
+        dependence of iterative pseudojet merges. Positive values
+        cluster low pt particles first, positive values cluster high pt
+        particles first, and a value of zero corresponds to no pt
+        dependence.
+    pt_cut : float, optional
+        Jet transverse momentum threshold, below which jets will be
+        discarded.
+    eta_cut : float, optional
+        Jet pseudorapidity threshold, above which jets will be
+        discarded.
+
+    Returns
+    -------
+    clusters : gcl.MaskGroup
+        MaskGroup object, containing boolean masks over the input data
+        for each jet clustering.
+
+    Notes
+    -----
+    This is a wrapper around FastJet's implementation.
+
+    Standard settings:
+        kt algorithm: p_val = 1
+        Cambridge/Aachen algorithm: p_val = 0
+        anti-kt algorithm: p_val = -1
+    """
+    pmu_pyjet = pmu.data[["e", "x", "y", "z"]]
+    pmu_pyjet.dtype.names = "E", "px", "py", "pz"
+    pmu_pyjet_idx = rfn.append_fields(
+        pmu_pyjet, "idx", np.arange(len(pmu_pyjet))
+    )
+    sequence: ClusterSequence = pyjet.cluster(
+        pmu_pyjet_idx, R=radius, p=p_val, ep=True
+    )
+    jets: Iterable[PseudoJet] = sequence.inclusive_jets()
+    if pt_cut is not None:
+        jets = filter(lambda jet: jet.pt > pt_cut, jets)
+    if eta_cut is not None:
+        jets = filter(lambda jet: abs(jet.eta) < eta_cut, jets)
+    cluster_mask = gcl.MaskGroup()
+    cluster_mask.agg_op = gcl.data.MaskAggOp.OR
+    for i, jet in enumerate(jets):
+        mask = np.zeros_like(pmu_pyjet, dtype="<?")
+        mask[list(map(lambda pcl: pcl.idx, jet))] = True  # type: ignore
+        cluster_mask[f"{i}"] = mask
+    return cluster_mask
