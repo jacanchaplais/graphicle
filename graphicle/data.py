@@ -211,7 +211,7 @@ class MaskGroup(MaskBase):
         return cls(dict(map(lambda name: (name, arr[name]), arr.dtype.names)))
 
     def __repr__(self) -> str:
-        keys = ", ".join(self.names)
+        keys = ", ".join(map(lambda name: '"' + name + '"', self.names))
         return f"MaskGroup(mask_arrays=[{keys}], agg_op={self.agg_op.name})"
 
     def __getitem__(self, key) -> Union[MaskArray, "MaskGroup"]:
