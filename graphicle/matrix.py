@@ -1,3 +1,4 @@
+from __future__ import annotations
 from typing import Optional
 
 import numpy as np
@@ -151,34 +152,24 @@ def fc_adj(
     return adj
 
 
-def delta_R_aff(
-    pmu_a: gcl.MomentumArray,
-    pmu_b: Optional[gcl.MomentumArray] = None,
-) -> Vector:
-    """Returns a matrix of delta R vals from one or two particle
-    sets' four-momenta.
+def delta_R_aff(pmu: gcl.MomentumArray) -> Vector:
+    """Returns the inter-particle Euclidean distances between particles
+    internally within the given MomentumArray.
 
     Parameters
     ----------
-    pmu_a : gcl.MomentumArray
-        Four-momenta of first particle set.
-    pmu_b : gcl.MomentumArray, optional
-        Four-momenta of second particle set. If not set, will use pmu_a,
-        and calculate internal particle distances within this set.
+    pmu : gcl.MomentumArray
+        Four-momenta.
 
     Returns
     -------
     delta_R_matrix : np.ndarray[double]
-        Matrix representing the Euclidean distance between the two sets
-        of particles in the eta-phi plane. Rows represent particles in
-        pmu_a, and columns particles in pmu_b. If only one set of
-        particles is provided, calculates internal distances within
-        particle set, thus the result is a square symmetric matrix.
+        Square symmetric matrix representing the Euclidean distance
+        between every pair of particles in the eta-phi plane.
+
+    Notes
+    -----
+    Infinite values may be encountered if particles are travelling
+    parallel to the beam axis, __ie.__ with infinite pseudorapidity.
     """
-    if pmu_b is None:
-        pmu_b = pmu_a
-    deta = pmu_a.eta[:, np.newaxis] - pmu_b.eta
-    phi_pol_a = gcl.calculate.phi_pol(pmu_a, normalize=False)
-    phi_pol_b = gcl.calculate.phi_pol(pmu_b, normalize=False)
-    dphi = np.angle(phi_pol_a[:, np.newaxis] * phi_pol_b.conjugate())
-    return np.hypot(deta, dphi)
+    return pmu.delta_R(pmu)
