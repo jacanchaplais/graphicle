@@ -54,6 +54,8 @@ from typing import (
 from itertools import zip_longest
 from copy import deepcopy
 from enum import Enum
+from functools import cached_property
+import warnings
 
 from attr import define, field, Factory, cmp_using, setters  # type: ignore
 import numpy as np
@@ -64,7 +66,8 @@ from typicle import Types
 from typicle.convert import cast_array
 
 from ._base import ParticleBase, AdjacencyBase, MaskBase, ArrayBase
-from .calculate import eta, phi
+from . import calculate
+from . import matrix
 
 
 ###########################################
@@ -72,12 +75,15 @@ from .calculate import eta, phi
 ###########################################
 _types = Types()
 DoubleVector = npt.NDArray[np.float64]
+ComplexVector = npt.NDArray[np.complex128]
 BoolVector = npt.NDArray[np.bool_]
 IntVector = npt.NDArray[np.int32]
 HalfIntVector = npt.NDArray[np.int16]
 ObjVector = npt.NDArray[np.object_]
 AnyVector = npt.NDArray[Any]
 DataType = TypeVar("DataType", bound=ArrayBase)
+
+DHUGE = np.finfo(np.dtype("<f8")).max * 0.1
 
 
 def _is_np_structured(array: AnyVector) -> bool:
@@ -471,19 +477,22 @@ class PdgArray(ArrayBase):
 ########################################
 @define
 class MomentumArray(ArrayBase):
-    """Returns data structure containing four-momentum of particle
-    list.
+    """Data structure containing four-momentum of particle list.
 
     Attributes
     ----------
-    data : ndarray
+    data : np.ndarray[double]
         Structured array containing four momenta.
-    pt : ndarray
+    pt : np.ndarray[double]
         Transverse component of particle momenta.
-    eta : ndarray
+    eta : np.ndarray[double]
         Pseudorapidity component of particle momenta.
-    phi : ndarray
+    phi : np.ndarray[double]
         Azimuthal component of particle momenta.
+    theta : np.ndarray[double]
+        Angular displacement from beam axis.
+    mass : np.ndarray[double]
+        Mass of the particles
     """
 
     data: AnyVector = array_field("pmu")
@@ -502,46 +511,87 @@ class MomentumArray(ArrayBase):
     def copy(self) -> "MomentumArray":
         return deepcopy(self)
 
-    @property
-    def _vector(self):
-        from vector import MomentumNumpy4D
+    @cached_property
+    def _xy_pol(self) -> ComplexVector:
+        return self.data["x"] + 1.0j * self.data["y"]  # type: ignore
 
-        dtype = deepcopy(self.data.dtype)
-        dtype.names = ("x", "y", "z", "t")
-        vec = self.data.view(dtype).view(MomentumNumpy4D)
-        return vec
+    @cached_property
+    def _zt_pol(self) -> ComplexVector:
+        return self.data["z"] + 1.0j * self.pt  # type: ignore
 
-    @property
+    @cached_property
+    def _spatial_mag(self) -> DoubleVector:
+        return np.abs(self._zt_pol)
+
+    @cached_property
     def pt(self) -> DoubleVector:
         """Momentum component transverse to the beam-axis."""
-        return self._vector.pt  # type: ignore
+        return np.abs(self._xy_pol)
 
-    @property
+    @cached_property
     def eta(self) -> DoubleVector:
-        """Pseudorapidity of particles."""
-        return eta(self)
+        """Pseudorapidity of particles.
 
-    @property
+        Notes
+        -----
+        Infinite values for particles travelling parallel to beam axis.
+        """
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            arr = np.arctanh(self.data["z"] / self._spatial_mag)
+        return arr  # type: ignore
+
+    @cached_property
     def phi(self) -> DoubleVector:
-        """Azimuthal angular displacement of particles about the
-        beam-axis.
-        """
-        return phi(self)
+        """Azimuthal angular displacement of particles about beam-axis."""
+        return np.angle(self._xy_pol)
 
-    @property
+    @cached_property
     def theta(self) -> DoubleVector:
-        """Spherical angular displacement of particles from the positive
-        beam-axis.
-        """
-        return self._vector.theta  # type: ignore
+        """Angular displacement of particles from positive beam-axis."""
+        return np.angle(self._zt_pol)
 
-    @property
+    @cached_property
     def mass(self) -> DoubleVector:
-        """Mass of the particles."""
-        return self._vector.mass  # type: ignore
+        """Mass of particles."""
+        e: DoubleVector = self.data["e"]
+        p = self._spatial_mag
+        sq_diff = e * e - p * p
+        sign = np.sign(sq_diff)
+        return sign * np.sqrt(np.abs(sq_diff))  # type: ignore
 
-    def delta_R(self, other_pmu: "MomentumArray") -> DoubleVector:
-        return self._vector.deltaR(other_pmu._vector)  # type: ignore
+    def delta_R(self, other: "MomentumArray") -> DoubleVector:
+        """Calculates the Euclidean inter-particle distances in the
+        eta-phi plane between this set of particles and a provided
+        'other' set. Produces a mxn matrix, where m is number of
+        particles in this MomentumArray, and n is the number of
+        particles in other.
+
+        Parameters
+        ----------
+        other : MomentumArray
+            Four-momenta of the particle set to compute delta_R against.
+
+        Returns
+        -------
+        delta_R_matrix : np.ndarray[double]
+            Matrix representing the Euclidean distance between the two
+            sets of particles in the eta-phi plane. Rows represent
+            particles in this particle set, and columns particles in
+            the other set.
+
+        Notes
+        -----
+        Infinite values may be encountered if comparing with particles
+        not present on the eta-phi plane, __ie.__ travelling parallel to
+        the beam axis.
+        """
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            deta = self.eta[:, np.newaxis] - other.eta
+            deta = np.nan_to_num(deta, nan=0.0, posinf=np.inf, neginf=-np.inf)
+        dphi = np.angle(self._xy_pol[:, np.newaxis] * other._xy_pol.conj())
+        return np.hypot(deta, dphi)
 
 
 #################

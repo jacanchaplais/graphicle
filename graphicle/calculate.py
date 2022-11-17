@@ -14,8 +14,6 @@ from typing import (
     Dict,
     Callable,
     Union,
-    TypeVar,
-    Any,
     Iterable,
 )
 from functools import lru_cache, partial
@@ -34,25 +32,6 @@ import graphicle as gcl
 
 _types = Types()
 DoubleVector = npt.NDArray[np.float64]
-ComplexVector = npt.NDArray[np.complex128]
-
-
-def eta(pmu: gcl.MomentumArray) -> DoubleVector:
-    px, py, pz = map(lambda key: pmu.data[key], "xyz")
-    return np.arctanh(np.divide(pz, np.hypot(px, np.hypot(py, pz))))
-
-
-def phi_pol(pmu: gcl.MomentumArray, normalize: bool = True) -> ComplexVector:
-    """Returns the azimuthal angle of the momentum as a complex polar."""
-    px, py = map(lambda key: pmu.data[key], "xy")
-    pol_vec: ComplexVector = px + 1.0j * py
-    if normalize is False:
-        return pol_vec
-    return np.divide(pol_vec, np.hypot(px, py))
-
-
-def phi(pmu: gcl.MomentumArray) -> DoubleVector:
-    return np.angle(phi_pol(pmu, normalize=False))  # type: ignore
 
 
 def combined_mass(
