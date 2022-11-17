@@ -66,8 +66,6 @@ from typicle import Types
 from typicle.convert import cast_array
 
 from ._base import ParticleBase, AdjacencyBase, MaskBase, ArrayBase
-from . import calculate
-from . import matrix
 
 
 ###########################################
@@ -540,6 +538,15 @@ class MomentumArray(ArrayBase):
             warnings.simplefilter("ignore")
             arr = np.arctanh(self.data["z"] / self._spatial_mag)
         return arr  # type: ignore
+
+    @cached_property
+    def rapidity(self) -> DoubleVector:
+        """Rapidity of particles."""
+        e, z = self.data["e"], self.data["z"]
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            rap = 0.5 * np.log((e + z) / (e - z))  # type: ignore
+        return rap  # type: ignore
 
     @cached_property
     def phi(self) -> DoubleVector:
