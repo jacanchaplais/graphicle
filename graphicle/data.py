@@ -38,6 +38,12 @@ For more details, see individual docstrings.
 """
 
 from __future__ import annotations
+from itertools import zip_longest
+from copy import deepcopy
+from enum import Enum
+from functools import cached_property
+import warnings
+from collections import abc
 from typing import TYPE_CHECKING
 from typing import (
     Tuple,
@@ -49,13 +55,8 @@ from typing import (
     Union,
     TypeVar,
     Type,
+    Iterator,
 )
-
-from itertools import zip_longest
-from copy import deepcopy
-from enum import Enum
-from functools import cached_property
-import warnings
 
 from attr import define, field, Factory, cmp_using, setters  # type: ignore
 import numpy as np
@@ -182,7 +183,7 @@ def _mask_dict_convert(masks: _IN_MASK_DICT) -> _MASK_DICT:
 
 
 @define
-class MaskGroup(MaskBase):
+class MaskGroup(MaskBase, abc.MutableMapping[str, MaskBase]):
     """Data structure to compose groups of masks over particle arrays.
     Can be nested to form complex hierarchies.
 
@@ -214,6 +215,9 @@ class MaskGroup(MaskBase):
         keys = ", ".join(map(lambda name: '"' + name + '"', self.names))
         return f"MaskGroup(mask_arrays=[{keys}], agg_op={self.agg_op.name})"
 
+    def __iter__(self) -> Iterator[str]:
+        return iter(self._mask_arrays)
+
     def __getitem__(self, key) -> Union[MaskArray, "MaskGroup"]:
         if not isinstance(key, str):
             return self.__class__(
@@ -236,7 +240,7 @@ class MaskGroup(MaskBase):
         self._mask_arrays.update({key: mask})
 
     def __len__(self) -> int:
-        return len(self.data)
+        return len(self.names)
 
     def __delitem__(self, key) -> None:
         """Remove a MaskArray from the group, using given key."""
