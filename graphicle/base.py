@@ -44,8 +44,6 @@ class EventInterface(Protocol):
 
     :group: base
 
-    :group: base
-
     Attributes
     ----------
     pdg : ndarray[int32]
