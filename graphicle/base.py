@@ -1,12 +1,69 @@
+"""
+``graphicle.base``
+==================
+
+Defines the base classes, types, and interface protocols used by
+graphicle's modules.
+"""
 from abc import ABC, abstractmethod
-from typing import Union, Any, Optional
+from typing import Union, Any, Optional, Protocol
 
 import numpy as np
 import numpy.typing as npt
 
 
-AnyVector = npt.NDArray[Any]
+__all__ = [
+    "DoubleVector",
+    "ComplexVector",
+    "BoolVector",
+    "IntVector",
+    "HalfIntVector",
+    "ObjVector",
+    "AnyVector",
+    "EventInterface",
+    "ArrayBase",
+    "ParticleBase",
+    "AdjacencyBase",
+    "MaskBase",
+]
+
+DoubleVector = npt.NDArray[np.float64]
+ComplexVector = npt.NDArray[np.complex128]
 BoolVector = npt.NDArray[np.bool_]
+IntVector = npt.NDArray[np.int32]
+HalfIntVector = npt.NDArray[np.int16]
+ObjVector = npt.NDArray[np.object_]
+AnyVector = npt.NDArray[Any]
+
+
+class EventInterface(Protocol):
+    @property
+    def pdg(self) -> IntVector:
+        ...
+
+    @property
+    def pmu(self) -> AnyVector:
+        ...
+
+    @property
+    def color(self) -> AnyVector:
+        ...
+
+    @property
+    def helicity(self) -> HalfIntVector:
+        ...
+
+    @property
+    def status(self) -> HalfIntVector:
+        ...
+
+    @property
+    def final(self) -> BoolVector:
+        ...
+
+    @property
+    def edges(self) -> AnyVector:
+        ...
 
 
 class ArrayBase(ABC):
@@ -52,33 +109,6 @@ class AdjacencyBase(ABC):
     @abstractmethod
     def nodes(self) -> npt.NDArray[np.int32]:
         pass
-
-
-class GraphicleBase(ABC):
-    @property
-    @abstractmethod
-    def edges(self) -> AnyVector:
-        pass
-
-    # @abstractmethod
-    # def vertex_pdg(self):
-    #     pass
-
-    # @abstractmethod
-    # def to_networkx(self):
-    #     pass
-
-    # @abstractmethod
-    # def to_pandas(self):
-    #     pass
-
-    # @abstractmethod
-    # def signal_mask(self):
-    #     pass
-
-    # @abstractmethod
-    # def copy(self):
-    #     pass
 
 
 # ---------------------------
