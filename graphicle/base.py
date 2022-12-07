@@ -37,6 +37,32 @@ AnyVector = npt.NDArray[Any]
 
 
 class EventInterface(Protocol):
+    """Defines the interface for a generic event object expected by
+    graphicle's routines. Attributes are stored as numpy arrays, with
+    each element corresponding to a particle in an event. Attributes
+    with 'fields' are numpy structured arrays.
+
+    :group: base
+
+    Attributes
+    ----------
+    pdg : ndarray[int32]
+        PDG codes.
+    pmu : ndarray[float64], fields ("x", "y", "z", "e")
+        Four-momenta.
+    color : ndarray[int32], fields ("color", "anticolor")
+        QCD color codes.
+    helicity : ndarray[int16]
+        Spin polarisation eigenvalues.
+    status : ndarray[int16]
+        Status codes annotating particles describing their generation.
+    final : ndarray[bool_]
+        Mask identifying final particles in the event's ancestry.
+    edges : ndarray[int32], fields ("in", "out")
+        Ancestry of particles in event, encoded as a COO list of
+        integers, describing a graph structure.
+    """
+
     @property
     def pdg(self) -> IntVector:
         ...
