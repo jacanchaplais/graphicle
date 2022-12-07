@@ -39,7 +39,10 @@ AnyVector = npt.NDArray[Any]
 class EventInterface(Protocol):
     """Defines the interface for a generic event object expected by
     graphicle's routines. Attributes are stored as numpy arrays, with
-    each element corresponding to a particle in an event.
+    each element corresponding to a particle in an event. Attributes
+    with 'fields' are numpy structured arrays.
+
+    :group: base
 
     :group: base
 
