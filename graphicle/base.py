@@ -41,6 +41,8 @@ class EventInterface(Protocol):
     graphicle's routines. Attributes are stored as numpy arrays, with
     each element corresponding to a particle in an event.
 
+    :group: base
+
     Attributes
     ----------
     pdg : ndarray[int32]
