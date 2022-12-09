@@ -653,7 +653,7 @@ class HelicityArray(ArrayBase):
     data: HalfIntVector = array_field("helicity")
 
     def copy(self) -> "HelicityArray":
-        """Returns a new StatusArray instance with same data."""
+        """Returns a new HelicityArray instance with same data."""
         return deepcopy(self)
 
     def __getitem__(self, key) -> "HelicityArray":
