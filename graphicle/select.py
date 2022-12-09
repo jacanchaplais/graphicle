@@ -119,6 +119,28 @@ def vertex_descendants(adj: gcl.AdjacencyList, vertex: int) -> gcl.MaskArray:
     return gcl.MaskArray(masks.data)
 
 
+def hadron_vertices(
+    adj: gcl.AdjacencyList,
+    status: gcl.StatusArray,
+) -> npt.NDArray[np.int32]:
+    """Locates the hadronisation vertices in the generation DAG.
+
+    Parameters
+    ----------
+    adj : AdjacencyList
+        The adjacency list of the generation DAG.
+    status : StatusArray
+        The status codes associated with each particle in the event.
+
+    Returns
+    -------
+    vertex_ids : ndarray[int32]
+        Indices of the hadronisation vertices in the generation DAG,
+        returned in no particular order.
+    """
+    return np.unique(adj.edges[status.in_range(80, 90)]["in"])
+
+
 def hard_descendants(
     graph: gcl.Graphicle, target: Set[int], sign_sensitive: bool = False
 ) -> gcl.MaskGroup:
