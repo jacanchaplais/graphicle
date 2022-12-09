@@ -704,7 +704,10 @@ class StatusArray(ArrayBase):
         return self.data
 
     def in_range(
-        self, min_status: int, max_status: int, sign_sensitive: bool = False
+        self,
+        min_status: int = 0,
+        max_status: Optional[int] = None,
+        sign_sensitive: bool = False,
     ) -> MaskArray:
         """Returns a boolean mask over particles with status codes
         sitting within passed (inclusive) range.
@@ -712,12 +715,13 @@ class StatusArray(ArrayBase):
         Parameters
         ----------
         min_status : int
-            Minimum value for status codes.
-        max_status : int
-            Maximum value for status codes.
+            Minimum value for status codes. Default is 0.
+        max_status : int, optional
+            Maximum value for status codes. Passing ``None`` results in
+            unbounded upper range. Default is ``None``.
         sign_sensitive : bool
             Whether or not to take signs into account during the
-            comparison. (Default is False.)
+            comparison. Default is False.
 
         Returns
         -------
@@ -728,10 +732,10 @@ class StatusArray(ArrayBase):
         array = self.data
         if sign_sensitive is False:
             array = np.abs(array)
-        elif sign_sensitive is not True:
-            raise ValueError("sign_sensitive must be boolean valued.")
-        more_than = array >= min_status  # type: ignore
-        less_than = array <= max_status  # type: ignore
+        more_than = array >= min_status
+        if max_status is None:
+            return MaskArray(more_than)
+        less_than = array <= max_status
         return MaskArray(np.bitwise_and(more_than, less_than))
 
     @property
