@@ -45,6 +45,8 @@ def combined_mass(
     components, and then taking the inner product of the result with
     itself in Minkowski space.
 
+    :group: calculate
+
     Parameters
     ----------
     pmu : MomentumArray, ndarray
@@ -145,6 +147,8 @@ def flow_trace(
     """Performs flow tracing from specified particles in an event, back
     to the hard partons.
 
+    :group: calculate
+
     Parameters
     ----------
     graph : Graphicle
@@ -233,7 +237,7 @@ def cluster_pmu(
 ) -> gcl.MaskGroup:
     """Clusters particles using the generalised-kt algorithm.
 
-    :group: calculations
+    :group: calculate
 
     Parameters
     ----------
