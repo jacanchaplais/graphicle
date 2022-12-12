@@ -10,7 +10,7 @@ from .data import (
     AdjacencyList,
     Graphicle,
 )
-from . import matrix, transform, select, calculate, _base
+from . import matrix, transform, select, calculate, base
 
 __all__ = [
     "MaskArray",
@@ -27,5 +27,5 @@ __all__ = [
     "transform",
     "select",
     "calculate",
-    "_base",
+    "base",
 ]

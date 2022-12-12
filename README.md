@@ -88,7 +88,7 @@ with `showerpipe`.
 
 ```python3
 >>> from showerpipe.generator import PythiaGenerator
-... from showerpipe.lhe import split
+...
 ... lhe_path = "https://zenodo.org/record/6034610/files/unweighted_events.lhe.gz"
 ... gen = PythiaGenerator("pythia-settings.cmnd", lhe_path)
 >>> for event in gen:
