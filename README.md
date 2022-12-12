@@ -179,4 +179,5 @@ MaskArray(data=array([ True,  True,  True,  True,  True,  True,  True,  True,  T
 80.419002446
 ```
 
-More rigorous documentation on the API is coming soon on readthedocs.
+More information on the API is available in the
+[documentation](https://graphicle.readthedocs.io)
