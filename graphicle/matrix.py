@@ -26,6 +26,8 @@ def cut_adj(
     The cut represents the limiting value of the affinity matrix for
     elements to form edges in the adjacency matrix.
 
+    :group: matrix
+
     Parameters
     ----------
     matrix : array
@@ -88,6 +90,8 @@ def knn_adj(
     towards the k nearest neighbours, determined from the input
     affinity matrix.
 
+    :group: matrix
+
     Parameters
     ----------
     matrix : 2d numpy array
@@ -145,7 +149,20 @@ def knn_adj(
 def fc_adj(
     num_nodes: int, self_loop: bool = False, dtype: npt.DTypeLike = _types.bool
 ) -> Vector:
-    """Create a fully connected adjacency matrix."""
+    """Create a fully connected adjacency matrix.
+
+    :group: matrix
+
+    Parameters
+    ----------
+    num_nodes : int
+        Number of nodes the graph should have.
+    self_loop : bool
+        Whether to include edges from a node to itself. Default is
+        ``False``.
+    dtype : dtype-like
+        The dtype of the output array. Default is ``np.bool_``.
+    """
     adj = np.ones((num_nodes, num_nodes), dtype=dtype)
     if self_loop is False:
         np.fill_diagonal(adj, 0)
@@ -155,6 +172,8 @@ def fc_adj(
 def delta_R_aff(pmu: gcl.MomentumArray) -> Vector:
     """Returns the inter-particle Euclidean distances between particles
     internally within the given MomentumArray.
+
+    :group: matrix
 
     Parameters
     ----------
