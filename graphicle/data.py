@@ -56,6 +56,7 @@ from typing import (
     TypeVar,
     Type,
     Iterator,
+    Callable,
 )
 
 from attr import define, field, Factory, cmp_using, setters  # type: ignore
@@ -81,12 +82,20 @@ HalfIntVector = npt.NDArray[np.int16]
 ObjVector = npt.NDArray[np.object_]
 AnyVector = npt.NDArray[Any]
 DataType = TypeVar("DataType", bound=ArrayBase)
+FuncType = TypeVar("FuncType", bound=Callable[..., Any])
+
+
+def _attach_doc(
+    parent: Union[Callable[..., Any], Type[Any]]
+) -> Callable[..., Any]:
+    def inner(func: FuncType) -> FuncType:
+        func.__doc__ = parent.__doc__
+        return func
+
+    return inner
+
 
 DHUGE = np.finfo(np.dtype("<f8")).max * 0.1
-
-
-def _is_np_structured(array: AnyVector) -> bool:
-    return array.dtype.names is not None
 
 
 def array_field(type_name: str):
@@ -120,7 +129,10 @@ class MaskAggOp(Enum):
 
 @define
 class MaskArray(MaskBase, ArrayBase):
-    """Data structure for containing masks over particle data."""
+    """Data structure for containing masks over particle data.
+
+    :group: datastructure
+    """
 
     data: BoolVector = array_field("bool")
 
@@ -186,6 +198,8 @@ def _mask_dict_convert(masks: _IN_MASK_DICT) -> _MASK_DICT:
 class MaskGroup(MaskBase, abc.MutableMapping[str, MaskBase]):
     """Data structure to compose groups of masks over particle arrays.
     Can be nested to form complex hierarchies.
+
+    :group: datastructure
 
     Parameters
     ----------
@@ -324,6 +338,13 @@ class MaskGroup(MaskBase, abc.MutableMapping[str, MaskBase]):
 class PdgArray(ArrayBase):
     """Returns data structure containing PDG integer codes for particle
     data.
+
+    :group: datastructure
+
+    Parameters
+    ----------
+    data : Sequence[int]
+        The PDG codes for each particle in the point cloud.
 
     Attributes
     ----------
@@ -481,20 +502,36 @@ class PdgArray(ArrayBase):
 class MomentumArray(ArrayBase):
     """Data structure containing four-momentum of particle list.
 
+    :group: datastructure
+
+    Parameters
+    ----------
+    data : np.ndarray[np.float64]
+        Data representing the four-momentum of each particle in the
+        point cloud. Given as either a (n, 4)-dimensional numpy array,
+        or a structured array, with fields "x", "y", "z", "e".
+
     Attributes
     ----------
-    data : np.ndarray[double]
+    data : ndarray[float64]
         Structured array containing four momenta.
-    pt : np.ndarray[double]
+    pt : ndarray[float64]
         Transverse component of particle momenta.
-    eta : np.ndarray[double]
+    rapidity : ndarray[float64]
+        Rapidity component of the particle momenta.
+    eta : ndarray[float64]
         Pseudorapidity component of particle momenta.
-    phi : np.ndarray[double]
+    phi : ndarray[float64]
         Azimuthal component of particle momenta.
     theta : np.ndarray[double]
         Angular displacement from beam axis.
     mass : np.ndarray[double]
         Mass of the particles
+
+    Methods
+    -------
+    delta_R()
+        Calculates interparticle distances with ``other`` MomentumArray.
     """
 
     data: AnyVector = array_field("pmu")
@@ -613,6 +650,15 @@ class ColorArray(ArrayBase):
     """Returns data structure of color / anti-color pairs for particle
     shower.
 
+    :group: datastructure
+
+    Parameters
+    ----------
+    data : np.ndarray[np.int32]
+        Data representing the QCD color charge of each particle in the
+        point cloud. Given as either a (n, 2)-dimensional numpy array,
+        or a structured array, with fields "color", "anticolor".
+
     Attributes
     ----------
     data : ndarray
@@ -644,9 +690,17 @@ class HelicityArray(ArrayBase):
     """Data structure containing helicity / polarisation values for
     particle set.
 
+    :group: datastructure
+
+    Parameters
+    ----------
+    data : Sequence[int]
+        Data representing the spin polarisation of each particle in the
+        point cloud.
+
     Attributes
     ----------
-    data : ndarray
+    data : ndarray[int16]
         Helicity values.
     """
 
@@ -675,9 +729,17 @@ class HelicityArray(ArrayBase):
 class StatusArray(ArrayBase):
     """Data structure containing status values for particle set.
 
+    :group: datastructure
+
+    Parameters
+    ----------
+    data : Sequence[int]
+        Data representing the Monte-Carlo event generator's status for
+        each particle in the point cloud.
+
     Attributes
     ----------
-    data : ndarray
+    data : ndarray[int32]
         Status codes.
 
     Notes
@@ -756,6 +818,23 @@ class StatusArray(ArrayBase):
 class ParticleSet(ParticleBase):
     """Composite of data structures containing particle set description.
 
+    :group: datastructure
+
+    Parameters
+    ----------
+    pdg : PdgArray
+        PDG codes.
+    pmu : MomentumArray
+        Four momenta.
+    color : ColorArray
+        Color / anti-color pairs.
+    helicity : HelicityArray
+        Helicity values.
+    status : StatusArray
+        Status codes from Monte-Carlo event generator.
+    final : MaskArray
+        Boolean array indicating final state in particle set.
+
     Attributes
     ----------
     pdg : PdgArray
@@ -820,19 +899,19 @@ class ParticleSet(ParticleBase):
 
         Parameters
         ----------
-        pdg : ndarray, optional
+        pdg : ndarray[int32], optional
             PDG codes.
-        pmu : ndarray, optional
+        pmu : ndarray[float64], optional
             Four momenta, formatted in columns of (x, y, z, e), or as
             a structured array with those fields.
-        color : ndarray, optional
+        color : ndarray[int32], optional
             Color / anti-color pairs, formatted in columns of
             (col, acol), or as a structured array with those fields.
-        helicity : ndarray, optional
+        helicity : ndarray[int16], optional
             Helicity values.
-        status : ndarray, optional
+        status : ndarray[int32], optional
             Status codes from Monte-Carlo event generator.
-        final : ndarray, optional
+        final : ndarray[bool_], optional
             Boolean array indicating which particles are final state.
 
         Returns
@@ -871,6 +950,16 @@ if TYPE_CHECKING:
 class AdjacencyList(AdjacencyBase):
     """Describes relations between particles in particle set using a
     COO edge list, and provides methods to convert representation.
+
+    :group: datastructure
+
+    Parameters
+    ----------
+    _data : np.ndarray[np.int32]
+        COO formatted edge pairs, either given as a (n-2)-dimensional
+        array, or a structured array with fields "in", "out".
+    weights : np.ndarray[np.float64]
+        Weights attributed to each edge in the COO list.
 
     Attributes
     ----------
@@ -1037,6 +1126,16 @@ class Graphicle:
     """Composite object, combining particle set data with relational
     information between particles.
 
+    :group: datastructure
+
+    Parameters
+    ----------
+    particles : ParticleSet
+        The point cloud data for the particles in the dataset.
+    adj : AdjacencyList
+        The connectivity of the particles in the point cloud, forming a
+        graph.
+
     Attributes
     ----------
     particles : ParticleSet
@@ -1143,23 +1242,28 @@ class Graphicle:
             adj_list = AdjacencyList()
         return cls(particles=particles, adj=adj_list)
 
-    @property
+    @property  # type: ignore
+    @_attach_doc(PdgArray)
     def pdg(self) -> PdgArray:
         return self.particles.pdg
 
-    @property
+    @property  # type: ignore
+    @_attach_doc(MomentumArray)
     def pmu(self) -> MomentumArray:
         return self.particles.pmu
 
-    @property
+    @property  # type: ignore
+    @_attach_doc(ColorArray)
     def color(self) -> ColorArray:
         return self.particles.color
 
-    @property
+    @property  # type: ignore
+    @_attach_doc(HelicityArray)
     def helicity(self) -> HelicityArray:
         return self.particles.helicity
 
-    @property
+    @property  # type: ignore
+    @_attach_doc(StatusArray)
     def status(self) -> StatusArray:
         return self.particles.status
 
@@ -1167,7 +1271,8 @@ class Graphicle:
     def hard_mask(self) -> MaskGroup:
         return self.particles.status.hard_mask
 
-    @property
+    @property  # type: ignore
+    @_attach_doc(MaskBase)
     def final(self) -> MaskBase:
         return self.particles.final
 

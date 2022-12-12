@@ -23,6 +23,8 @@ def particle_as_node(adj_list: gcl.AdjacencyList) -> gcl.AdjacencyList:
     The order of the nodes in the resulting AdjacencyList retains the
     same particle ordering of the initial edge list.
 
+    :group: transform
+
     Parameters
     ----------
     adj_list : AdjacencyList
@@ -73,6 +75,8 @@ def particle_as_node(adj_list: gcl.AdjacencyList) -> gcl.AdjacencyList:
 def centre_angle(angle: Vector, pt: Vector) -> Vector:
     """Shifts angles so transverse momentum weighted centroid is at 0.
 
+    :group: transform
+
     Parameters
     ----------
     angle : array
@@ -97,7 +101,23 @@ def centre_angle(angle: Vector, pt: Vector) -> Vector:
 
 
 def centre_pseudorapidity(eta: Vector, pt: Vector) -> Vector:
-    """Shifts pseudorapidities so pt weighted midpoint is at 0."""
+    """Shifts pseudorapidities so pt weighted midpoint is at 0.
+
+    :group: transform
+
+    Parameters
+    ----------
+    eta : ndarray[float64]
+        Values of pseudorapidity for the particle set.
+    pt : ndarray[float64]
+        Values of transverse momenta for the particle set.
+
+    Returns
+    -------
+    eta_centred : ndarray[float64]
+        Pseudorapidity values relative to the centre of transverse
+        momentum.
+    """
     pt_norm = pt / pt.sum()
     eta_wt_mid = (eta * pt_norm).sum()
     return eta - eta_wt_mid  # type: ignore
