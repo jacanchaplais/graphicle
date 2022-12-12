@@ -36,6 +36,7 @@ proj_dir = Path(repo.path).parent
 release = get_version(project)
 # for example take major/minor
 version = ".".join(release.split(".")[:2])
+release = version
 
 packages = {Path(project)}
 

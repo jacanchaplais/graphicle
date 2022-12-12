@@ -41,7 +41,9 @@ from __future__ import annotations
 from itertools import zip_longest
 from copy import deepcopy
 from enum import Enum
-from functools import wraps
+from functools import cached_property
+import warnings
+from collections import abc
 from typing import TYPE_CHECKING
 from typing import (
     Tuple,
@@ -53,6 +55,7 @@ from typing import (
     Union,
     TypeVar,
     Type,
+    Iterator,
     Callable,
 )
 
@@ -65,7 +68,6 @@ from typicle import Types
 from typicle.convert import cast_array
 
 from ._base import ParticleBase, AdjacencyBase, MaskBase, ArrayBase
-from .calculate import eta, phi
 
 
 ###########################################
@@ -73,6 +75,7 @@ from .calculate import eta, phi
 ###########################################
 _types = Types()
 DoubleVector = npt.NDArray[np.float64]
+ComplexVector = npt.NDArray[np.complex128]
 BoolVector = npt.NDArray[np.bool_]
 IntVector = npt.NDArray[np.int32]
 HalfIntVector = npt.NDArray[np.int16]
@@ -92,8 +95,7 @@ def _attach_doc(
     return inner
 
 
-def _is_np_structured(array: AnyVector) -> bool:
-    return array.dtype.names is not None
+DHUGE = np.finfo(np.dtype("<f8")).max * 0.1
 
 
 def array_field(type_name: str):
@@ -193,7 +195,7 @@ def _mask_dict_convert(masks: _IN_MASK_DICT) -> _MASK_DICT:
 
 
 @define
-class MaskGroup(MaskBase):
+class MaskGroup(MaskBase, abc.MutableMapping[str, MaskBase]):
     """Data structure to compose groups of masks over particle arrays.
     Can be nested to form complex hierarchies.
 
@@ -224,8 +226,11 @@ class MaskGroup(MaskBase):
         return cls(dict(map(lambda name: (name, arr[name]), arr.dtype.names)))
 
     def __repr__(self) -> str:
-        keys = ", ".join(self.names)
+        keys = ", ".join(map(lambda name: '"' + name + '"', self.names))
         return f"MaskGroup(mask_arrays=[{keys}], agg_op={self.agg_op.name})"
+
+    def __iter__(self) -> Iterator[str]:
+        return iter(self._mask_arrays)
 
     def __getitem__(self, key) -> Union[MaskArray, "MaskGroup"]:
         if not isinstance(key, str):
@@ -249,7 +254,7 @@ class MaskGroup(MaskBase):
         self._mask_arrays.update({key: mask})
 
     def __len__(self) -> int:
-        return len(self.data)
+        return len(self.names)
 
     def __delitem__(self, key) -> None:
         """Remove a MaskArray from the group, using given key."""
@@ -495,8 +500,7 @@ class PdgArray(ArrayBase):
 ########################################
 @define
 class MomentumArray(ArrayBase):
-    """Returns data structure containing four-momentum of particle
-    list.
+    """Data structure containing four-momentum of particle list.
 
     :group: datastructure
 
@@ -509,14 +513,25 @@ class MomentumArray(ArrayBase):
 
     Attributes
     ----------
-    data : ndarray
+    data : ndarray[float64]
         Structured array containing four momenta.
-    pt : ndarray
+    pt : ndarray[float64]
         Transverse component of particle momenta.
-    eta : ndarray
+    rapidity : ndarray[float64]
+        Rapidity component of the particle momenta.
+    eta : ndarray[float64]
         Pseudorapidity component of particle momenta.
-    phi : ndarray
+    phi : ndarray[float64]
         Azimuthal component of particle momenta.
+    theta : np.ndarray[double]
+        Angular displacement from beam axis.
+    mass : np.ndarray[double]
+        Mass of the particles
+
+    Methods
+    -------
+    delta_R()
+        Calculates interparticle distances with ``other`` MomentumArray.
     """
 
     data: AnyVector = array_field("pmu")
@@ -535,46 +550,96 @@ class MomentumArray(ArrayBase):
     def copy(self) -> "MomentumArray":
         return deepcopy(self)
 
-    @property
-    def _vector(self):
-        from vector import MomentumNumpy4D
+    @cached_property
+    def _xy_pol(self) -> ComplexVector:
+        return self.data["x"] + 1.0j * self.data["y"]  # type: ignore
 
-        dtype = deepcopy(self.data.dtype)
-        dtype.names = ("x", "y", "z", "t")
-        vec = self.data.view(dtype).view(MomentumNumpy4D)
-        return vec
+    @cached_property
+    def _zt_pol(self) -> ComplexVector:
+        return self.data["z"] + 1.0j * self.pt  # type: ignore
 
-    @property
+    @cached_property
+    def _spatial_mag(self) -> DoubleVector:
+        return np.abs(self._zt_pol)
+
+    @cached_property
     def pt(self) -> DoubleVector:
         """Momentum component transverse to the beam-axis."""
-        return self._vector.pt  # type: ignore
+        return np.abs(self._xy_pol)
 
-    @property
+    @cached_property
     def eta(self) -> DoubleVector:
-        """Pseudorapidity of particles."""
-        return eta(self)
+        """Pseudorapidity of particles.
 
-    @property
+        Notes
+        -----
+        Infinite values for particles travelling parallel to beam axis.
+        """
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            arr = np.arctanh(self.data["z"] / self._spatial_mag)
+        return arr  # type: ignore
+
+    @cached_property
+    def rapidity(self) -> DoubleVector:
+        """Rapidity of particles."""
+        e, z = self.data["e"], self.data["z"]
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            rap = 0.5 * np.log((e + z) / (e - z))  # type: ignore
+        return rap  # type: ignore
+
+    @cached_property
     def phi(self) -> DoubleVector:
-        """Azimuthal angular displacement of particles about the
-        beam-axis.
-        """
-        return phi(self)
+        """Azimuthal angular displacement of particles about beam-axis."""
+        return np.angle(self._xy_pol)
 
-    @property
+    @cached_property
     def theta(self) -> DoubleVector:
-        """Spherical angular displacement of particles from the positive
-        beam-axis.
-        """
-        return self._vector.theta  # type: ignore
+        """Angular displacement of particles from positive beam-axis."""
+        return np.angle(self._zt_pol)
 
-    @property
+    @cached_property
     def mass(self) -> DoubleVector:
-        """Mass of the particles."""
-        return self._vector.mass  # type: ignore
+        """Mass of particles."""
+        e: DoubleVector = self.data["e"]
+        p = self._spatial_mag
+        sq_diff = e * e - p * p
+        sign = np.sign(sq_diff)
+        return sign * np.sqrt(np.abs(sq_diff))  # type: ignore
 
-    def delta_R(self, other_pmu: "MomentumArray") -> DoubleVector:
-        return self._vector.deltaR(other_pmu._vector)  # type: ignore
+    def delta_R(self, other: "MomentumArray") -> DoubleVector:
+        """Calculates the Euclidean inter-particle distances in the
+        eta-phi plane between this set of particles and a provided
+        'other' set. Produces a mxn matrix, where m is number of
+        particles in this MomentumArray, and n is the number of
+        particles in other.
+
+        Parameters
+        ----------
+        other : MomentumArray
+            Four-momenta of the particle set to compute delta_R against.
+
+        Returns
+        -------
+        delta_R_matrix : np.ndarray[double]
+            Matrix representing the Euclidean distance between the two
+            sets of particles in the eta-phi plane. Rows represent
+            particles in this particle set, and columns particles in
+            the other set.
+
+        Notes
+        -----
+        Infinite values may be encountered if comparing with particles
+        not present on the eta-phi plane, __ie.__ travelling parallel to
+        the beam axis.
+        """
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            deta = self.eta[:, np.newaxis] - other.eta
+            deta = np.nan_to_num(deta, nan=0.0, posinf=np.inf, neginf=-np.inf)
+        dphi = np.angle(self._xy_pol[:, np.newaxis] * other._xy_pol.conj())
+        return np.hypot(deta, dphi)
 
 
 #################
@@ -635,7 +700,7 @@ class HelicityArray(ArrayBase):
 
     Attributes
     ----------
-    data : np.ndarray[np.int16]
+    data : ndarray[int16]
         Helicity values.
     """
 
@@ -674,7 +739,7 @@ class StatusArray(ArrayBase):
 
     Attributes
     ----------
-    data : np.ndarray[np.int32]
+    data : ndarray[int32]
         Status codes.
 
     Notes
@@ -834,19 +899,19 @@ class ParticleSet(ParticleBase):
 
         Parameters
         ----------
-        pdg : np.ndarray[np.int32], optional
+        pdg : ndarray[int32], optional
             PDG codes.
-        pmu : np.ndarray[np.float64], optional
+        pmu : ndarray[float64], optional
             Four momenta, formatted in columns of (x, y, z, e), or as
             a structured array with those fields.
-        color : np.ndarray[np.int32], optional
+        color : ndarray[int32], optional
             Color / anti-color pairs, formatted in columns of
             (col, acol), or as a structured array with those fields.
-        helicity : np.ndarray[np.int16], optional
+        helicity : ndarray[int16], optional
             Helicity values.
-        status : np.ndarray[np.int32], optional
+        status : ndarray[int32], optional
             Status codes from Monte-Carlo event generator.
-        final : np.ndarray[np.bool_], optional
+        final : ndarray[bool_], optional
             Boolean array indicating which particles are final state.
 
         Returns

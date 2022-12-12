@@ -1,5 +1,12 @@
-.. py:module:: heparchy
+.. py:module:: showerpipe
 
 graphicle
 =========
-.. python-apigen-group:: datastructure
+
+Pythia
+------
+.. python-apigen-group:: Pythia
+
+Les Houches
+------
+.. python-apigen-group:: LesHouches

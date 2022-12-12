@@ -1,3 +1,4 @@
+from __future__ import annotations
 from typing import Optional
 
 import numpy as np
@@ -152,11 +153,23 @@ def fc_adj(
 
 
 def delta_R_aff(pmu: gcl.MomentumArray) -> Vector:
-    """Returns a symmetric matrix of delta R vals from input
-    MomentumArray.
+    """Returns the inter-particle Euclidean distances between particles
+    internally within the given MomentumArray.
+
+    Parameters
+    ----------
+    pmu : gcl.MomentumArray
+        Four-momenta.
+
+    Returns
+    -------
+    delta_R_matrix : np.ndarray[double]
+        Square symmetric matrix representing the Euclidean distance
+        between every pair of particles in the eta-phi plane.
+
+    Notes
+    -----
+    Infinite values may be encountered if particles are travelling
+    parallel to the beam axis, __ie.__ with infinite pseudorapidity.
     """
-    eta = pmu.eta
-    deta = eta[:, np.newaxis] - eta
-    phi_pol = gcl.calculate.phi_pol(pmu, normalize=False)
-    dphi = np.angle(phi_pol[:, np.newaxis] * phi_pol.conjugate())
-    return np.hypot(deta, dphi)
+    return pmu.delta_R(pmu)
