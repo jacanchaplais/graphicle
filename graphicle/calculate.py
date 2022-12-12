@@ -37,6 +37,8 @@ DoubleVector = npt.NDArray[np.float64]
 def azimuth_centre(pmu: gcl.MomentumArray, pt_weight: bool = True) -> float:
     """Calculates the central point in azimuth for a set of particles.
 
+    :group: calculate
+
     Parameters
     ----------
     pmu : MomentumArray
@@ -54,7 +56,7 @@ def azimuth_centre(pmu: gcl.MomentumArray, pt_weight: bool = True) -> float:
     pol = pmu._xy_pol
     if pt_weight is True:
         pol = pol * pmu.pt
-    return np.angle(pol.sum())
+    return float(np.angle(pol.sum()))
 
 
 def combined_mass(
