@@ -34,6 +34,29 @@ _types = Types()
 DoubleVector = npt.NDArray[np.float64]
 
 
+def azimuth_centre(pmu: gcl.MomentumArray, pt_weight: bool = True) -> float:
+    """Calculates the central point in azimuth for a set of particles.
+
+    Parameters
+    ----------
+    pmu : MomentumArray
+        Four-momenta of the particles.
+    pt_weight : bool
+        If ``True``, will weight the contributions of each particle by
+        transverse momentum. Similar to finding a centre-of-mass, but
+        for transverse momentum. Default is ``True``.
+
+    Returns
+    -------
+    azimuth : float
+        The centre of the particle set in the azimuth dimension.
+    """
+    pol = pmu._xy_pol
+    if pt_weight is True:
+        pol = pol * pmu.pt
+    return np.angle(pol.sum())
+
+
 def combined_mass(
     pmu: Union[gcl.MomentumArray, np.ndarray],
     weight: Optional[DoubleVector] = None,
