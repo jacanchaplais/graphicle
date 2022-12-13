@@ -34,6 +34,31 @@ _types = Types()
 DoubleVector = npt.NDArray[np.float64]
 
 
+def azimuth_centre(pmu: gcl.MomentumArray, pt_weight: bool = True) -> float:
+    """Calculates the central point in azimuth for a set of particles.
+
+    :group: calculate
+
+    Parameters
+    ----------
+    pmu : MomentumArray
+        Four-momenta of the particles.
+    pt_weight : bool
+        If ``True``, will weight the contributions of each particle by
+        transverse momentum. Similar to finding a centre-of-mass, but
+        for transverse momentum. Default is ``True``.
+
+    Returns
+    -------
+    azimuth : float
+        The centre of the particle set in the azimuth dimension.
+    """
+    pol = pmu._xy_pol
+    if pt_weight is True:
+        pol = pol * pmu.pt
+    return float(np.angle(pol.sum()))
+
+
 def combined_mass(
     pmu: Union[gcl.MomentumArray, np.ndarray],
     weight: Optional[DoubleVector] = None,
@@ -44,6 +69,8 @@ def combined_mass(
     This is done by summing the four momenta, optionally weighting the
     components, and then taking the inner product of the result with
     itself in Minkowski space.
+
+    :group: calculate
 
     Parameters
     ----------
@@ -145,6 +172,8 @@ def flow_trace(
     """Performs flow tracing from specified particles in an event, back
     to the hard partons.
 
+    :group: calculate
+
     Parameters
     ----------
     graph : Graphicle
@@ -233,7 +262,7 @@ def cluster_pmu(
 ) -> gcl.MaskGroup:
     """Clusters particles using the generalised-kt algorithm.
 
-    :group: calculations
+    :group: calculate
 
     Parameters
     ----------

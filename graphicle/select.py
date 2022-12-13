@@ -23,6 +23,8 @@ def find_vertex(
     """Locate vertices with the inward and outward particles of the
     passed pdg codes.
 
+    :group: select
+
     Parameters
     ----------
     graph : Graphicle
@@ -95,6 +97,8 @@ def vertex_descendants(adj: gcl.AdjacencyList, vertex: int) -> gcl.MaskArray:
     """Return a mask over a graphicle object, identifying which
     particles descend from a given interaction vertex.
 
+    :group: select
+
     Parameters
     ----------
     adj : AdjacencyList
@@ -147,6 +151,8 @@ def hard_descendants(
     """Returns a MaskGroup over the particles in the graph, where True
     indicates a particle descends from a specific hard parton.
 
+    :group: select
+
     Parameters
     ----------
     graph : Graphicle
@@ -192,6 +198,8 @@ def hard_edge(graph: gcl.Graphicle, pdg: int) -> Tuple[int, int]:
 def any_overlap(masks: gcl.MaskGroup) -> bool:
     """Given a MaskGroup object, checks if any of the masks overlap
     with each other.
+
+    :group: select
 
     Parameters
     ----------

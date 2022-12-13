@@ -37,14 +37,12 @@ connectivity into a single graph representation of HEP data.
 For more details, see individual docstrings.
 """
 
-from __future__ import annotations
 from itertools import zip_longest
 from copy import deepcopy
 from enum import Enum
 from functools import cached_property
 import warnings
 from collections import abc
-from typing import TYPE_CHECKING
 from typing import (
     Tuple,
     List,
@@ -56,6 +54,7 @@ from typing import (
     TypeVar,
     Type,
     Iterator,
+    Callable,
 )
 
 from attr import define, field, Factory, cmp_using, setters  # type: ignore
@@ -66,27 +65,26 @@ from numpy.lib import recfunctions as rfn
 from typicle import Types
 from typicle.convert import cast_array
 
-from ._base import ParticleBase, AdjacencyBase, MaskBase, ArrayBase
+from . import base
 
 
 ###########################################
 # SET UP ARRAY ATTRIBUTES FOR DATACLASSES #
 ###########################################
 _types = Types()
-DoubleVector = npt.NDArray[np.float64]
-ComplexVector = npt.NDArray[np.complex128]
-BoolVector = npt.NDArray[np.bool_]
-IntVector = npt.NDArray[np.int32]
-HalfIntVector = npt.NDArray[np.int16]
-ObjVector = npt.NDArray[np.object_]
-AnyVector = npt.NDArray[Any]
-DataType = TypeVar("DataType", bound=ArrayBase)
-
+DataType = TypeVar("DataType", bound=base.ArrayBase)
+FuncType = TypeVar("FuncType", bound=Callable[..., Any])
 DHUGE = np.finfo(np.dtype("<f8")).max * 0.1
 
 
-def _is_np_structured(array: AnyVector) -> bool:
-    return array.dtype.names is not None
+def _attach_doc(
+    parent: Union[Callable[..., Any], Type[Any]]
+) -> Callable[..., Any]:
+    def inner(func: FuncType) -> FuncType:
+        func.__doc__ = parent.__doc__
+        return func
+
+    return inner
 
 
 def array_field(type_name: str):
@@ -96,9 +94,9 @@ def array_field(type_name: str):
     default = Factory(lambda: np.array([], dtype=dtype))
     equality_comparison = cmp_using(np.array_equal)
 
-    def converter(values: npt.ArrayLike) -> AnyVector:
+    def converter(values: npt.ArrayLike) -> base.AnyVector:
         data = np.array(values)
-        out_array: AnyVector = cast_array(data, cast_type=dtype)
+        out_array: base.AnyVector = cast_array(data, cast_type=dtype)
         return out_array
 
     return field(
@@ -119,27 +117,29 @@ class MaskAggOp(Enum):
 
 
 @define
-class MaskArray(MaskBase, ArrayBase):
+class MaskArray(base.MaskBase, base.ArrayBase):
     """Data structure for containing masks over particle data."""
 
-    data: BoolVector = array_field("bool")
+    data: base.BoolVector = array_field("bool")
 
     def copy(self) -> "MaskArray":
         return deepcopy(self)
 
     def __getitem__(self, key) -> "MaskArray":
-        if isinstance(key, MaskBase):
+        if isinstance(key, base.MaskBase):
             key = key.data
         return self.__class__(np.array(self.data[key]))
 
     def __len__(self) -> int:
         return len(self.data)
 
-    def __array__(self) -> BoolVector:
+    def __array__(self) -> base.BoolVector:
         return self.data
 
-    def __and__(self, other: Union[MaskBase, BoolVector]) -> MaskArray:
-        if isinstance(other, MaskBase):
+    def __and__(
+        self, other: Union[base.MaskBase, base.BoolVector]
+    ) -> "MaskArray":
+        if isinstance(other, base.MaskBase):
             other_data = other.data
         elif isinstance(other, np.ndarray):
             other_data = other
@@ -150,8 +150,10 @@ class MaskArray(MaskBase, ArrayBase):
             )
         return self.__class__(np.bitwise_and(self.data, other_data))
 
-    def __or__(self, other: Union[MaskBase, BoolVector]) -> MaskArray:
-        if isinstance(other, MaskBase):
+    def __or__(
+        self, other: Union[base.MaskBase, base.BoolVector]
+    ) -> "MaskArray":
+        if isinstance(other, base.MaskBase):
             other_data = other.data
         elif isinstance(other, np.ndarray):
             other_data = other
@@ -162,13 +164,12 @@ class MaskArray(MaskBase, ArrayBase):
             )
         return self.__class__(np.bitwise_or(self.data, other_data))
 
-    def __invert__(self) -> MaskArray:
+    def __invert__(self) -> "MaskArray":
         return self.__class__(~self.data)
 
 
-if TYPE_CHECKING:
-    _IN_MASK_DICT = Dict[str, Union[MaskArray, BoolVector]]
-    _MASK_DICT = Dict[str, MaskArray]
+_IN_MASK_DICT = Dict[str, Union[MaskArray, base.BoolVector]]
+_MASK_DICT = Dict[str, MaskArray]
 
 
 def _mask_dict_convert(masks: _IN_MASK_DICT) -> _MASK_DICT:
@@ -183,9 +184,11 @@ def _mask_dict_convert(masks: _IN_MASK_DICT) -> _MASK_DICT:
 
 
 @define
-class MaskGroup(MaskBase, abc.MutableMapping[str, MaskBase]):
+class MaskGroup(base.MaskBase, abc.MutableMapping[str, base.MaskBase]):
     """Data structure to compose groups of masks over particle arrays.
     Can be nested to form complex hierarchies.
+
+    :group: datastructure
 
     Parameters
     ----------
@@ -235,7 +238,7 @@ class MaskGroup(MaskBase, abc.MutableMapping[str, MaskBase]):
         """Add a new MaskArray to the group, with given key."""
         if not isinstance(key, str):
             raise KeyError("Key must be string.")
-        if not isinstance(mask, MaskBase):
+        if not isinstance(mask, base.MaskBase):
             mask = MaskArray(mask)
         self._mask_arrays.update({key: mask})
 
@@ -246,11 +249,13 @@ class MaskGroup(MaskBase, abc.MutableMapping[str, MaskBase]):
         """Remove a MaskArray from the group, using given key."""
         self._mask_arrays.pop(key)
 
-    def __array__(self) -> BoolVector:
+    def __array__(self) -> base.BoolVector:
         return self.data
 
-    def __and__(self, other: Union[MaskBase, BoolVector]) -> MaskArray:
-        if isinstance(other, MaskBase):
+    def __and__(
+        self, other: Union[base.MaskBase, base.BoolVector]
+    ) -> MaskArray:
+        if isinstance(other, base.MaskBase):
             other_data = other.data
         elif isinstance(other, np.ndarray):
             other_data = other
@@ -261,8 +266,10 @@ class MaskGroup(MaskBase, abc.MutableMapping[str, MaskBase]):
             )
         return MaskArray(np.bitwise_and(self.data, other_data))
 
-    def __or__(self, other: Union[MaskBase, BoolVector]) -> MaskArray:
-        if isinstance(other, MaskBase):
+    def __or__(
+        self, other: Union[base.MaskBase, base.BoolVector]
+    ) -> MaskArray:
+        if isinstance(other, base.MaskBase):
             other_data = other.data
         elif isinstance(other, np.ndarray):
             other_data = other
@@ -284,19 +291,19 @@ class MaskGroup(MaskBase, abc.MutableMapping[str, MaskBase]):
         return list(self._mask_arrays.keys())
 
     @property
-    def bitwise_or(self) -> BoolVector:
+    def bitwise_or(self) -> base.BoolVector:
         return np.bitwise_or.reduce(  # type: ignore
             [child.data for child in self._mask_arrays.values()]
         )
 
     @property
-    def bitwise_and(self) -> BoolVector:
+    def bitwise_and(self) -> base.BoolVector:
         return np.bitwise_and.reduce(  # type: ignore
             [child.data for child in self._mask_arrays.values()]
         )
 
     @property
-    def data(self) -> BoolVector:
+    def data(self) -> base.BoolVector:
         """Same as MaskGroup.bitwise_and."""
         if self.agg_op is MaskAggOp.AND:
             return self.bitwise_and
@@ -313,7 +320,7 @@ class MaskGroup(MaskBase, abc.MutableMapping[str, MaskBase]):
             )
 
     @property
-    def dict(self) -> Dict[str, BoolVector]:
+    def dict(self) -> Dict[str, base.BoolVector]:
         return {key: val.data for key, val in self._mask_arrays.items()}
 
 
@@ -321,9 +328,16 @@ class MaskGroup(MaskBase, abc.MutableMapping[str, MaskBase]):
 # PDG STORAGE AND QUERYING #
 ############################
 @define
-class PdgArray(ArrayBase):
+class PdgArray(base.ArrayBase):
     """Returns data structure containing PDG integer codes for particle
     data.
+
+    :group: datastructure
+
+    Parameters
+    ----------
+    data : Sequence[int]
+        The PDG codes for each particle in the point cloud.
 
     Attributes
     ----------
@@ -353,7 +367,7 @@ class PdgArray(ArrayBase):
 
     from mcpid.lookup import PdgRecords as __PdgRecords
 
-    data: IntVector = array_field("int")
+    data: base.IntVector = array_field("int")
     __lookup_table: __PdgRecords = field(init=False, repr=False)
     __mega_to_giga: float = field(init=False, repr=False)
 
@@ -364,11 +378,11 @@ class PdgArray(ArrayBase):
     def __len__(self) -> int:
         return len(self.data)
 
-    def __array__(self) -> IntVector:
+    def __array__(self) -> base.IntVector:
         return self.data
 
     def __getitem__(self, key) -> "PdgArray":
-        if isinstance(key, MaskBase):
+        if isinstance(key, base.MaskBase):
             key = key.data
         return self.__class__(np.array(self.data[key]))
 
@@ -412,65 +426,65 @@ class PdgArray(ArrayBase):
             np.isin(data, target, assume_unique=False, invert=blacklist)
         )
 
-    def __get_prop(self, field: str) -> AnyVector:
+    def __get_prop(self, field: str) -> base.AnyVector:
         props = self.__lookup_table.properties(self.data, [field])[field]
         return props  # type: ignore
 
-    def __get_prop_range(self, field: str) -> AnyVector:
+    def __get_prop_range(self, field: str) -> base.AnyVector:
         field_range = [field + "lower", field + "upper"]
         props = self.__lookup_table.properties(self.data, field_range)
         return props  # type: ignore
 
     @property
-    def name(self) -> ObjVector:
+    def name(self) -> base.ObjVector:
         return self.__get_prop("name")
 
     @property
-    def charge(self) -> DoubleVector:
+    def charge(self) -> base.DoubleVector:
         return self.__get_prop("charge")
 
     @property
-    def mass(self) -> DoubleVector:
-        out: DoubleVector = self.__get_prop("mass") * self.__mega_to_giga
+    def mass(self) -> base.DoubleVector:
+        out: base.DoubleVector = self.__get_prop("mass") * self.__mega_to_giga
         return out
 
     @property
-    def mass_bounds(self) -> AnyVector:
+    def mass_bounds(self) -> base.AnyVector:
         range_arr = self.__get_prop_range("mass")
         for name in range_arr.dtype.names:
             range_arr[name] *= self.__mega_to_giga
         return range_arr
 
     @property
-    def quarks(self) -> ObjVector:
+    def quarks(self) -> base.ObjVector:
         return self.__get_prop("quarks")
 
     @property
-    def width(self) -> DoubleVector:
-        out: DoubleVector = self.__get_prop("width") * self.__mega_to_giga
+    def width(self) -> base.DoubleVector:
+        out: base.DoubleVector = self.__get_prop("width") * self.__mega_to_giga
         return out
 
     @property
-    def width_bounds(self) -> AnyVector:
+    def width_bounds(self) -> base.AnyVector:
         range_arr = self.__get_prop_range("width")
         for name in range_arr.dtype.names:
             range_arr[name] *= self.__mega_to_giga
         return range_arr
 
     @property
-    def isospin(self) -> DoubleVector:
+    def isospin(self) -> base.DoubleVector:
         return self.__get_prop("i")
 
     @property
-    def g_parity(self) -> DoubleVector:
+    def g_parity(self) -> base.DoubleVector:
         return self.__get_prop("g")
 
     @property
-    def space_parity(self) -> DoubleVector:
+    def space_parity(self) -> base.DoubleVector:
         return self.__get_prop("p")
 
     @property
-    def charge_parity(self) -> DoubleVector:
+    def charge_parity(self) -> base.DoubleVector:
         return self.__get_prop("c")
 
 
@@ -478,35 +492,51 @@ class PdgArray(ArrayBase):
 # MOMENTUM STORAGE AND TRANSFORMATIONS #
 ########################################
 @define
-class MomentumArray(ArrayBase):
+class MomentumArray(base.ArrayBase):
     """Data structure containing four-momentum of particle list.
+
+    :group: datastructure
+
+    Parameters
+    ----------
+    data : np.ndarray[np.float64]
+        Data representing the four-momentum of each particle in the
+        point cloud. Given as either a (n, 4)-dimensional numpy array,
+        or a structured array, with fields "x", "y", "z", "e".
 
     Attributes
     ----------
-    data : np.ndarray[double]
+    data : ndarray[float64]
         Structured array containing four momenta.
-    pt : np.ndarray[double]
+    pt : ndarray[float64]
         Transverse component of particle momenta.
-    eta : np.ndarray[double]
+    rapidity : ndarray[float64]
+        Rapidity component of the particle momenta.
+    eta : ndarray[float64]
         Pseudorapidity component of particle momenta.
-    phi : np.ndarray[double]
+    phi : ndarray[float64]
         Azimuthal component of particle momenta.
     theta : np.ndarray[double]
         Angular displacement from beam axis.
     mass : np.ndarray[double]
         Mass of the particles
+
+    Methods
+    -------
+    delta_R()
+        Calculates interparticle distances with ``other`` MomentumArray.
     """
 
-    data: AnyVector = array_field("pmu")
+    data: base.AnyVector = array_field("pmu")
 
     def __len__(self) -> int:
         return len(self.data)
 
-    def __array__(self) -> AnyVector:
+    def __array__(self) -> base.AnyVector:
         return self.data
 
     def __getitem__(self, key) -> "MomentumArray":
-        if isinstance(key, MaskBase):
+        if isinstance(key, base.MaskBase):
             key = key.data
         return self.__class__(np.array(self.data[key]))
 
@@ -514,24 +544,24 @@ class MomentumArray(ArrayBase):
         return deepcopy(self)
 
     @cached_property
-    def _xy_pol(self) -> ComplexVector:
+    def _xy_pol(self) -> base.ComplexVector:
         return self.data["x"] + 1.0j * self.data["y"]  # type: ignore
 
     @cached_property
-    def _zt_pol(self) -> ComplexVector:
+    def _zt_pol(self) -> base.ComplexVector:
         return self.data["z"] + 1.0j * self.pt  # type: ignore
 
     @cached_property
-    def _spatial_mag(self) -> DoubleVector:
+    def _spatial_mag(self) -> base.DoubleVector:
         return np.abs(self._zt_pol)
 
     @cached_property
-    def pt(self) -> DoubleVector:
+    def pt(self) -> base.DoubleVector:
         """Momentum component transverse to the beam-axis."""
         return np.abs(self._xy_pol)
 
     @cached_property
-    def eta(self) -> DoubleVector:
+    def eta(self) -> base.DoubleVector:
         """Pseudorapidity of particles.
 
         Notes
@@ -544,7 +574,7 @@ class MomentumArray(ArrayBase):
         return arr  # type: ignore
 
     @cached_property
-    def rapidity(self) -> DoubleVector:
+    def rapidity(self) -> base.DoubleVector:
         """Rapidity of particles."""
         e, z = self.data["e"], self.data["z"]
         with warnings.catch_warnings():
@@ -553,25 +583,25 @@ class MomentumArray(ArrayBase):
         return rap  # type: ignore
 
     @cached_property
-    def phi(self) -> DoubleVector:
+    def phi(self) -> base.DoubleVector:
         """Azimuthal angular displacement of particles about beam-axis."""
         return np.angle(self._xy_pol)
 
     @cached_property
-    def theta(self) -> DoubleVector:
+    def theta(self) -> base.DoubleVector:
         """Angular displacement of particles from positive beam-axis."""
         return np.angle(self._zt_pol)
 
     @cached_property
-    def mass(self) -> DoubleVector:
+    def mass(self) -> base.DoubleVector:
         """Mass of particles."""
-        e: DoubleVector = self.data["e"]
+        e: base.DoubleVector = self.data["e"]
         p = self._spatial_mag
         sq_diff = e * e - p * p
         sign = np.sign(sq_diff)
         return sign * np.sqrt(np.abs(sq_diff))  # type: ignore
 
-    def delta_R(self, other: "MomentumArray") -> DoubleVector:
+    def delta_R(self, other: "MomentumArray") -> base.DoubleVector:
         """Calculates the Euclidean inter-particle distances in the
         eta-phi plane between this set of particles and a provided
         'other' set. Produces a mxn matrix, where m is number of
@@ -609,9 +639,18 @@ class MomentumArray(ArrayBase):
 # COLOR STORAGE #
 #################
 @define
-class ColorArray(ArrayBase):
+class ColorArray(base.ArrayBase):
     """Returns data structure of color / anti-color pairs for particle
     shower.
+
+    :group: datastructure
+
+    Parameters
+    ----------
+    data : np.ndarray[np.int32]
+        Data representing the QCD color charge of each particle in the
+        point cloud. Given as either a (n, 2)-dimensional numpy array,
+        or a structured array, with fields "color", "anticolor".
 
     Attributes
     ----------
@@ -619,20 +658,20 @@ class ColorArray(ArrayBase):
         Structured array containing color / anti-color pairs.
     """
 
-    data: AnyVector = array_field("color")
+    data: base.AnyVector = array_field("color")
 
     def copy(self):
         return deepcopy(self)
 
     def __getitem__(self, key) -> "ColorArray":
-        if isinstance(key, MaskBase):
+        if isinstance(key, base.MaskBase):
             key = key.data
         return self.__class__(np.array(self.data[key]))
 
     def __len__(self) -> int:
         return len(self.data)
 
-    def __array__(self) -> AnyVector:
+    def __array__(self) -> base.AnyVector:
         return self.data
 
 
@@ -640,31 +679,39 @@ class ColorArray(ArrayBase):
 # HELICITY STORAGE #
 ####################
 @define
-class HelicityArray(ArrayBase):
+class HelicityArray(base.ArrayBase):
     """Data structure containing helicity / polarisation values for
     particle set.
 
+    :group: datastructure
+
+    Parameters
+    ----------
+    data : Sequence[int]
+        Data representing the spin polarisation of each particle in the
+        point cloud.
+
     Attributes
     ----------
-    data : ndarray
+    data : ndarray[int16]
         Helicity values.
     """
 
-    data: HalfIntVector = array_field("helicity")
+    data: base.HalfIntVector = array_field("helicity")
 
     def copy(self) -> "HelicityArray":
         """Returns a new HelicityArray instance with same data."""
         return deepcopy(self)
 
     def __getitem__(self, key) -> "HelicityArray":
-        if isinstance(key, MaskBase):
+        if isinstance(key, base.MaskBase):
             key = key.data
         return self.__class__(np.array(self.data[key]))
 
     def __len__(self) -> int:
         return len(self.data)
 
-    def __array__(self) -> HalfIntVector:
+    def __array__(self) -> base.HalfIntVector:
         return self.data
 
 
@@ -672,12 +719,20 @@ class HelicityArray(ArrayBase):
 # STATUS CODE STORAGE AND QUERYING #
 ####################################
 @define
-class StatusArray(ArrayBase):
+class StatusArray(base.ArrayBase):
     """Data structure containing status values for particle set.
+
+    :group: datastructure
+
+    Parameters
+    ----------
+    data : Sequence[int]
+        Data representing the Monte-Carlo event generator's status for
+        each particle in the point cloud.
 
     Attributes
     ----------
-    data : ndarray
+    data : ndarray[int32]
         Status codes.
 
     Notes
@@ -686,21 +741,21 @@ class StatusArray(ArrayBase):
     produced the data.
     """
 
-    data: HalfIntVector = array_field("h_int")
+    data: base.HalfIntVector = array_field("h_int")
 
     def copy(self) -> "StatusArray":
         """Returns a new StatusArray instance with same data."""
         return deepcopy(self)
 
     def __getitem__(self, key) -> "StatusArray":
-        if isinstance(key, MaskBase):
+        if isinstance(key, base.MaskBase):
             key = key.data
         return self.__class__(np.array(self.data[key]))
 
     def __len__(self) -> int:
         return len(self.data)
 
-    def __array__(self) -> HalfIntVector:
+    def __array__(self) -> base.HalfIntVector:
         return self.data
 
     def in_range(
@@ -757,8 +812,25 @@ class StatusArray(ArrayBase):
 # COMPOSITE OF PARTICLE DATA STRUCTURES #
 #########################################
 @define
-class ParticleSet(ParticleBase):
+class ParticleSet(base.ParticleBase):
     """Composite of data structures containing particle set description.
+
+    :group: datastructure
+
+    Parameters
+    ----------
+    pdg : PdgArray
+        PDG codes.
+    pmu : MomentumArray
+        Four momenta.
+    color : ColorArray
+        Color / anti-color pairs.
+    helicity : HelicityArray
+        Helicity values.
+    status : StatusArray
+        Status codes from Monte-Carlo event generator.
+    final : MaskArray
+        Boolean array indicating final state in particle set.
 
     Attributes
     ----------
@@ -813,30 +885,30 @@ class ParticleSet(ParticleBase):
     @classmethod
     def from_numpy(
         cls,
-        pdg: Optional[IntVector] = None,
-        pmu: Optional[AnyVector] = None,
-        color: Optional[AnyVector] = None,
-        helicity: Optional[HalfIntVector] = None,
-        status: Optional[HalfIntVector] = None,
-        final: Optional[BoolVector] = None,
+        pdg: Optional[base.IntVector] = None,
+        pmu: Optional[base.AnyVector] = None,
+        color: Optional[base.AnyVector] = None,
+        helicity: Optional[base.HalfIntVector] = None,
+        status: Optional[base.HalfIntVector] = None,
+        final: Optional[base.BoolVector] = None,
     ) -> "ParticleSet":
         """Creates a ParticleSet instance directly from numpy arrays.
 
         Parameters
         ----------
-        pdg : ndarray, optional
+        pdg : ndarray[int32], optional
             PDG codes.
-        pmu : ndarray, optional
+        pmu : ndarray[float64], optional
             Four momenta, formatted in columns of (x, y, z, e), or as
             a structured array with those fields.
-        color : ndarray, optional
+        color : ndarray[int32], optional
             Color / anti-color pairs, formatted in columns of
             (col, acol), or as a structured array with those fields.
-        helicity : ndarray, optional
+        helicity : ndarray[int16], optional
             Helicity values.
-        status : ndarray, optional
+        status : ndarray[int32], optional
             Status codes from Monte-Carlo event generator.
-        final : ndarray, optional
+        final : ndarray[bool_], optional
             Boolean array indicating which particles are final state.
 
         Returns
@@ -847,7 +919,7 @@ class ParticleSet(ParticleBase):
         """
 
         def optional(
-            data_class: Type[DataType], data: Optional[AnyVector]
+            data_class: Type[DataType], data: Optional[base.AnyVector]
         ) -> DataType:
             return data_class(data) if data is not None else data_class()
 
@@ -864,17 +936,25 @@ class ParticleSet(ParticleBase):
 #############################################
 # CONNECTIVITY INFORMATION AS COO EDGE LIST #
 #############################################
-if TYPE_CHECKING:
-
-    class _AdjDict(TypedDict):
-        edges: Tuple[int, int, Dict[str, Any]]
-        nodes: Tuple[int, Dict[str, Any]]
+class _AdjDict(TypedDict):
+    edges: Tuple[int, int, Dict[str, Any]]
+    nodes: Tuple[int, Dict[str, Any]]
 
 
 @define
-class AdjacencyList(AdjacencyBase):
+class AdjacencyList(base.AdjacencyBase):
     """Describes relations between particles in particle set using a
     COO edge list, and provides methods to convert representation.
+
+    :group: datastructure
+
+    Parameters
+    ----------
+    _data : np.ndarray[np.int32]
+        COO formatted edge pairs, either given as a (n-2)-dimensional
+        array, or a structured array with fields "in", "out".
+    weights : np.ndarray[np.float64]
+        Weights attributed to each edge in the COO list.
 
     Attributes
     ----------
@@ -888,17 +968,17 @@ class AdjacencyList(AdjacencyBase):
         Adjacency matrix representation.
     """
 
-    _data: AnyVector = array_field("edge")
-    weights: DoubleVector = array_field("double")
+    _data: base.AnyVector = array_field("edge")
+    weights: base.DoubleVector = array_field("double")
 
     def __len__(self) -> int:
         return len(self._data)
 
-    def __array__(self) -> AnyVector:
+    def __array__(self) -> base.AnyVector:
         return self._data
 
     def __getitem__(self, key) -> "AdjacencyList":
-        if isinstance(key, MaskBase):
+        if isinstance(key, base.MaskBase):
             key = key.data
         return self.__class__(np.array(self._data[key]))
 
@@ -930,7 +1010,7 @@ class AdjacencyList(AdjacencyBase):
     @classmethod
     def from_matrix(
         cls,
-        adj_matrix: Union[DoubleVector, BoolVector, IntVector],
+        adj_matrix: Union[base.DoubleVector, base.BoolVector, base.IntVector],
         weighted: bool = False,
         self_loop: bool = False,
     ) -> "AdjacencyList":
@@ -959,7 +1039,7 @@ class AdjacencyList(AdjacencyBase):
         return cls(**kwargs)
 
     @property
-    def matrix(self) -> Union[DoubleVector, IntVector]:
+    def matrix(self) -> Union[base.DoubleVector, base.IntVector]:
         size = len(self.nodes)
         if len(self.weights) > 0:
             weights = self.weights
@@ -972,11 +1052,11 @@ class AdjacencyList(AdjacencyBase):
         return adj
 
     @property
-    def edges(self) -> AnyVector:
+    def edges(self) -> base.AnyVector:
         return self._data
 
     @property
-    def nodes(self) -> IntVector:
+    def nodes(self) -> base.IntVector:
         """Nodes are extracted from the edge list, and put in
         ascending order of magnitude, regardless of sign.
         Positive sign conventionally means final state particle.
@@ -989,8 +1069,12 @@ class AdjacencyList(AdjacencyBase):
 
     def to_dicts(
         self,
-        edge_data: Optional[Dict[str, Union[ArrayBase, AnyVector]]] = None,
-        node_data: Optional[Dict[str, Union[ArrayBase, AnyVector]]] = None,
+        edge_data: Optional[
+            Dict[str, Union[base.ArrayBase, base.AnyVector]]
+        ] = None,
+        node_data: Optional[
+            Dict[str, Union[base.ArrayBase, base.AnyVector]]
+        ] = None,
     ) -> _AdjDict:
         """Returns data in dictionary format, which is more easily
         parsed by external libraries, such as NetworkX.
@@ -1002,11 +1086,11 @@ class AdjacencyList(AdjacencyBase):
 
         def make_data_dicts(
             orig: Tuple[Any, ...],
-            data: Dict[str, Union[ArrayBase, AnyVector]],
+            data: Dict[str, Union[base.ArrayBase, base.AnyVector]],
         ):
             def array_iterator(array_dict):
                 for array in array_dict.values():
-                    if isinstance(array, ArrayBase):
+                    if isinstance(array, base.ArrayBase):
                         yield array.data
                     elif isinstance(array, np.ndarray):
                         yield array
@@ -1040,6 +1124,16 @@ class AdjacencyList(AdjacencyBase):
 class Graphicle:
     """Composite object, combining particle set data with relational
     information between particles.
+
+    :group: datastructure
+
+    Parameters
+    ----------
+    particles : ParticleSet
+        The point cloud data for the particles in the dataset.
+    adj : AdjacencyList
+        The connectivity of the particles in the point cloud, forming a
+        graph.
 
     Attributes
     ----------
@@ -1090,16 +1184,41 @@ class Graphicle:
         return deepcopy(self)
 
     @classmethod
+    def from_event(cls, event: base.EventInterface) -> "Graphicle":
+        """Instantiates a Graphicle object from a generic event object,
+        whose attribute structure is compatible with
+        ``base.EventInterface``.
+
+        Parameters
+        ----------
+        event : base.EventInterface
+            Object of any type with a subset of parameters with
+            consistent names and values to those defined in the
+            interface. ``heparchy`` and ``showerpipe`` event objects
+            can be passed for easy instantiation.
+        """
+        params = dict()
+        for attr in base.EventInterface.__dict__:
+            if attr[0] == "_":
+                continue
+            try:
+                params[attr] = getattr(event, attr)
+            except AttributeError:
+                if attr == "final" and hasattr(event, "masks"):
+                    params["final"] = event.masks["final"]
+        return cls.from_numpy(**params)
+
+    @classmethod
     def from_numpy(
         cls,
-        pdg: Optional[IntVector] = None,
-        pmu: Optional[AnyVector] = None,
-        color: Optional[AnyVector] = None,
-        helicity: Optional[HalfIntVector] = None,
-        status: Optional[HalfIntVector] = None,
-        final: Optional[BoolVector] = None,
-        edges: Optional[AnyVector] = None,
-        weights: Optional[DoubleVector] = None,
+        pdg: Optional[base.IntVector] = None,
+        pmu: Optional[base.AnyVector] = None,
+        color: Optional[base.AnyVector] = None,
+        helicity: Optional[base.HalfIntVector] = None,
+        status: Optional[base.HalfIntVector] = None,
+        final: Optional[base.BoolVector] = None,
+        edges: Optional[base.AnyVector] = None,
+        weights: Optional[base.DoubleVector] = None,
     ) -> "Graphicle":
         """Instantiates a Graphicle object from an optional collection
         of numpy arrays.
@@ -1147,23 +1266,28 @@ class Graphicle:
             adj_list = AdjacencyList()
         return cls(particles=particles, adj=adj_list)
 
-    @property
+    @property  # type: ignore
+    @_attach_doc(PdgArray)
     def pdg(self) -> PdgArray:
         return self.particles.pdg
 
-    @property
+    @property  # type: ignore
+    @_attach_doc(MomentumArray)
     def pmu(self) -> MomentumArray:
         return self.particles.pmu
 
-    @property
+    @property  # type: ignore
+    @_attach_doc(ColorArray)
     def color(self) -> ColorArray:
         return self.particles.color
 
-    @property
+    @property  # type: ignore
+    @_attach_doc(HelicityArray)
     def helicity(self) -> HelicityArray:
         return self.particles.helicity
 
-    @property
+    @property  # type: ignore
+    @_attach_doc(StatusArray)
     def status(self) -> StatusArray:
         return self.particles.status
 
@@ -1171,16 +1295,17 @@ class Graphicle:
     def hard_mask(self) -> MaskGroup:
         return self.particles.status.hard_mask
 
-    @property
-    def final(self) -> MaskBase:
+    @property  # type: ignore
+    @_attach_doc(base.MaskBase)
+    def final(self) -> base.MaskBase:
         return self.particles.final
 
     @property
-    def edges(self) -> AnyVector:
+    def edges(self) -> base.AnyVector:
         return self.adj.edges
 
     @property
-    def nodes(self) -> IntVector:
+    def nodes(self) -> base.IntVector:
         return self.adj.nodes
 
     def _need_attr(self, attr_name: str, task: str) -> None:

@@ -88,7 +88,7 @@ with `showerpipe`.
 
 ```python3
 >>> from showerpipe.generator import PythiaGenerator
-... from showerpipe.lhe import split
+...
 ... lhe_path = "https://zenodo.org/record/6034610/files/unweighted_events.lhe.gz"
 ... gen = PythiaGenerator("pythia-settings.cmnd", lhe_path)
 >>> for event in gen:
@@ -179,4 +179,5 @@ MaskArray(data=array([ True,  True,  True,  True,  True,  True,  True,  True,  T
 80.419002446
 ```
 
-More rigorous documentation on the API is coming soon on readthedocs.
+More information on the API is available in the
+[documentation](https://graphicle.readthedocs.io)
