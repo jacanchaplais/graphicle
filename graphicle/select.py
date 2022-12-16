@@ -236,10 +236,12 @@ def hard_hierarchy(
     use_pmu: bool = True,
     desc: Optional[gcl.MaskGroup] = None,
 ) -> gcl.MaskGroup:
-    """Composite MaskGroup of MaskGroups, representing the descendants
-    of the hard process. Uses a tree structure, such that partons which
-    are descendants of other hard partons are accessible, and nested
-    within their parents.
+    """Composite ``MaskGroup`` of ``MaskGroup``s, representing the
+    descendants of the hard process. Uses a tree structure, such that
+    partons which are descendants of other hard partons are accessible,
+    and nested within their parents.
+
+    :group: select
 
     Parameters
     ----------
