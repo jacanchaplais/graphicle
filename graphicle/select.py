@@ -179,7 +179,7 @@ def _hard_children(
     parents = filter(lambda parton: np.any(parton[1]), zip(names, comp_mat))
     comp_dict = dict()
     for name, parton in parents:
-        comp_dict[name] = list(compress(names, parton))
+        comp_dict[name] = tuple(compress(names, parton))
     return comp_dict
 
 
