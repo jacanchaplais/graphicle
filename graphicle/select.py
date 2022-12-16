@@ -236,10 +236,10 @@ def hierarchy(
     use_pmu: bool = True,
     desc: Optional[gcl.MaskGroup] = None,
 ) -> gcl.MaskGroup:
-    """Composite ``MaskGroup`` of ``MaskGroup``s, representing the
-    descendants of the hard process. Uses a tree structure, such that
-    partons which are descendants of other hard partons are accessible,
-    and nested within their parents.
+    """Composite ``MaskGroup`` of ``MaskGroup`` instances, representing
+    the descendants of the hard process. Uses a tree structure, such
+    that partons which are descendants of other hard partons are
+    accessible, and nested within their parents.
 
     :group: select
 
@@ -264,7 +264,7 @@ def hierarchy(
     Returns
     -------
     hierarchy : MaskGroup
-        Nested composite of ``MaskGroup``s, representing the
+        Nested composite of ``MaskGroup`` instances, representing the
         hierarchical structure of the hard process, and the descendants
         of the partons throughout the shower. Nested ``MaskGroup``s
         additionally contain a ``latent`` ``MaskArray``, referring to
@@ -308,7 +308,6 @@ def hierarchy(
             │   ├── u~
             │   └── latent
             └── latent
-
         >>> # latent contains the descendants not from constituents
         ... graph[masks["t"]["latent"]].pdg.name
         array(['t', 't', 't', 't', 't', 'b', 'W+'], dtype=object)
@@ -316,8 +315,7 @@ def hierarchy(
     Notes
     -----
     Each mask refers to the descendants of the parton it is labelled by.
-    This is an exclusive set, _ie._ it does not include the parton
-    itself.
+    This is an exclusive set, ie. it does not include the parton itself.
     """
     hard_mask = graph.hard_mask
     del hard_mask["incoming"]
@@ -330,8 +328,8 @@ def hierarchy(
         desc = hard_descendants(graph)
     hard_desc = desc[hard_mask][list(names)]
     hard = _hard_children(
-        _composite_matrix(_hard_matrix(hard_desc)), names
-    )  # type: ignore
+        _composite_matrix(_hard_matrix(hard_desc)), names  # type: ignore
+    )
     keys = set(hard.keys())
     vals = set(chain.from_iterable(hard.values()))
     roots = keys.difference(keys.intersection(vals))
