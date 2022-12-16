@@ -222,7 +222,7 @@ class MaskGroup(base.MaskBase, abc.MutableMapping[str, base.MaskBase]):
 
     def __repr__(self) -> str:
         keys = ", ".join(map(lambda name: '"' + name + '"', self.names))
-        return f"MaskGroup(mask_arrays=[{keys}], agg_op={self.agg_op.name})"
+        return f"MaskGroup(masks=[{keys}], agg_op={self.agg_op.name})"
 
     def __rich__(self) -> Tree:
         name = self.__class__.__name__
@@ -368,6 +368,30 @@ class MaskGroup(base.MaskBase, abc.MutableMapping[str, base.MaskBase]):
     @property
     def dict(self) -> Dict[str, base.BoolVector]:
         return {key: val.data for key, val in self._mask_arrays.items()}
+
+    def flatten(self) -> "MaskGroup":
+        """Removes nesting such that the ``MaskGroup`` contains only
+        ``MaskArray``s, and no other ``MaskGroup``s.
+
+        Returns
+        -------
+        flat_masks : MaskGroup
+            ``MaskGroup`` in which all sub-``MaskGroup``s are aggregated
+            and placed at the top level of the outer ``MaskGroup``,
+            along with the ``MaskArray``s from the innermost levels.
+        """
+
+        def leaves(mask_group: "MaskGroup"):
+            for key, val in mask_group.items():
+                if key == "latent":
+                    continue
+                if isinstance(val, type(self)):
+                    yield key, val.data
+                    yield from leaves(val)
+                else:
+                    yield key, val
+
+        return self.__class__(dict(leaves(self)), "or")  # type: ignore
 
 
 ############################
