@@ -64,6 +64,8 @@ from scipy.sparse import coo_array
 from numpy.lib import recfunctions as rfn
 from typicle import Types
 from typicle.convert import cast_array
+from rich.tree import Tree
+from rich.console import Console
 
 from . import base
 
@@ -212,11 +214,37 @@ class MaskGroup(base.MaskBase, abc.MutableMapping[str, base.MaskBase]):
 
     @classmethod
     def from_numpy_structured(cls, arr: np.ndarray) -> "MaskGroup":
-        return cls(dict(map(lambda name: (name, arr[name]), arr.dtype.names)))
+        return cls(
+            dict(  # type: ignore
+                map(lambda name: (name, arr[name]), arr.dtype.names)
+            )
+        )
 
     def __repr__(self) -> str:
         keys = ", ".join(map(lambda name: '"' + name + '"', self.names))
         return f"MaskGroup(mask_arrays=[{keys}], agg_op={self.agg_op.name})"
+
+    def __rich__(self) -> Tree:
+        name = self.__class__.__name__
+        agg_op = self.agg_op.name
+        tree = Tree(f"{name}(agg_op=[yellow]{agg_op}[default])")
+
+        def make_tree(mask: "MaskGroup", branch: Tree) -> Tree:
+            branch_copy = deepcopy(branch)
+            for key, val in mask.items():
+                sub_branch = Tree(f"{key}")
+                if isinstance(val, MaskGroup):
+                    sub_branch = sub_branch.add(make_tree(val, sub_branch))
+                branch_copy.add(sub_branch)
+            return branch_copy
+
+        return make_tree(self, tree)
+
+    def __str__(self) -> str:
+        console = Console(color_system=None)
+        with console.capture() as capture:
+            console.print(self)
+        return capture.get()
 
     def __iter__(self) -> Iterator[str]:
         return iter(self._mask_arrays)
