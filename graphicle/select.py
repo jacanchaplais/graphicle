@@ -231,7 +231,7 @@ def hard_descendants(
     return masks
 
 
-def hard_hierarchy(
+def hierarchy(
     graph: gcl.Graphicle,
     use_pmu: bool = True,
     desc: Optional[gcl.MaskGroup] = None,
@@ -266,7 +266,58 @@ def hard_hierarchy(
     hierarchy : MaskGroup
         Nested composite of ``MaskGroup``s, representing the
         hierarchical structure of the hard process, and the descendants
-        of the partons throughout the shower.
+        of the partons throughout the shower. Nested ``MaskGroup``s
+        additionally contain a ``latent`` ``MaskArray``, referring to
+        the descendants of the parent parton which are not also
+        descendants of the children partons.
+
+    Examples
+    --------
+    Generating an event and automatically detecting process structure:
+
+        >>> import showerpipe as shp
+        ... import graphicle as gcl
+        ...
+        ... # generate event using showerpipe
+        ... lhe_url = ("https://zenodo.org/record/6034610/"
+        ...            "files/unweighted_events.lhe.gz")
+        ... gen = shp.generator.PythiaGenerator(
+        ...             "pythia-settings.cmnd", lhe_url)
+        ... event = next(gen)
+        ... # create graphicle objects
+        ... graph = gcl.Graphicle.from_event(event)
+        ... masks = gcl.select.hierarchy(graph)
+        ...
+        >>> masks
+        MaskGroup(masks=["t", "t~"], agg_op=OR)
+        >>> masks["t"]
+        MaskGroup(masks=["b", "W+", "latent"], agg_op=OR)
+        >>> print(masks)  # view full nested structure
+        MaskGroup(agg_op=OR)
+        ├── t
+        │   ├── b
+        │   ├── W+
+        │   │   ├── d~
+        │   │   ├── u
+        │   │   └── latent
+        │   └── latent
+        └── t~
+            ├── b~
+            ├── W-
+            │   ├── d
+            │   ├── u~
+            │   └── latent
+            └── latent
+
+        >>> # latent contains the descendants not from constituents
+        ... graph[masks["t"]["latent"]].pdg.name
+        array(['t', 't', 't', 't', 't', 'b', 'W+'], dtype=object)
+
+    Notes
+    -----
+    Each mask refers to the descendants of the parton it is labelled by.
+    This is an exclusive set, _ie._ it does not include the parton
+    itself.
     """
     hard_mask = graph.hard_mask
     del hard_mask["incoming"]
@@ -278,26 +329,30 @@ def hard_hierarchy(
     if desc is None:
         desc = hard_descendants(graph)
     hard_desc = desc[hard_mask][list(names)]
-    hard = _hard_children(_composite_matrix(_hard_matrix(hard_desc)), names)
+    hard = _hard_children(
+        _composite_matrix(_hard_matrix(hard_desc)), names
+    )  # type: ignore
     keys = set(hard.keys())
     vals = set(chain.from_iterable(hard.values()))
     roots = keys.difference(keys.intersection(vals))
 
     def make_tree(flat):
-        branch = gcl.MaskGroup(agg_op="or")
+        branch = gcl.MaskGroup(agg_op="or")  # type: ignore
         if isinstance(flat, dict):
             for key, nest in flat.items():
                 if key not in roots:
                     continue
                 branch[key] = make_tree(nest)
-                branch[key]["latent"] = branch[key].data != desc[key].data
+                branch[key]["latent"] = (  # type: ignore
+                    branch[key].data != desc[key].data
+                )
         else:
             no_hard = True
             for parton in flat:
                 if parton in hard:
                     no_hard = False
                     branch[parton] = make_tree(hard[parton])
-                    branch[parton]["latent"] = (
+                    branch[parton]["latent"] = (  # type: ignore
                         branch[parton].data != desc[parton].data
                     )
                 else:
