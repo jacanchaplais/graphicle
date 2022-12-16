@@ -297,15 +297,15 @@ def hierarchy(
         ├── t
         │   ├── b
         │   ├── W+
-        │   │   ├── d~
-        │   │   ├── u
+        │   │   ├── tau+
+        │   │   ├── nu(tau)
         │   │   └── latent
         │   └── latent
         └── t~
             ├── b~
             ├── W-
-            │   ├── d
-            │   ├── u~
+            │   ├── s
+            │   ├── c~
             │   └── latent
             └── latent
         >>> # latent contains the descendants not from constituents
