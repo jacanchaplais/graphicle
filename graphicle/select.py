@@ -266,10 +266,10 @@ def hierarchy(
     hierarchy : MaskGroup
         Nested composite of ``MaskGroup`` instances, representing the
         hierarchical structure of the hard process, and the descendants
-        of the partons throughout the shower. Nested ``MaskGroup``s
-        additionally contain a ``latent`` ``MaskArray``, referring to
-        the descendants of the parent parton which are not also
-        descendants of the children partons.
+        of the partons throughout the shower. Nested ``MaskGroup``
+        instances additionally contain a ``latent`` ``MaskArray``,
+        referring to the descendants of the parent parton which are not
+        also descendants of the children partons.
 
     Examples
     --------
