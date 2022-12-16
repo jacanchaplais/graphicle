@@ -177,7 +177,7 @@ _MASK_DICT = OrderedDict[str, MaskArray]
 def _mask_dict_convert(masks: _IN_MASK_DICT) -> _MASK_DICT:
     out_masks = OrderedDict()
     for key, val in masks.items():
-        if isinstance(val, MaskArray):
+        if isinstance(val, MaskArray) or isinstance(val, MaskGroup):
             mask = val
         else:
             mask = MaskArray(val)
@@ -273,7 +273,7 @@ class MaskGroup(base.MaskBase, abc.MutableMapping[str, base.MaskBase]):
 
         Parameters
         ----------
-        key : str, list[str], slice
+        key : str, list[str], slice, np.ndarray[bool_], base.MaskBase
             If string, will return the ``MaskBase`` object associated
             with a key of the same name. If list of strings, will return
             a new ``MaskGroup`` with only the keys included in the list.
@@ -287,15 +287,10 @@ class MaskGroup(base.MaskBase, abc.MutableMapping[str, base.MaskBase]):
                 OrderedDict({k: self._mask_arrays[k] for k in key}), agg
             )
         elif not isinstance(key, str):
-            return self.__class__(
-                OrderedDict(
-                    map(
-                        lambda name_arr: (name_arr[0], name_arr[1][key]),
-                        self._mask_arrays.items(),
-                    )
-                ),
-                agg,
-            )
+            masked_data = OrderedDict()
+            for dict_key, val in self._mask_arrays.items():
+                masked_data[dict_key] = val[key]
+            return self.__class__(masked_data, agg)
         else:
             return self._mask_arrays[key]
 
