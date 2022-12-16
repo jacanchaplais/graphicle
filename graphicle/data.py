@@ -194,7 +194,7 @@ class MaskGroup(base.MaskBase, abc.MutableMapping[str, base.MaskBase]):
 
     Parameters
     ----------
-    mask_arrays : dict of MaskArrays or array-like objects
+    _mask_arrays : dict of MaskArrays or array-like objects
         Dictionary of MaskArray objects to be composed.
     agg_op : str or MaskAggOp
         Defines the aggregation operation when accessing the `data`
@@ -205,6 +205,25 @@ class MaskGroup(base.MaskBase, abc.MutableMapping[str, base.MaskBase]):
     ----------
     data : np.ndarray
         Combination of all masks in group via bitwise AND reduction.
+    names : list[str]
+        Provides the string values of the keys to the top-level nested
+        ``MaskBase`` objects as a list. Will be deprecated in future.
+        ``MaskGroup.keys()`` is preferred.
+    bitwise_or : np.ndarray[bool_]
+        Bitwise ``OR`` reduction over the nested masks.
+    bitwise_or : np.ndarray[bool_]
+        Bitwise ``AND`` reduction over the nested masks.
+    dict : dict[base.MaskBase]
+        Masks nested in a dictionary instead of a ``MaskGroup``.
+
+    Methods
+    -------
+    from_numpy_structured()
+        Converts a structured boolean array into a ``MaskGroup``.
+    flatten()
+        Removes any nesting of ``MaskGroup``s within ``MaskGroup``s.
+    copy()
+        Copies the ``MaskGroup`` instance.
     """
 
     _mask_arrays: _MASK_DICT = field(
