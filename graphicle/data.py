@@ -42,7 +42,7 @@ from copy import deepcopy
 from enum import Enum
 from functools import cached_property
 import warnings
-from collections import abc
+from collections import abc, OrderedDict
 from typing import (
     Tuple,
     List,
@@ -168,12 +168,12 @@ class MaskArray(base.MaskBase, base.ArrayBase):
         return self.__class__(~self.data)
 
 
-_IN_MASK_DICT = Dict[str, Union[MaskArray, base.BoolVector]]
-_MASK_DICT = Dict[str, MaskArray]
+_IN_MASK_DICT = OrderedDict[str, Union[MaskArray, base.BoolVector]]
+_MASK_DICT = OrderedDict[str, MaskArray]
 
 
 def _mask_dict_convert(masks: _IN_MASK_DICT) -> _MASK_DICT:
-    out_masks = dict()
+    out_masks = OrderedDict()
     for key, val in masks.items():
         if isinstance(val, MaskArray):
             mask = val
@@ -222,17 +222,35 @@ class MaskGroup(base.MaskBase, abc.MutableMapping[str, base.MaskBase]):
         return iter(self._mask_arrays)
 
     def __getitem__(self, key) -> Union[MaskArray, "MaskGroup"]:
-        if not isinstance(key, str):
+        """Subscripting for ``MaskGroup`` object.
+
+        Parameters
+        ----------
+        key : str, list[str], slice
+            If string, will return the ``MaskBase`` object associated
+            with a key of the same name. If list of strings, will return
+            a new ``MaskGroup`` with only the keys included in the list.
+            Otherwise will be treated as an array-like slice, returning
+            the ``MaskGroup`` whose components each individually have
+            the passed slice applied.
+        """
+        agg = self.agg_op
+        if isinstance(key, list):
             return self.__class__(
-                dict(
+                OrderedDict({k: self._mask_arrays[k] for k in key}), agg
+            )
+        elif not isinstance(key, str):
+            return self.__class__(
+                OrderedDict(
                     map(
                         lambda name_arr: (name_arr[0], name_arr[1][key]),
                         self._mask_arrays.items(),
                     )
-                )
+                ),
+                agg,
             )
-
-        return self._mask_arrays[key]
+        else:
+            return self._mask_arrays[key]
 
     def __setitem__(self, key, mask) -> None:
         """Add a new MaskArray to the group, with given key."""

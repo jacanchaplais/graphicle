@@ -4,8 +4,8 @@
 
 Utilities for selecting elements from graph structured particle data.
 """
-from typing import Set, Optional, Tuple
-from itertools import combinations
+from typing import Set, Optional, Tuple, Iterable, Dict, Union
+from itertools import combinations, compress, chain
 
 import numpy as np
 import numpy.typing as npt
@@ -13,6 +13,7 @@ import pandas as pd
 import networkx as _nx
 
 import graphicle as gcl
+from . import base
 
 
 def find_vertex(
@@ -145,8 +146,47 @@ def hadron_vertices(
     return np.unique(adj.edges[status.in_range(80, 90)]["in"])
 
 
+def _hard_matrix(hard_desc: gcl.MaskGroup) -> base.BoolVector:
+    """Returns a square adjacency matrix for the hard process. Rows
+    represent each hard parton, and the values indicate whether another
+    given hard parton is a descendant of it.
+    """
+    num_hard = len(hard_desc)
+    mat = np.zeros((num_hard, num_hard), dtype="<?")
+    for i, mask in enumerate(hard_desc.values()):
+        mat[i, :] = mask.data
+    return mat
+
+
+def _composite_matrix(hard_matrix: base.BoolVector) -> base.BoolVector:
+    """Similar to ``_hard_matrix()``, but columns represent direct
+    children, not grand-children further nested composites.
+    """
+    pcls_with_hard_children = filter(np.any, hard_matrix)
+    asc_parents = sorted(pcls_with_hard_children, key=np.sum)
+    for row_i in reversed(asc_parents):
+        for row_j in asc_parents:
+            if row_i is row_j:
+                continue
+            row_i[row_j] = False
+    return hard_matrix
+
+
+def _hard_children(
+    comp_mat: base.BoolVector,
+    names: Tuple[str, ...],
+) -> Dict[str, Tuple[str, ...]]:
+    parents = filter(lambda parton: np.any(parton[1]), zip(names, comp_mat))
+    comp_dict = dict()
+    for name, parton in parents:
+        comp_dict[name] = list(compress(names, parton))
+    return comp_dict
+
+
 def hard_descendants(
-    graph: gcl.Graphicle, target: Set[int], sign_sensitive: bool = False
+    graph: gcl.Graphicle,
+    target: Optional[Iterable[int]] = None,
+    sign_sensitive: bool = False,
 ) -> gcl.MaskGroup:
     """Returns a MaskGroup over the particles in the graph, where True
     indicates a particle descends from a specific hard parton.
@@ -157,9 +197,10 @@ def hard_descendants(
     ----------
     graph : Graphicle
         Particle graph containing at least PdgArray and StatusArray.
-    target : set
+    target : Iterable[int], optional
         PDG codes referring to the hard particles for which descendants
-        are obtained.
+        are obtained. If ``None``, will obtain masks for all
+        intermediate and outgoing hard partons. Default is ``None``.
     sign_sensitive : bool
         Indicates whether sign of PDG code should be used when selecting
         hard partons, ie. if set to False both particle and
@@ -168,23 +209,115 @@ def hard_descendants(
         Default is False.
     """
     hard_vtxs = dict()
-    target_list = list(target)
     # get the vertices of the hard partons
-    for stage in ("intermediate", "outgoing"):
-        mask = graph.hard_mask[stage]
+    for stage, mask in graph.hard_mask.items():
+        if stage == "incoming":
+            continue
         pcls = graph[mask]
-        hard_mask = pcls.pdg.mask(
-            target_list, blacklist=False, sign_sensitive=sign_sensitive
-        )
-        hard_pcls = pcls[hard_mask]
+        if target is not None:
+            hard_mask = pcls.pdg.mask(
+                list(target), blacklist=False, sign_sensitive=sign_sensitive
+            )
+            if not np.any(hard_mask):
+                continue
+            pcls = pcls[hard_mask]
         hard_vtxs.update(
-            dict(zip(tuple(hard_pcls.pdg.name), tuple(hard_pcls.edges["out"])))
+            dict(zip(tuple(pcls.pdg.name), tuple(pcls.edges["out"])))
         )
     # find the descendants of those vertices
     masks = gcl.MaskGroup(agg_op=gcl.data.MaskAggOp.OR)
     for pcl_name, vtx in hard_vtxs.items():
         masks[pcl_name] = vertex_descendants(graph.adj, vtx)
     return masks
+
+
+def hard_hierarchy(
+    graph: gcl.Graphicle,
+    use_pmu: bool = True,
+    desc: Optional[gcl.MaskGroup] = None,
+) -> gcl.MaskGroup:
+    """Composite MaskGroup of MaskGroups, representing the descendants
+    of the hard process. Uses a tree structure, such that partons which
+    are descendants of other hard partons are accessible, and nested
+    within their parents.
+
+    Parameters
+    ----------
+    graph : Graphicle
+        The event to be parsed. Must include ``status``, ``edges``,
+        ``pmu``, and ``pdg`` data.
+    use_pmu : bool
+        If set to ``True``, when colour singlet particles are outgoing
+        from a hadronisation vertex on which more than one hard parton's
+        descendants were incident, the outgoing particles will be
+        associated with the nearest parton in the pseudorapidity-azimuth
+        plane. If set to ``False``, the deepest nested masks may
+        overlap, but will be based entirely upon the ancestral structure
+        of the DAG. Default is ``True``.
+    desc : MaskGroup, optional
+        If the masks for all partons in the hard process have already
+        been computed, these may be passed here to save performing the
+        computation again.
+
+    Returns
+    -------
+    hierarchy : MaskGroup
+        Nested composite of ``MaskGroup``s, representing the
+        hierarchical structure of the hard process, and the descendants
+        of the partons throughout the shower.
+    """
+    hard_mask = graph.hard_mask
+    del hard_mask["incoming"]
+    pmu = graph.pmu
+    hard_pdg = graph.pdg[hard_mask]
+    hard_pmu = pmu[hard_mask]
+    names = tuple(map(str, hard_pdg.name))
+    name_to_pdg = dict(zip(names, map(int, hard_pdg.data)))
+    if desc is None:
+        desc = hard_descendants(graph)
+    hard_desc = desc[hard_mask][list(names)]
+    hard = _hard_children(_composite_matrix(_hard_matrix(hard_desc)), names)
+    keys = set(hard.keys())
+    vals = set(chain.from_iterable(hard.values()))
+    roots = keys.difference(keys.intersection(vals))
+
+    def make_tree(flat):
+        branch = gcl.MaskGroup(agg_op="or")
+        if isinstance(flat, dict):
+            for key, nest in flat.items():
+                if key not in roots:
+                    continue
+                branch[key] = make_tree(nest)
+                branch[key]["latent"] = branch[key].data != desc[key].data
+        else:
+            no_hard = True
+            for parton in flat:
+                if parton in hard:
+                    no_hard = False
+                    branch[parton] = make_tree(hard[parton])
+                    branch[parton]["latent"] = (
+                        branch[parton].data != desc[parton].data
+                    )
+                else:
+                    branch[parton] = desc[parton]
+            if (use_pmu is True) and (no_hard is True):
+                branch_pdgs = tuple(name_to_pdg[k] for k in branch.keys())
+                parton_mask = hard_pdg.mask(
+                    branch_pdgs, blacklist=False, sign_sensitive=True
+                )
+                parton_names = tuple(map(str, hard_pdg[parton_mask].name))
+                parton_pmu = hard_pmu[parton_mask]
+                overlap = branch.bitwise_and
+                dR = parton_pmu.delta_R(pmu[overlap])
+                alloc = np.argmin(dR, axis=0)
+                for num, name in enumerate(parton_names):
+                    alloc_mask = alloc == num
+                    data = branch[name].data[overlap]
+                    data[~alloc_mask] = False
+                    branch[name].data[overlap] = data
+        return branch
+
+    return make_tree(hard)
 
 
 def hard_edge(graph: gcl.Graphicle, pdg: int) -> Tuple[int, int]:
