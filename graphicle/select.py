@@ -4,8 +4,9 @@
 
 Utilities for selecting elements from graph structured particle data.
 """
-from typing import Set, Optional, Tuple, Iterable, Dict, Union
+from typing import Set, Optional, Tuple, Iterable, Dict, Union, Any
 from itertools import combinations, compress, chain
+from dataclasses import dataclass
 
 import numpy as np
 import numpy.typing as npt
@@ -183,6 +184,14 @@ def _hard_children(
     return comp_dict
 
 
+def _flat_hierarchy(hard_desc: gcl.MaskGroup) -> Dict[str, Tuple[str, ...]]:
+    """Produces a flat representation of the hard process hierarchy."""
+    names = tuple(hard_desc.keys())
+    hard_matrix = _hard_matrix(hard_desc)
+    comp_matrix = _composite_matrix(hard_matrix)
+    return _hard_children(comp_matrix, names)
+
+
 def hard_descendants(
     graph: gcl.Graphicle,
     target: Optional[Iterable[int]] = None,
@@ -229,6 +238,41 @@ def hard_descendants(
     for pcl_name, vtx in hard_vtxs.items():
         masks[pcl_name] = vertex_descendants(graph.adj, vtx)
     return masks
+
+
+@dataclass(frozen=True)
+class TreeConf:
+    """Encapsulates the data needed in each recursive pass of
+    ``make_tree()``.
+
+    Attributes
+    ----------
+    roots : set[str]
+        Identifies ancestors from which all other partons in hard
+        process descend (following the collision).
+    hard : dict[str, tuple[str, ...]]
+        Provides a flat representation of the hard process hierarchy.
+    pmu : gcl.MomentumArray
+        Momentum of all particles within the full event.
+    hard_pmu : gcl.MomentumArray
+        Momentum of partons in hard process.
+    hard_pdg : gcl.PdgArray
+        PDG codes of partons in hard process.
+    name_top_pdg : dict[str, int]
+        Mapping from string names of hard partons to PDG codes.
+    use_pmu : bool
+        Setting determines whether to use momentum in parton allocation
+        for final state.
+    """
+
+    roots: Set[str]
+    hard: Dict[str, Tuple[str, ...]]
+    pmu: gcl.MomentumArray
+    hard_pmu: gcl.MomentumArray
+    hard_pdg: gcl.PdgArray
+    desc: gcl.MaskGroup
+    name_to_pdg: Dict[str, int]
+    use_pmu: bool
 
 
 def hierarchy(
@@ -326,53 +370,56 @@ def hierarchy(
     name_to_pdg = dict(zip(names, map(int, hard_pdg.data)))
     if desc is None:
         desc = hard_descendants(graph)
-    hard_desc = desc[hard_mask][list(names)]
-    hard = _hard_children(
-        _composite_matrix(_hard_matrix(hard_desc)), names  # type: ignore
-    )
+    hard_desc: gcl.MaskGroup = desc[hard_mask][list(names)]  # type: ignore
+    hard = _flat_hierarchy(hard_desc)
     keys = set(hard.keys())
     vals = set(chain.from_iterable(hard.values()))
     roots = keys.difference(keys.intersection(vals))
+    tree_conf = TreeConf(
+        roots, hard, pmu, hard_pmu, hard_pdg, desc, name_to_pdg, use_pmu
+    )
+    return _make_tree(hard, tree_conf)
 
-    def make_tree(flat):
-        branch = gcl.MaskGroup(agg_op="or")  # type: ignore
-        if isinstance(flat, dict):
-            for key, nest in flat.items():
-                if key not in roots:
-                    continue
-                branch[key] = make_tree(nest)
-                branch[key]["latent"] = (  # type: ignore
-                    branch[key].data != desc[key].data
-                )
-        else:
-            no_hard = True
-            for parton in flat:
-                if parton in hard:
-                    no_hard = False
-                    branch[parton] = make_tree(hard[parton])
-                    branch[parton]["latent"] = (  # type: ignore
-                        branch[parton].data != desc[parton].data
-                    )
-                else:
-                    branch[parton] = desc[parton]
-            if (use_pmu is True) and (no_hard is True):
-                branch_pdgs = tuple(name_to_pdg[k] for k in branch.keys())
-                parton_mask = hard_pdg.mask(
-                    branch_pdgs, blacklist=False, sign_sensitive=True
-                )
-                parton_names = tuple(map(str, hard_pdg[parton_mask].name))
-                parton_pmu = hard_pmu[parton_mask]
-                overlap = branch.bitwise_and
-                dR = parton_pmu.delta_R(pmu[overlap])
-                alloc = np.argmin(dR, axis=0)
-                for num, name in enumerate(parton_names):
-                    alloc_mask = alloc == num
-                    data = branch[name].data[overlap]
-                    data[~alloc_mask] = False
-                    branch[name].data[overlap] = data
-        return branch
 
-    return make_tree(hard)
+def _make_tree(
+    flat: Union[Dict[str, Any], Tuple[str, ...]], conf: TreeConf
+) -> gcl.MaskGroup:
+    branch = gcl.MaskGroup(agg_op="or")  # type: ignore
+    if isinstance(flat, dict):
+        for key, nest in flat.items():
+            if key not in conf.roots:
+                continue
+            branch[key] = _make_tree(nest, conf)
+            branch[key]["latent"] = (  # type: ignore
+                branch[key].data != conf.desc[key].data
+            )
+    else:
+        no_hard = True
+        for parton in flat:
+            if parton in conf.hard:
+                no_hard = False
+                branch[parton] = _make_tree(conf.hard[parton], conf)
+                branch[parton]["latent"] = (  # type: ignore
+                    branch[parton].data != conf.desc[parton].data
+                )
+            else:
+                branch[parton] = conf.desc[parton]
+        if (conf.use_pmu is True) and (no_hard is True):
+            branch_pdgs = tuple(conf.name_to_pdg[k] for k in branch.keys())
+            parton_mask = conf.hard_pdg.mask(
+                branch_pdgs, blacklist=False, sign_sensitive=True
+            )
+            parton_names = tuple(map(str, conf.hard_pdg[parton_mask].name))
+            parton_pmu = conf.hard_pmu[parton_mask]
+            overlap = branch.bitwise_and
+            dR = parton_pmu.delta_R(conf.pmu[overlap])
+            alloc = np.argmin(dR, axis=0)
+            for num, name in enumerate(parton_names):
+                alloc_mask = alloc == num
+                data = branch[name].data[overlap]
+                data[~alloc_mask] = False
+                branch[name].data[overlap] = data
+    return branch
 
 
 def hard_edge(graph: gcl.Graphicle, pdg: int) -> Tuple[int, int]:
