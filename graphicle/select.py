@@ -21,6 +21,8 @@ __all__ = [
     "vertex_descendants",
     "hard_descendants",
     "any_overlap",
+    "hierarchy",
+    "hadron_vertices",
 ]
 
 
