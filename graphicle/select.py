@@ -8,11 +8,11 @@ from typing import Set, Optional, Tuple
 from itertools import combinations
 
 import numpy as np
-import numpy.typing as npt
 import pandas as pd
 import networkx as _nx
 
 import graphicle as gcl
+from . import base
 
 
 def find_vertex(
