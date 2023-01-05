@@ -5,7 +5,6 @@
 Algorithms for performing common HEP calculations using graphicle data
 structures.
 """
-from __future__ import annotations
 from typing import (
     Tuple,
     Optional,
@@ -20,7 +19,6 @@ from functools import lru_cache, partial
 import warnings
 
 import numpy as np
-import numpy.typing as npt
 import numpy.lib.recfunctions as rfn
 from typicle import Types
 import networkx as nx
@@ -28,10 +26,17 @@ import pyjet
 from pyjet import ClusterSequence, PseudoJet
 
 import graphicle as gcl
+from . import base
 
+
+__all__ = [
+    "azimuth_centre",
+    "combined_mass",
+    "flow_trace",
+    "cluster_pmu",
+]
 
 _types = Types()
-DoubleVector = npt.NDArray[np.float64]
 
 
 def azimuth_centre(pmu: gcl.MomentumArray, pt_weight: bool = True) -> float:
@@ -61,7 +66,7 @@ def azimuth_centre(pmu: gcl.MomentumArray, pt_weight: bool = True) -> float:
 
 def combined_mass(
     pmu: Union[gcl.MomentumArray, np.ndarray],
-    weight: Optional[DoubleVector] = None,
+    weight: Optional[base.DoubleVector] = None,
 ) -> float:
     """Returns the combined mass of the particles represented in the
     provided MomentumArray.
@@ -164,8 +169,8 @@ def _trace_vector(
 
 def flow_trace(
     graph: gcl.Graphicle,
-    mask: Union[gcl._base.MaskBase, np.ndarray],
-    prop: Union[gcl._base.ArrayBase, np.ndarray],
+    mask: Union[base.MaskBase, np.ndarray],
+    prop: Union[base.ArrayBase, np.ndarray],
     exclusive: bool = False,
     target: Optional[Set[int]] = None,
 ) -> Dict[str, np.ndarray]:
@@ -206,7 +211,7 @@ def flow_trace(
         the contributions of hard partons traced down to the properties
         of the selected subset of particles specified by mask.
     """
-    if isinstance(prop, gcl._base.ArrayBase):
+    if isinstance(prop, base.ArrayBase):
         prop = prop.data
     # encoding graph features onto NetworkX
     nx_graph = nx.DiGraph()

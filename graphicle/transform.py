@@ -5,16 +5,17 @@
 Utilities for manipulating the graph structure of particle data.
 """
 import numpy as np
-import numpy.typing as npt
 import networkx as _nx
 from typicle import Types
 from typicle.convert import cast_array
 
 import graphicle as gcl
+from . import base
 
+
+__all__ = ["particle_as_node", "centre_angle", "centre_pseudorapidity"]
 
 _types = Types()
-Vector = npt.NDArray[np.float64]
 
 
 def particle_as_node(adj_list: gcl.AdjacencyList) -> gcl.AdjacencyList:
@@ -72,7 +73,9 @@ def particle_as_node(adj_list: gcl.AdjacencyList) -> gcl.AdjacencyList:
     return gcl.AdjacencyList(np.array(nx_node_graph.edges))
 
 
-def centre_angle(angle: Vector, pt: Vector) -> Vector:
+def centre_angle(
+    angle: base.DoubleVector, pt: base.DoubleVector
+) -> base.DoubleVector:
     """Shifts angles so transverse momentum weighted centroid is at 0.
 
     :group: transform
@@ -100,7 +103,9 @@ def centre_angle(angle: Vector, pt: Vector) -> Vector:
     return np.angle(pos_centred)  # type: ignore
 
 
-def centre_pseudorapidity(eta: Vector, pt: Vector) -> Vector:
+def centre_pseudorapidity(
+    eta: base.DoubleVector, pt: base.DoubleVector
+) -> base.DoubleVector:
     """Shifts pseudorapidities so pt weighted midpoint is at 0.
 
     :group: transform
