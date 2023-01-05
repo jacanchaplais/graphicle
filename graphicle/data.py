@@ -1350,28 +1350,23 @@ class Graphicle:
             adj_list = AdjacencyList()
         return cls(particles=particles, adj=adj_list)
 
-    @property  # type: ignore
-    @_attach_doc(PdgArray)
+    @property
     def pdg(self) -> PdgArray:
         return self.particles.pdg
 
-    @property  # type: ignore
-    @_attach_doc(MomentumArray)
+    @property
     def pmu(self) -> MomentumArray:
         return self.particles.pmu
 
-    @property  # type: ignore
-    @_attach_doc(ColorArray)
+    @property
     def color(self) -> ColorArray:
         return self.particles.color
 
-    @property  # type: ignore
-    @_attach_doc(HelicityArray)
+    @property
     def helicity(self) -> HelicityArray:
         return self.particles.helicity
 
-    @property  # type: ignore
-    @_attach_doc(StatusArray)
+    @property
     def status(self) -> StatusArray:
         return self.particles.status
 
@@ -1379,8 +1374,7 @@ class Graphicle:
     def hard_mask(self) -> MaskGroup:
         return self.particles.status.hard_mask
 
-    @property  # type: ignore
-    @_attach_doc(base.MaskBase)
+    @property
     def final(self) -> base.MaskBase:
         return self.particles.final
 
