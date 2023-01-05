@@ -9,7 +9,6 @@ from itertools import combinations, compress, chain
 from dataclasses import dataclass
 
 import numpy as np
-import numpy.typing as npt
 import pandas as pd
 import networkx as _nx
 
@@ -21,7 +20,7 @@ def find_vertex(
     graph: gcl.Graphicle,
     pdgs_in: Optional[Set[int]] = None,
     pdgs_out: Optional[Set[int]] = None,
-) -> npt.NDArray[np.int32]:
+) -> base.IntVector:
     """Locate vertices with the inward and outward particles of the
     passed pdg codes.
 
@@ -128,7 +127,7 @@ def vertex_descendants(adj: gcl.AdjacencyList, vertex: int) -> gcl.MaskArray:
 def hadron_vertices(
     adj: gcl.AdjacencyList,
     status: gcl.StatusArray,
-) -> npt.NDArray[np.int32]:
+) -> base.IntVector:
     """Locates the hadronisation vertices in the generation DAG.
 
     Parameters
