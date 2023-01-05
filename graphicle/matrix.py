@@ -1,4 +1,3 @@
-from __future__ import annotations
 from typing import Optional
 
 import numpy as np
@@ -6,19 +5,21 @@ import numpy.typing as npt
 from typicle import Types
 
 import graphicle as gcl
+from . import base
 
+
+__all__ = ["cut_adj", "knn_adj", "fc_adj", "delta_R_aff"]
 
 _types = Types()
-Vector = npt.NDArray[np.float64]
 
 
 def cut_adj(
-    matrix: Vector,
+    matrix: base.DoubleVector,
     cut: float,
     mode: str = "max",
     self_loop: bool = False,
     weighted: bool = False,
-) -> Vector:
+) -> base.DoubleVector:
     """Produce a directed adjacency matrix with outward edges
     towards the neighbours within a cut range, determined from the input
     affinity matrix.
@@ -79,13 +80,13 @@ def cut_adj(
 
 
 def knn_adj(
-    matrix: Vector,
+    matrix: base.DoubleVector,
     k: int,
     self_loop: bool = False,
     weighted: bool = False,
     row: bool = True,
     dtype: Optional[npt.DTypeLike] = None,
-) -> Vector:
+) -> base.DoubleVector:
     """Produce a directed adjacency matrix with outward edges
     towards the k nearest neighbours, determined from the input
     affinity matrix.
@@ -148,7 +149,7 @@ def knn_adj(
 
 def fc_adj(
     num_nodes: int, self_loop: bool = False, dtype: npt.DTypeLike = _types.bool
-) -> Vector:
+) -> base.DoubleVector:
     """Create a fully connected adjacency matrix.
 
     :group: matrix
@@ -169,7 +170,7 @@ def fc_adj(
     return adj
 
 
-def delta_R_aff(pmu: gcl.MomentumArray) -> Vector:
+def delta_R_aff(pmu: gcl.MomentumArray) -> base.DoubleVector:
     """Returns the inter-particle Euclidean distances between particles
     internally within the given MomentumArray.
 
