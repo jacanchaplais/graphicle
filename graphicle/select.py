@@ -118,10 +118,9 @@ def vertex_descendants(adj: gcl.AdjacencyList, vertex: int) -> gcl.MaskArray:
     nx_graph = _nx.MultiDiGraph()
     _ = nx_graph.add_edges_from(graph_dict["edges"])
     desc_nodes = np.array(list(_nx.descendants(nx_graph, vertex)), dtype="<i4")
-    masks = gcl.MaskGroup(agg_op=gcl.data.MaskAggOp.OR)
-    masks["in"] = np.isin(adj.edges["in"], desc_nodes)
-    masks["out"] = np.isin(adj.edges["out"], desc_nodes)
-    return gcl.MaskArray(masks.data)
+    mask = np.isin(adj.edges["in"], desc_nodes)
+    mask[adj.edges["in"] == vertex] = True
+    return gcl.MaskArray(mask)
 
 
 def hadron_vertices(
