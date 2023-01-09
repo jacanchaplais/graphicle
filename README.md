@@ -92,15 +92,7 @@ with `showerpipe`.
 ... lhe_path = "https://zenodo.org/record/6034610/files/unweighted_events.lhe.gz"
 ... gen = PythiaGenerator("pythia-settings.cmnd", lhe_path)
 >>> for event in gen:
-...     graph = gcl.Graphicle.from_numpy(
-...         pmu=event.pmu,
-...         pdg=event.pdg,
-...         color=event.color,
-...         helicity=event.helicity,
-...         status=event.status,
-...         final=event.final,
-...         edges=event.edges
-...         )
+...     graph = gcl.Graphicle.from_event(event)
 ...     break
 
 >>> graph.pdg
