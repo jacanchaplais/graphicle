@@ -121,6 +121,12 @@ def array_field(type_name: str):
     )
 
 
+def _truthy(data: Union[base.ArrayBase, base.AdjacencyBase]) -> bool:
+    if len(data) == 0:
+        return False
+    return True
+
+
 ##################################
 # COMPOSITE MASK DATA STRUCTURES #
 ##################################
@@ -184,9 +190,7 @@ class MaskArray(base.MaskBase, base.ArrayBase):
     def __array__(self) -> base.BoolVector:
         return self.data
 
-    def __and__(
-        self, other: Union[base.MaskBase, base.BoolVector]
-    ) -> "MaskArray":
+    def __and__(self, other: base.MaskLike) -> "MaskArray":
         if isinstance(other, base.MaskBase):
             other_data = other.data
         elif isinstance(other, np.ndarray):
@@ -198,9 +202,7 @@ class MaskArray(base.MaskBase, base.ArrayBase):
             )
         return self.__class__(np.bitwise_and(self.data, other_data))
 
-    def __or__(
-        self, other: Union[base.MaskBase, base.BoolVector]
-    ) -> "MaskArray":
+    def __or__(self, other: base.MaskLike) -> "MaskArray":
         if isinstance(other, base.MaskBase):
             other_data = other.data
         elif isinstance(other, np.ndarray):
@@ -214,6 +216,35 @@ class MaskArray(base.MaskBase, base.ArrayBase):
 
     def __invert__(self) -> "MaskArray":
         return self.__class__(~self.data)
+
+    def __eq__(self, other: base.MaskLike) -> "MaskArray":
+        return _mask_eq(self.data, other)
+
+    def __bool__(self) -> bool:
+        return _truthy(self)
+
+
+def _mask_eq(mask1: base.MaskLike, mask2: base.MaskLike) -> MaskArray:
+    """Provides a boolean comparison operation for ``MaskBase`` objects
+    against boolean numpy arrays.
+
+    Parameters
+    ----------
+    mask1 : numpy.ndarray
+        Boolean numpy array to compare against.
+    mask2 : base.MaskBase | numpy.ndarray
+        The other array.
+    """
+    for mask in (mask1, mask2):
+        valid = isinstance(mask, base.MaskBase) or isinstance(mask, np.ndarray)
+        if not valid:
+            raise ValueError(
+                "Bitwise operation supported for graphicle or numpy arrays."
+            )
+    shape1, shape2 = np.shape(mask1), np.shape(mask2)
+    if shape1 != shape2:
+        raise ValueError(f"Incompatible mask shapes {shape1} and {shape2}.")
+    return MaskArray(np.equal(mask1, mask2))
 
 
 _IN_MASK_DICT = Dict[str, Union[MaskArray, base.BoolVector]]
@@ -290,6 +321,11 @@ class MaskGroup(base.MaskBase, abc.MutableMapping[str, base.MaskBase]):
             mask = MaskArray(mask)
         self._mask_arrays.update({key: mask})
 
+    def __bool__(self) -> bool:
+        if np.shape(self.data)[0] == 0:
+            return False
+        return True
+
     def __len__(self) -> int:
         return len(self.names)
 
@@ -300,9 +336,7 @@ class MaskGroup(base.MaskBase, abc.MutableMapping[str, base.MaskBase]):
     def __array__(self) -> base.BoolVector:
         return self.data
 
-    def __and__(
-        self, other: Union[base.MaskBase, base.BoolVector]
-    ) -> MaskArray:
+    def __and__(self, other: base.MaskLike) -> MaskArray:
         if isinstance(other, base.MaskBase):
             other_data = other.data
         elif isinstance(other, np.ndarray):
@@ -314,9 +348,7 @@ class MaskGroup(base.MaskBase, abc.MutableMapping[str, base.MaskBase]):
             )
         return MaskArray(np.bitwise_and(self.data, other_data))
 
-    def __or__(
-        self, other: Union[base.MaskBase, base.BoolVector]
-    ) -> MaskArray:
+    def __or__(self, other: base.MaskLike) -> MaskArray:
         if isinstance(other, base.MaskBase):
             other_data = other.data
         elif isinstance(other, np.ndarray):
@@ -330,6 +362,9 @@ class MaskGroup(base.MaskBase, abc.MutableMapping[str, base.MaskBase]):
 
     def __invert__(self) -> MaskArray:
         return MaskArray(~self.data)
+
+    def __eq__(self, other: base.MaskLike) -> "MaskArray":
+        return _mask_eq(self, other)
 
     def copy(self):
         return deepcopy(self)
@@ -428,6 +463,9 @@ class PdgArray(base.ArrayBase):
 
     def __array__(self) -> base.IntVector:
         return self.data
+
+    def __bool__(self) -> bool:
+        return _truthy(self)
 
     def __getitem__(self, key) -> "PdgArray":
         if isinstance(key, base.MaskBase):
@@ -588,6 +626,9 @@ class MomentumArray(base.ArrayBase):
             key = key.data
         return self.__class__(np.array(self.data[key]))
 
+    def __bool__(self) -> bool:
+        return _truthy(self)
+
     def copy(self) -> "MomentumArray":
         return deepcopy(self)
 
@@ -722,6 +763,9 @@ class ColorArray(base.ArrayBase):
     def __array__(self) -> base.AnyVector:
         return self.data
 
+    def __bool__(self) -> bool:
+        return _truthy(self)
+
 
 ####################
 # HELICITY STORAGE #
@@ -761,6 +805,9 @@ class HelicityArray(base.ArrayBase):
 
     def __array__(self) -> base.HalfIntVector:
         return self.data
+
+    def __bool__(self) -> bool:
+        return _truthy(self)
 
 
 ####################################
@@ -805,6 +852,9 @@ class StatusArray(base.ArrayBase):
 
     def __array__(self) -> base.HalfIntVector:
         return self.data
+
+    def __bool__(self) -> bool:
+        return _truthy(self)
 
     def in_range(
         self, min_status: int, max_status: int, sign_sensitive: bool = False
@@ -913,6 +963,12 @@ class ParticleSet(base.ParticleBase):
                 kwargs.update({name: data[key]})
         return self.__class__(**kwargs)
 
+    def __bool__(self) -> bool:
+        for dset in self.__dsets:
+            if dset["data"]:
+                return True
+        return False
+
     def __repr__(self) -> str:
         dset_repr = (repr(dset["data"]) for dset in self.__dsets)
         dset_str = ",\n".join(dset_repr)
@@ -1017,6 +1073,9 @@ class AdjacencyList(base.AdjacencyBase):
 
     def __len__(self) -> int:
         return len(self._data)
+
+    def __bool__(self) -> bool:
+        return _truthy(self)
 
     def __array__(self) -> base.AnyVector:
         return self._data
@@ -1223,6 +1282,12 @@ class Graphicle:
             if len(data) != 0:
                 kwargs.update({name: data[key]})
         return self.__class__(**kwargs)
+
+    def __bool__(self) -> bool:
+        for name in self.__attr_names:
+            if getattr(self, name):
+                return True
+        return False
 
     def copy(self) -> "Graphicle":
         return deepcopy(self)
