@@ -132,7 +132,36 @@ class MaskAggOp(Enum):
 
 @define
 class MaskArray(base.MaskBase, base.ArrayBase):
-    """Data structure for containing masks over particle data."""
+    """Boolean mask over Graphicle data structures.
+
+    :group: datastructure
+
+    Parameters
+    ----------
+    data : Sequence[bool]
+        Boolean values consituting the mask.
+
+    Attributes
+    ----------
+    data : ndarray[bool_]
+        Numpy representation of the boolean mask.
+
+    Methods
+    -------
+    copy()
+        Provides a deepcopy of the data.
+
+    Examples
+    --------
+    Instantiating, copying, and updating values by index:
+
+        >>> import graphicle as gcl
+        >>> mask1 = gcl.MaskArray([True, True, True])
+        >>> mask2 = mask1.copy()
+        >>> mask2[1] = False
+        >>> mask2
+        MaskArray(data=array([ True, False,  True]))
+    """
 
     data: base.BoolVector = array_field("bool")
 
@@ -143,6 +172,11 @@ class MaskArray(base.MaskBase, base.ArrayBase):
         if isinstance(key, base.MaskBase):
             key = key.data
         return self.__class__(np.array(self.data[key]))
+
+    def __setitem__(self, key, val) -> None:
+        if isinstance(key, base.MaskBase):
+            key = key.data
+        self.data[key] = val
 
     def __len__(self) -> int:
         return len(self.data)
