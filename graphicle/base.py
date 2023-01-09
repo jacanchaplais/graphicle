@@ -25,6 +25,7 @@ __all__ = [
     "ParticleBase",
     "AdjacencyBase",
     "MaskBase",
+    "MaskLike",
 ]
 
 DoubleVector = npt.NDArray[np.float64]
@@ -34,6 +35,7 @@ IntVector = npt.NDArray[np.int32]
 HalfIntVector = npt.NDArray[np.int16]
 ObjVector = npt.NDArray[np.object_]
 AnyVector = npt.NDArray[Any]
+MaskLike = Union["MaskBase", BoolVector]
 
 
 class EventInterface(Protocol):
@@ -97,6 +99,18 @@ class ArrayBase(ABC):
     def __init__(self, data: Optional[AnyVector] = None) -> None:
         pass
 
+    @abstractmethod
+    def __len__(self) -> int:
+        """Number of elements in array."""
+
+    @abstractmethod
+    def __bool__(self) -> bool:
+        """Truthy returns ``False`` if no elements, ``True`` otherwise."""
+
+    @abstractmethod
+    def __array__(self) -> npt.NDArray[Any]:
+        """Numpy array representation of the data."""
+
     @property
     @abstractmethod
     def data(self) -> AnyVector:
@@ -104,6 +118,22 @@ class ArrayBase(ABC):
 
 
 class ParticleBase(ABC):
+    @abstractmethod
+    def __getitem__(self, key) -> "ParticleBase":
+        pass
+
+    @abstractmethod
+    def __len__(self) -> int:
+        pass
+
+    @abstractmethod
+    def __bool__(self) -> bool:
+        pass
+
+    @abstractmethod
+    def copy(self) -> "ParticleBase":
+        pass
+
     @property
     @abstractmethod
     def pdg(self) -> ArrayBase:
@@ -126,6 +156,22 @@ class ParticleBase(ABC):
 
 
 class AdjacencyBase(ABC):
+    @abstractmethod
+    def __len__(self) -> int:
+        pass
+
+    @abstractmethod
+    def __array__(self) -> AnyVector:
+        pass
+
+    @abstractmethod
+    def __bool__(self) -> bool:
+        pass
+
+    @abstractmethod
+    def __getitem__(self, key) -> "AdjacencyBase":
+        pass
+
     @property
     @abstractmethod
     def edges(self) -> AnyVector:
@@ -133,7 +179,7 @@ class AdjacencyBase(ABC):
 
     @property
     @abstractmethod
-    def nodes(self) -> npt.NDArray[np.int32]:
+    def nodes(self) -> IntVector:
         pass
 
 
@@ -147,13 +193,33 @@ class MaskBase(ABC):
         pass
 
     @abstractmethod
+    def copy(self) -> "MaskBase":
+        pass
+
+    @abstractmethod
+    def __array__(self) -> npt.NDArray[Any]:
+        """Numpy array representation of the data."""
+
+    @abstractmethod
     def __getitem__(self, key) -> "MaskBase":
         pass
 
     @abstractmethod
-    def __and__(self, other: Union["MaskBase", BoolVector]) -> "MaskBase":
+    def __and__(self, other: MaskLike) -> "MaskBase":
         pass
 
     @abstractmethod
-    def __or__(self, other: Union["MaskBase", BoolVector]) -> "MaskBase":
+    def __or__(self, other: MaskLike) -> "MaskBase":
+        pass
+
+    @abstractmethod
+    def __eq__(self, other: MaskLike) -> "MaskBase":
+        pass
+
+    @abstractmethod
+    def __invert__(self) -> "MaskBase":
+        pass
+
+    @abstractmethod
+    def __bool__(self) -> bool:
         pass
