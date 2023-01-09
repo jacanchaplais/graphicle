@@ -159,13 +159,15 @@ class MaskArray(base.MaskBase, base.ArrayBase):
 
     Examples
     --------
-    Instantiating, copying, and updating values by index:
+    Instantiating, copying, updating by index, and comparison:
 
         >>> import graphicle as gcl
-        >>> mask1 = gcl.MaskArray([True, True, True])
+        >>> mask1 = gcl.MaskArray([True, True, False])
         >>> mask2 = mask1.copy()
         >>> mask2[1] = False
         >>> mask2
+        MaskArray(data=array([ True, False, False]))
+        >>> mask1 == mask2
         MaskArray(data=array([ True, False,  True]))
     """
 
