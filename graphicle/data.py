@@ -171,6 +171,8 @@ class MaskArray(base.MaskBase, base.ArrayBase):
         MaskArray(data=array([ True, False, False]))
         >>> mask1 == mask2
         MaskArray(data=array([ True, False,  True]))
+        >>> mask1 != mask2
+        MaskArray(data=array([False,  True, False]))
     """
 
     data: base.BoolVector = array_field("bool")
@@ -224,31 +226,64 @@ class MaskArray(base.MaskBase, base.ArrayBase):
     def __eq__(self, other: base.MaskLike) -> "MaskArray":
         return _mask_eq(self.data, other)
 
+    def __ne__(self, other: base.MaskLike) -> "MaskArray":
+        return _mask_neq(self, other)
+
     def __bool__(self) -> bool:
         return _truthy(self)
 
 
+def _mask_compat(*masks: base.MaskLike) -> bool:
+    """Check if a collection of masks are compatible, ie. they must be
+    either numpy boolean arrays, or ``MaskBase`` instances.
+    """
+    for mask in masks:
+        valid = isinstance(mask, base.MaskBase) or isinstance(mask, np.ndarray)
+        if not valid:
+            return False
+    return True
+
+
 def _mask_eq(mask1: base.MaskLike, mask2: base.MaskLike) -> MaskArray:
-    """Provides a boolean comparison operation for ``MaskBase`` objects
-    against boolean numpy arrays.
+    """Provides a boolean comparison ``==`` operation for ``MaskBase``
+    objects against other masks (including numpy boolean arrays).
 
     Parameters
     ----------
-    mask1 : numpy.ndarray
-        Boolean numpy array to compare against.
+    mask1 : base.MaskBase | numpy.ndarray
+        Boolean array to compare against.
     mask2 : base.MaskBase | numpy.ndarray
         The other array.
     """
-    for mask in (mask1, mask2):
-        valid = isinstance(mask, base.MaskBase) or isinstance(mask, np.ndarray)
-        if not valid:
-            raise ValueError(
-                "Bitwise operation supported for graphicle or numpy arrays."
-            )
+    if not _mask_compat(mask1, mask2):
+        raise ValueError(
+            "Bitwise operation supported for graphicle or numpy arrays."
+        )
     shape1, shape2 = np.shape(mask1), np.shape(mask2)
     if shape1 != shape2:
         raise ValueError(f"Incompatible mask shapes {shape1} and {shape2}.")
     return MaskArray(np.equal(mask1, mask2))
+
+
+def _mask_neq(mask1: base.MaskLike, mask2: base.MaskLike) -> MaskArray:
+    """Provides a boolean comparison ``!=`` operation for ``MaskBase``
+    objects against other masks (including numpy boolean arrays).
+
+    Parameters
+    ----------
+    mask1 : base.MaskBase | numpy.ndarray
+        Boolean array to compare against.
+    mask2 : base.MaskBase | numpy.ndarray
+        The other array.
+    """
+    if not _mask_compat(mask1, mask2):
+        raise ValueError(
+            "Bitwise operation supported for graphicle or numpy arrays."
+        )
+    shape1, shape2 = np.shape(mask1), np.shape(mask2)
+    if shape1 != shape2:
+        raise ValueError(f"Incompatible mask shapes {shape1} and {shape2}.")
+    return MaskArray(np.not_equal(mask1, mask2))
 
 
 _IN_MASK_DICT = OrderedDict[str, Union[MaskArray, base.BoolVector]]
@@ -427,6 +462,9 @@ class MaskGroup(base.MaskBase, abc.MutableMapping[str, base.MaskBase]):
 
     def __eq__(self, other: base.MaskLike) -> "MaskArray":
         return _mask_eq(self, other)
+
+    def __ne__(self, other: base.MaskLike) -> "MaskArray":
+        return _mask_neq(self, other)
 
     def copy(self):
         return deepcopy(self)
