@@ -193,3 +193,13 @@ def delta_R_aff(pmu: gcl.MomentumArray) -> base.DoubleVector:
     parallel to the beam axis, __ie.__ with infinite pseudorapidity.
     """
     return pmu.delta_R(pmu)
+
+
+def parton_hadron_distance(
+    parton_pmu: gcl.MomentumArray,
+    hadron_pmu: gcl.MomentumArray,
+    pt_exp: float = -0.1,
+) -> base.DoubleVector:
+    dR = parton_pmu.delta_R(hadron_pmu)
+    pt_weight = np.power(parton_pmu.pt, pt_exp)
+    return pt_weight[:, np.newaxis] * dR
