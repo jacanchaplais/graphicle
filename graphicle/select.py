@@ -7,7 +7,8 @@ Utilities for selecting elements from graph structured particle data.
 import typing as ty
 import itertools as it
 import functools as fn
-from dataclasses import dataclass
+import collections as cl
+import operator as op
 
 import numpy as np
 import pandas as pd
@@ -23,6 +24,7 @@ __all__ = [
     "hard_descendants",
     "any_overlap",
     "hierarchy",
+    "partition_descendants",
     "hadron_vertices",
 ]
 
@@ -130,7 +132,7 @@ def vertex_descendants(adj: gcl.AdjacencyList, vertex: int) -> gcl.MaskArray:
         passed AdjacencyList.
     """
     bft = breadth_first_tree(adj._sparse, abs(vertex))
-    desc_nodes = ((2 * bft.data - 1) * bft.indices).astype("<i4")
+    desc_nodes = (2 * bft.data.astype("<i4") - 1) * bft.indices
     mask = np.isin(adj.edges["in"], desc_nodes)
     mask[adj.edges["in"] == vertex] = True
     return gcl.MaskArray(mask)
@@ -141,6 +143,8 @@ def hadron_vertices(
     status: gcl.StatusArray,
 ) -> ty.Tuple[int, ...]:
     """Locates the hadronisation vertices in the generation DAG.
+
+    :group: select
 
     Parameters
     ----------
@@ -219,8 +223,35 @@ def _partition_vertex(
 def partition_descendants(
     graph: gcl.Graphicle,
     hier: gcl.MaskGroup,
+    pt_exp: float = -0.1,
 ) -> gcl.MaskGroup:
-    dist_strat = fn.partial(gcl.matrix.parton_hadron_distance, pt_exp=-0.1)
+    """Partitions the final state descendants with mixed hard partonic
+    heritage, by aligning them with their nearest ancestor.
+
+    :group: select
+
+    Parameters
+    ----------
+    graph : Graphicle
+        The generation DAG of the event.
+    hier : MaskGroup
+        Nested ``MaskGroup`` tree structure representing the hierarchy
+        of the hard process, obtained with ``hierarchy()``.
+    pt_exp : float
+        Exponent to raise the transverse momentum weighting on the
+        distances. Passing ``pt_exp=0.0`` will result in standard
+        delta R distances from partons to hadrons. Setting this to a
+        negative value ensures infrared safety. High negative values
+        will bias high transverse momentum partons to claim all of the
+        hadrons. Default is ``-0.1``.
+
+    Returns
+    -------
+    hier_parted : MaskGroup
+        Same nested tree structure as input, but with the final
+        state hadrons partitioned to their nearest hard parton ancestor.
+    """
+    dist_strat = fn.partial(gcl.matrix.parton_hadron_distance, pt_exp=pt_exp)
     hadron_vtxs = _hadron_vtx_parton_iter(
         graph.adj, graph.status, hier.bitwise_or
     )
@@ -284,6 +315,29 @@ def _flat_hierarchy(
     return _hard_children(comp_matrix, names)
 
 
+def _pdgs_to_keys(pdg: gcl.PdgArray) -> ty.Tuple[str, ...]:
+    """Converts a ``PdgArray`` into a tuple of unique strings, which
+    starts with the particle name, and if a PDG code has duplicates,
+    they will be numerically indexed by appending ``:n``, where ``n``
+    is the index of each duplicate, starting at ``:0`` for the first
+    occurrence.
+    """
+    names = tuple(map(str, pdg.name))
+    pdg_counter = cl.Counter(names)
+    pdg_counts = map(pdg_counter.__getitem__, names)
+    has_dup = tuple(map(fn.partial(op.lt, 1), pdg_counts))
+    if not any(has_dup):
+        return names
+    counters = cl.defaultdict(it.count)
+    nums = map(next, map(counters.__getitem__, names))
+    renames = map(":".join, zip(names, map(str, nums)))
+    names = it.starmap(
+        lambda name, rename, dup: rename if dup else name,
+        zip(names, renames, has_dup),
+    )
+    return tuple(names)
+
+
 def hard_descendants(
     graph: gcl.Graphicle,
     target: ty.Optional[ty.Iterable[int]] = None,
@@ -322,54 +376,17 @@ def hard_descendants(
             if not np.any(hard_mask):
                 continue
             pcls = pcls[hard_mask]
-        hard_vtxs.update(
-            dict(zip(tuple(pcls.pdg.name), tuple(pcls.edges["out"])))
-        )
+        pdg_keys = _pdgs_to_keys(pcls.pdg)
+        hard_vtxs.update(dict(zip(pdg_keys, tuple(pcls.edges["out"]))))
     # find the descendants of those vertices
     masks = gcl.MaskGroup(agg_op=gcl.data.MaskAggOp.OR)
-    for pcl_name, vtx in hard_vtxs.items():
-        masks[pcl_name] = vertex_descendants(graph.adj, vtx)
+    for pdg_key, vtx in hard_vtxs.items():
+        masks[pdg_key] = vertex_descendants(graph.adj, vtx)
     return masks
-
-
-@dataclass(frozen=True)
-class TreeConf:
-    """Encapsulates the data needed in each recursive pass of
-    ``make_tree()``.
-
-    Attributes
-    ----------
-    roots : set[str]
-        Identifies ancestors from which all other partons in hard
-        process descend (following the collision).
-    hard : dict[str, tuple[str, ...]]
-        Provides a flat representation of the hard process hierarchy.
-    pmu : gcl.MomentumArray
-        Momentum of all particles within the full event.
-    hard_pmu : gcl.MomentumArray
-        Momentum of partons in hard process.
-    hard_pdg : gcl.PdgArray
-        PDG codes of partons in hard process.
-    name_top_pdg : dict[str, int]
-        Mapping from string names of hard partons to PDG codes.
-    use_pmu : bool
-        Setting determines whether to use momentum in parton allocation
-        for final state.
-    """
-
-    roots: ty.Set[str]
-    hard: ty.Dict[str, ty.Tuple[str, ...]]
-    pmu: gcl.MomentumArray
-    hard_pmu: gcl.MomentumArray
-    hard_pdg: gcl.PdgArray
-    desc: gcl.MaskGroup
-    name_to_pdg: ty.Dict[str, int]
-    use_pmu: bool
 
 
 def hierarchy(
     graph: gcl.Graphicle,
-    use_pmu: bool = True,
     desc: ty.Optional[gcl.MaskGroup] = None,
 ) -> gcl.MaskGroup:
     """Composite ``MaskGroup`` of ``MaskGroup`` instances, representing
@@ -384,14 +401,6 @@ def hierarchy(
     graph : Graphicle
         The event to be parsed. Must include ``status``, ``edges``,
         ``pmu``, and ``pdg`` data.
-    use_pmu : bool
-        If set to ``True``, when colour singlet particles are outgoing
-        from a hadronisation vertex on which more than one hard parton's
-        descendants were incident, the outgoing particles will be
-        associated with the nearest parton in the pseudorapidity-azimuth
-        plane. If set to ``False``, the deepest nested masks may
-        overlap, but will be based entirely upon the ancestral structure
-        of the DAG. Default is ``True``.
     desc : MaskGroup, optional
         If the masks for all partons in the hard process have already
         been computed, these may be passed here to save performing the
@@ -450,16 +459,14 @@ def hierarchy(
 
     Notes
     -----
-    Each mask refers to the descendants of the parton it is labelled by.
-    This is an exclusive set, ie. it does not include the parton itself.
+    This function will not separate the mixed heritage when two sibling
+    hard partons share ancestry for a given particle. In order to
+    partition the resulting structure, use ``partition_descendants()``.
     """
     hard_mask = graph.hard_mask
     del hard_mask["incoming"]
-    pmu = graph.pmu
     hard_pdg = graph.pdg[hard_mask]
-    hard_pmu = pmu[hard_mask]
-    names = tuple(map(str, hard_pdg.name))
-    name_to_pdg = dict(zip(names, map(int, hard_pdg.data)))
+    names = _pdgs_to_keys(hard_pdg)
     if desc is None:
         desc = hard_descendants(graph)
     hard_desc: gcl.MaskGroup = desc[hard_mask][list(names)]  # type: ignore
@@ -467,50 +474,51 @@ def hierarchy(
     keys = set(hard.keys())
     vals = set(it.chain.from_iterable(hard.values()))
     roots = keys.difference(keys.intersection(vals))
-    tree_conf = TreeConf(
-        roots, hard, pmu, hard_pmu, hard_pdg, desc, name_to_pdg, use_pmu
-    )
-    return _make_tree(hard, tree_conf)
+    return _make_tree(hard, roots, hard, desc)
 
 
 def _make_tree(
-    flat: ty.Union[ty.Dict[str, ty.Any], ty.Tuple[str, ...]], conf: TreeConf
+    flat: ty.Union[ty.Dict[str, ty.Any], ty.Tuple[str, ...]],
+    roots: ty.Set[str],
+    hard: ty.Dict[str, ty.Tuple[str, ...]],
+    desc: gcl.MaskGroup,
 ) -> gcl.MaskGroup:
+    """Recursive function to convert a flat representation of the hard
+    process tree into a nested ``MaskGroup`` of ``MaskGroup`` object.
+
+    Parameters
+    ----------
+    flat : dict[str, tuple[str, ...]]
+        Flat representation of a branch of the hard process tree. At the
+        first level before entering recursion, this is the same as the
+        value for ``hard``.
+    roots : set[str]
+        String valued keys at the root of the hard process tree.
+    hard : dict[str, tuple[str, ...]]
+        Flat representation of the hard process tree. May be obtained
+        from ``_flat_hierarchy()``.
+    desc : MaskGroup
+        The masks descending from the hard process, given by
+        ``hard_descendants()``.
+    """
     branch = gcl.MaskGroup(agg_op="or")  # type: ignore
     if isinstance(flat, dict):
         for key, nest in flat.items():
-            if key not in conf.roots:
+            if key not in roots:
                 continue
-            branch[key] = _make_tree(nest, conf)
+            branch[key] = _make_tree(nest, roots, hard, desc)
             branch[key]["latent"] = (  # type: ignore
-                branch[key].data != conf.desc[key].data
+                branch[key].data != desc[key].data
             )
     else:
-        no_hard = True
         for parton in flat:
-            if parton in conf.hard:
-                no_hard = False
-                branch[parton] = _make_tree(conf.hard[parton], conf)
+            if parton in hard:
+                branch[parton] = _make_tree(hard[parton], roots, hard, desc)
                 branch[parton]["latent"] = (  # type: ignore
-                    branch[parton].data != conf.desc[parton].data
+                    branch[parton].data != desc[parton].data
                 )
             else:
-                branch[parton] = conf.desc[parton]
-        if (conf.use_pmu is True) and (no_hard is True):
-            branch_pdgs = tuple(conf.name_to_pdg[k] for k in branch.keys())
-            parton_mask = conf.hard_pdg.mask(
-                branch_pdgs, blacklist=False, sign_sensitive=True
-            )
-            parton_names = tuple(map(str, conf.hard_pdg[parton_mask].name))
-            parton_pmu = conf.hard_pmu[parton_mask]
-            overlap = branch.bitwise_and
-            dR = parton_pmu.delta_R(conf.pmu[overlap])
-            alloc = np.argmin(dR, axis=0)
-            for num, name in enumerate(parton_names):
-                alloc_mask = alloc == num
-                data = branch[name].data[overlap]
-                data[~alloc_mask] = False
-                branch[name].data[overlap] = data
+                branch[parton] = desc[parton]
     return branch
 
 
@@ -552,14 +560,6 @@ def leaf_masks(mask_tree: gcl.MaskGroup) -> gcl.MaskGroup:
     for name, branch in mask_tree.items():
         mask_group.update(dict(_leaf_mask_iter(branch, name)))  # type: ignore
     return mask_group
-
-
-def hard_edge(graph: gcl.Graphicle, pdg: int) -> ty.Tuple[int, int]:
-    hard_graph = graph[graph.hard_mask.bitwise_or]
-    parton = hard_graph[
-        hard_graph.pdg.mask(target=[pdg], blacklist=False, sign_sensitive=True)
-    ]
-    return tuple(parton.edges[0])  # type: ignore
 
 
 def any_overlap(masks: gcl.MaskGroup) -> bool:
