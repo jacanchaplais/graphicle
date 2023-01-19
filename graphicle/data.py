@@ -1210,6 +1210,36 @@ class AdjacencyList(base.AdjacencyBase):
         sort_idxs = np.argsort(np.abs(unsort_nodes))
         return unsort_nodes[sort_idxs]  # type: ignore
 
+    @cached_property
+    def _sparse(self) -> coo_array:
+        return self.to_sparse()
+
+    def to_sparse(self, data: Optional[base.AnyVector] = None) -> coo_array:
+        """Converts the graph structure to a ``scipy.sparse.coo_array``
+        instance.
+
+        Parameters
+        ----------
+        data : ndarray, optional
+            Data stored on each edge. If ``None``, these will be boolean
+            values indicating whether the outgoing node is a leaf.
+            Default is ``None``.
+
+        Returns
+        -------
+        arr : scipy.sparse.coo_array
+            COO-formatted sparse array, where rows are "in" and cols
+            are "out" indices for ``AdjacencyList.edges``.
+        """
+        out = self._data["out"]
+        size = np.max(out) + 1
+        if data is None:
+            data = np.sign(self._data["out"]) == 1
+        return coo_array(
+            (data, (np.abs(self._data["in"]), np.abs(self._data["out"]))),
+            shape=(size, size),
+        )
+
     def to_dicts(
         self,
         edge_data: Optional[
