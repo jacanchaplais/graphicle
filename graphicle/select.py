@@ -11,7 +11,7 @@ from dataclasses import dataclass
 
 import numpy as np
 import pandas as pd
-import networkx as _nx
+from scipy.sparse.csgraph import breadth_first_tree
 
 import graphicle as gcl
 from . import base
@@ -129,11 +129,8 @@ def vertex_descendants(adj: gcl.AdjacencyList, vertex: int) -> gcl.MaskArray:
         Boolean mask over the graphicle objects associated with the
         passed AdjacencyList.
     """
-    graph_dict = adj.to_dicts()
-    vertex = int(vertex)
-    nx_graph = _nx.MultiDiGraph()
-    _ = nx_graph.add_edges_from(graph_dict["edges"])
-    desc_nodes = np.array(list(_nx.descendants(nx_graph, vertex)), dtype="<i4")
+    bft = breadth_first_tree(adj._sparse, abs(vertex))
+    desc_nodes = ((2 * bft.data - 1) * bft.indices).astype("<i4")
     mask = np.isin(adj.edges["in"], desc_nodes)
     mask[adj.edges["in"] == vertex] = True
     return gcl.MaskArray(mask)
