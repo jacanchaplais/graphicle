@@ -120,8 +120,7 @@ def vertex_descendants(adj: gcl.AdjacencyList, vertex: int) -> gcl.MaskArray:
         Boolean mask over the graphicle objects associated with the
         passed AdjacencyList.
     """
-    sparse = adj.to_sparse()
-    bft = breadth_first_tree(sparse, abs(vertex))
+    bft = breadth_first_tree(adj._sparse, abs(vertex))
     desc_nodes = ((2 * bft.data - 1) * bft.indices).astype("<i4")
     mask = np.isin(adj.edges["in"], desc_nodes)
     mask[adj.edges["in"] == vertex] = True

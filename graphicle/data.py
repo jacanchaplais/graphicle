@@ -1210,6 +1210,10 @@ class AdjacencyList(base.AdjacencyBase):
         sort_idxs = np.argsort(np.abs(unsort_nodes))
         return unsort_nodes[sort_idxs]  # type: ignore
 
+    @cached_property
+    def _sparse(self) -> coo_array:
+        return self.to_sparse()
+
     def to_sparse(self, data: Optional[base.AnyVector] = None) -> coo_array:
         """Converts the graph structure to a ``scipy.sparse.coo_array``
         instance.
