@@ -78,8 +78,8 @@ array([[0.        , 3.2913868 , 3.27485993, 0.89554388, 2.94501476,
 
 Graphicle really shines with its composite data structures. These can be used
 to filter and query heterogeneous particle data records simultaneously, either
-using user provided boolean masks, or `MaskArray`s produced with routines in
-the `select` module.
+using user provided boolean masks, or `MaskArray` instances produced with
+routines in the `select` module.
 Additionally, routines in the `calculate` and `transform` modules take
 composite data structures to standardise useful calculations which blends
 multiple particle data records.
