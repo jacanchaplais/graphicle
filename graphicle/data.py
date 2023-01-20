@@ -42,7 +42,7 @@ from copy import deepcopy
 from enum import Enum
 from functools import cached_property
 import warnings
-from collections import abc
+from collections import abc, OrderedDict
 from typing import (
     Tuple,
     List,
@@ -64,6 +64,8 @@ from scipy.sparse import coo_array
 from numpy.lib import recfunctions as rfn
 from typicle import Types
 from typicle.convert import cast_array
+from rich.tree import Tree
+from rich.console import Console
 
 from . import base
 
@@ -284,14 +286,14 @@ def _mask_neq(mask1: base.MaskLike, mask2: base.MaskLike) -> MaskArray:
     return MaskArray(np.not_equal(mask1, mask2))
 
 
-_IN_MASK_DICT = Dict[str, Union[MaskArray, base.BoolVector]]
-_MASK_DICT = Dict[str, MaskArray]
+_IN_MASK_DICT = OrderedDict[str, Union[MaskArray, base.BoolVector]]
+_MASK_DICT = OrderedDict[str, MaskArray]
 
 
 def _mask_dict_convert(masks: _IN_MASK_DICT) -> _MASK_DICT:
-    out_masks = dict()
+    out_masks = OrderedDict()
     for key, val in masks.items():
-        if isinstance(val, MaskArray):
+        if isinstance(val, MaskArray) or isinstance(val, MaskGroup):
             mask = val
         else:
             mask = MaskArray(val)
@@ -308,7 +310,7 @@ class MaskGroup(base.MaskBase, abc.MutableMapping[str, base.MaskBase]):
 
     Parameters
     ----------
-    mask_arrays : dict of MaskArrays or array-like objects
+    _mask_arrays : dict of MaskArrays or array-like objects
         Dictionary of MaskArray objects to be composed.
     agg_op : str or MaskAggOp
         Defines the aggregation operation when accessing the `data`
@@ -319,6 +321,25 @@ class MaskGroup(base.MaskBase, abc.MutableMapping[str, base.MaskBase]):
     ----------
     data : np.ndarray
         Combination of all masks in group via bitwise AND reduction.
+    names : list[str]
+        Provides the string values of the keys to the top-level nested
+        ``MaskBase`` objects as a list. Will be deprecated in future.
+        ``MaskGroup.keys()`` is preferred.
+    bitwise_or : np.ndarray[bool_]
+        Bitwise ``OR`` reduction over the nested masks.
+    bitwise_or : np.ndarray[bool_]
+        Bitwise ``AND`` reduction over the nested masks.
+    dict : dict[base.MaskBase]
+        Masks nested in a dictionary instead of a ``MaskGroup``.
+
+    Methods
+    -------
+    from_numpy_structured()
+        Converts a structured boolean array into a ``MaskGroup``.
+    flatten()
+        Removes any nesting of ``MaskGroup``s within ``MaskGroup``s.
+    copy()
+        Copies the ``MaskGroup`` instance.
     """
 
     _mask_arrays: _MASK_DICT = field(
@@ -328,27 +349,66 @@ class MaskGroup(base.MaskBase, abc.MutableMapping[str, base.MaskBase]):
 
     @classmethod
     def from_numpy_structured(cls, arr: np.ndarray) -> "MaskGroup":
-        return cls(dict(map(lambda name: (name, arr[name]), arr.dtype.names)))
+        return cls(
+            dict(  # type: ignore
+                map(lambda name: (name, arr[name]), arr.dtype.names)
+            )
+        )
 
     def __repr__(self) -> str:
         keys = ", ".join(map(lambda name: '"' + name + '"', self.names))
-        return f"MaskGroup(mask_arrays=[{keys}], agg_op={self.agg_op.name})"
+        return f"MaskGroup(masks=[{keys}], agg_op={self.agg_op.name})"
+
+    def __rich__(self) -> Tree:
+        name = self.__class__.__name__
+        agg_op = self.agg_op.name
+        tree = Tree(f"{name}(agg_op=[yellow]{agg_op}[default])")
+
+        def make_tree(mask: "MaskGroup", branch: Tree) -> Tree:
+            branch_copy = deepcopy(branch)
+            for key, val in mask.items():
+                sub_branch = Tree(f"{key}")
+                if isinstance(val, MaskGroup):
+                    sub_branch = sub_branch.add(make_tree(val, sub_branch))
+                branch_copy.add(sub_branch)
+            return branch_copy
+
+        return make_tree(self, tree)
+
+    def __str__(self) -> str:
+        console = Console(color_system=None)
+        with console.capture() as capture:
+            console.print(self)
+        return capture.get()
 
     def __iter__(self) -> Iterator[str]:
         return iter(self._mask_arrays)
 
     def __getitem__(self, key) -> Union[MaskArray, "MaskGroup"]:
-        if not isinstance(key, str):
-            return self.__class__(
-                dict(
-                    map(
-                        lambda name_arr: (name_arr[0], name_arr[1][key]),
-                        self._mask_arrays.items(),
-                    )
-                )
-            )
+        """Subscripting for ``MaskGroup`` object.
 
-        return self._mask_arrays[key]
+        Parameters
+        ----------
+        key : str, list[str], slice, np.ndarray[bool_], base.MaskBase
+            If string, will return the ``MaskBase`` object associated
+            with a key of the same name. If list of strings, will return
+            a new ``MaskGroup`` with only the keys included in the list.
+            Otherwise will be treated as an array-like slice, returning
+            the ``MaskGroup`` whose components each individually have
+            the passed slice applied.
+        """
+        agg = self.agg_op
+        if isinstance(key, list):
+            return self.__class__(
+                OrderedDict({k: self._mask_arrays[k] for k in key}), agg
+            )
+        elif not isinstance(key, str):
+            masked_data = OrderedDict()
+            for dict_key, val in self._mask_arrays.items():
+                masked_data[dict_key] = val[key]
+            return self.__class__(masked_data, agg)
+        else:
+            return self._mask_arrays[key]
 
     def __setitem__(self, key, mask) -> None:
         """Add a new MaskArray to the group, with given key."""
@@ -445,6 +505,30 @@ class MaskGroup(base.MaskBase, abc.MutableMapping[str, base.MaskBase]):
     @property
     def dict(self) -> Dict[str, base.BoolVector]:
         return {key: val.data for key, val in self._mask_arrays.items()}
+
+    def flatten(self) -> "MaskGroup":
+        """Removes nesting such that the ``MaskGroup`` contains only
+        ``MaskArray``s, and no other ``MaskGroup``s.
+
+        Returns
+        -------
+        flat_masks : MaskGroup
+            ``MaskGroup`` in which all sub-``MaskGroup``s are aggregated
+            and placed at the top level of the outer ``MaskGroup``,
+            along with the ``MaskArray``s from the innermost levels.
+        """
+
+        def leaves(mask_group: "MaskGroup"):
+            for key, val in mask_group.items():
+                if key == "latent":
+                    continue
+                if isinstance(val, type(self)):
+                    yield key, val.data
+                    yield from leaves(val)
+                else:
+                    yield key, val
+
+        return self.__class__(dict(leaves(self)), "or")  # type: ignore
 
 
 ############################
@@ -832,7 +916,7 @@ class HelicityArray(base.ArrayBase):
     data: base.HalfIntVector = array_field("helicity")
 
     def copy(self) -> "HelicityArray":
-        """Returns a new StatusArray instance with same data."""
+        """Returns a new HelicityArray instance with same data."""
         return deepcopy(self)
 
     def __getitem__(self, key) -> "HelicityArray":
@@ -897,7 +981,10 @@ class StatusArray(base.ArrayBase):
         return _truthy(self)
 
     def in_range(
-        self, min_status: int, max_status: int, sign_sensitive: bool = False
+        self,
+        min_status: int = 0,
+        max_status: Optional[int] = None,
+        sign_sensitive: bool = False,
     ) -> MaskArray:
         """Returns a boolean mask over particles with status codes
         sitting within passed (inclusive) range.
@@ -905,12 +992,13 @@ class StatusArray(base.ArrayBase):
         Parameters
         ----------
         min_status : int
-            Minimum value for status codes.
-        max_status : int
-            Maximum value for status codes.
+            Minimum value for status codes. Default is 0.
+        max_status : int, optional
+            Maximum value for status codes. Passing ``None`` results in
+            unbounded upper range. Default is ``None``.
         sign_sensitive : bool
             Whether or not to take signs into account during the
-            comparison. (Default is False.)
+            comparison. Default is False.
 
         Returns
         -------
@@ -921,10 +1009,10 @@ class StatusArray(base.ArrayBase):
         array = self.data
         if sign_sensitive is False:
             array = np.abs(array)
-        elif sign_sensitive is not True:
-            raise ValueError("sign_sensitive must be boolean valued.")
-        more_than = array >= min_status  # type: ignore
-        less_than = array <= max_status  # type: ignore
+        more_than = array >= min_status
+        if max_status is None:
+            return MaskArray(more_than)
+        less_than = array <= max_status
         return MaskArray(np.bitwise_and(more_than, less_than))
 
     @property
@@ -1445,28 +1533,23 @@ class Graphicle:
             adj_list = AdjacencyList()
         return cls(particles=particles, adj=adj_list)
 
-    @property  # type: ignore
-    @_attach_doc(PdgArray)
+    @property
     def pdg(self) -> PdgArray:
         return self.particles.pdg
 
-    @property  # type: ignore
-    @_attach_doc(MomentumArray)
+    @property
     def pmu(self) -> MomentumArray:
         return self.particles.pmu
 
-    @property  # type: ignore
-    @_attach_doc(ColorArray)
+    @property
     def color(self) -> ColorArray:
         return self.particles.color
 
-    @property  # type: ignore
-    @_attach_doc(HelicityArray)
+    @property
     def helicity(self) -> HelicityArray:
         return self.particles.helicity
 
-    @property  # type: ignore
-    @_attach_doc(StatusArray)
+    @property
     def status(self) -> StatusArray:
         return self.particles.status
 
@@ -1474,8 +1557,7 @@ class Graphicle:
     def hard_mask(self) -> MaskGroup:
         return self.particles.status.hard_mask
 
-    @property  # type: ignore
-    @_attach_doc(base.MaskBase)
+    @property
     def final(self) -> base.MaskBase:
         return self.particles.final
 
