@@ -471,11 +471,19 @@ def hierarchy(
     names = _pdgs_to_keys(hard_pdg)
     if desc is None:
         desc = hard_descendants(graph)
+    else:
+        desc = desc.copy()
     hard_desc: gcl.MaskGroup = desc[hard_mask][list(names)]  # type: ignore
     hard = _flat_hierarchy(hard_desc)
     keys = set(hard.keys())
     vals = set(it.chain.from_iterable(hard.values()))
     roots = keys.difference(keys.intersection(vals))
+    hard_final = hard_mask & graph.final
+    if np.any(hard_final):
+        hard_final_keys = it.compress(names, hard_final[hard_mask].data)
+        hard_final_idxs = np.flatnonzero(hard_final)
+        for key, idx in zip(hard_final_keys, hard_final_idxs):
+            desc[key].data[idx] = True
     masks = _make_tree(hard, roots, hard, desc, graph.adj)
     for root_name, root in masks.items():
         for name, mask in _leaf_mask_iter(root, root_name, False):
@@ -532,8 +540,8 @@ def _make_tree(
                 mask = desc[parton]
                 in_edge = adj.edges["in"][mask][0]
                 initial_parton_mask = adj.edges["out"] == in_edge
-                assert np.sum(initial_parton_mask) == 1
-                mask.data[initial_parton_mask] = True
+                if np.sum(initial_parton_mask) == 1:
+                    mask.data[initial_parton_mask] = True
                 branch[parton] = mask
     return branch
 
