@@ -363,7 +363,7 @@ def hard_descendants(
         partons explicitly matching the target sign will be considered.
         Default is False.
     """
-    hard_vtxs = dict()
+    hard_vtxs = list()
     # get the vertices of the hard partons
     for stage, mask in graph.hard_mask.items():
         if stage == "incoming":
@@ -377,10 +377,11 @@ def hard_descendants(
                 continue
             pcls = pcls[hard_mask]
         pdg_keys = _pdgs_to_keys(pcls.pdg)
-        hard_vtxs.update(dict(zip(pdg_keys, tuple(pcls.edges["out"]))))
+        pcl_out_vtxs = map(int, pcls.edges["out"])
+        hard_vtxs.extend(list(zip(pdg_keys, pcl_out_vtxs)))
     # find the descendants of those vertices
     masks = gcl.MaskGroup(agg_op=gcl.data.MaskAggOp.OR)
-    for pdg_key, vtx in hard_vtxs.items():
+    for pdg_key, vtx in hard_vtxs:
         masks[pdg_key] = vertex_descendants(graph.adj, vtx)
     return masks
 
@@ -390,9 +391,9 @@ def hierarchy(
     desc: ty.Optional[gcl.MaskGroup] = None,
 ) -> gcl.MaskGroup:
     """Composite ``MaskGroup`` of ``MaskGroup`` instances, representing
-    the descendants of the hard process. Uses a tree structure, such
-    that partons which are descendants of other hard partons are
-    accessible, and nested within their parents.
+    the partons of the hard process and their descendants. Uses a tree
+    structure, such that partons which are descendants of other hard
+    partons are accessible, and nested within their parents.
 
     :group: select
 
@@ -411,10 +412,11 @@ def hierarchy(
     hierarchy : MaskGroup
         Nested composite of ``MaskGroup`` instances, representing the
         hierarchical structure of the hard process, and the descendants
-        of the partons throughout the shower. Nested ``MaskGroup``
-        instances additionally contain a ``latent`` ``MaskArray``,
-        referring to the descendants of the parent parton which are not
-        also descendants of the children partons.
+        of the hard process partons throughout the shower. Nested
+        ``MaskGroup`` instances additionally contain a ``latent``
+        ``MaskArray``, referring to the parent parton and its
+        descendants which are not also descendants of the children
+        partons.
 
     Examples
     --------
@@ -453,9 +455,9 @@ def hierarchy(
             │   ├── c~
             │   └── latent
             └── latent
-        >>> # latent contains the descendants not from constituents
+        >>> # latent contains the mask not from constituents
         ... graph[masks["t"]["latent"]].pdg.name
-        array(['t', 't', 't', 't', 't', 'b', 'W+'], dtype=object)
+        array(['t', 't', 't', 't', 't'], dtype=object)
 
     Notes
     -----
@@ -474,7 +476,13 @@ def hierarchy(
     keys = set(hard.keys())
     vals = set(it.chain.from_iterable(hard.values()))
     roots = keys.difference(keys.intersection(vals))
-    return _make_tree(hard, roots, hard, desc)
+    masks = _make_tree(hard, roots, hard, desc, graph.adj)
+    for root_name, root in masks.items():
+        for name, mask in _leaf_mask_iter(root, root_name, False):
+            if name != "latent":
+                continue
+            mask[mask & graph.hard_mask] = False
+    return masks
 
 
 def _make_tree(
@@ -482,6 +490,7 @@ def _make_tree(
     roots: ty.Set[str],
     hard: ty.Dict[str, ty.Tuple[str, ...]],
     desc: gcl.MaskGroup,
+    adj: gcl.AdjacencyList,
 ) -> gcl.MaskGroup:
     """Recursive function to convert a flat representation of the hard
     process tree into a nested ``MaskGroup`` of ``MaskGroup`` object.
@@ -506,25 +515,33 @@ def _make_tree(
         for key, nest in flat.items():
             if key not in roots:
                 continue
-            branch[key] = _make_tree(nest, roots, hard, desc)
+            branch[key] = _make_tree(nest, roots, hard, desc, adj)
             branch[key]["latent"] = (  # type: ignore
                 branch[key].data != desc[key].data
             )
     else:
         for parton in flat:
             if parton in hard:
-                branch[parton] = _make_tree(hard[parton], roots, hard, desc)
+                branch[parton] = _make_tree(
+                    hard[parton], roots, hard, desc, adj
+                )
                 branch[parton]["latent"] = (  # type: ignore
                     branch[parton].data != desc[parton].data
                 )
             else:
-                branch[parton] = desc[parton]
+                mask = desc[parton]
+                in_edge = adj.edges["in"][mask][0]
+                initial_parton_mask = adj.edges["out"] == in_edge
+                assert np.sum(initial_parton_mask) == 1
+                mask.data[initial_parton_mask] = True
+                branch[parton] = mask
     return branch
 
 
 def _leaf_mask_iter(
     branch: ty.Union[gcl.MaskGroup, gcl.MaskArray],
     branch_name: str,
+    exclude_latent: bool = True,
 ) -> ty.Generator[ty.Tuple[str, gcl.MaskArray], None, None]:
     """Recursive function, traversing a branch of the nested mask tree
     structure from ``hierarchy()``, and yielding the leaves.
@@ -533,7 +550,7 @@ def _leaf_mask_iter(
         yield branch_name, branch
     else:
         for name, mask in branch.items():
-            if name == "latent":
+            if exclude_latent and name == "latent":
                 continue
             # TODO: look into contravariant type for this
             yield from _leaf_mask_iter(mask, name)  # type: ignore
