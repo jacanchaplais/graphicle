@@ -37,38 +37,38 @@ connectivity into a single graph representation of HEP data.
 For more details, see individual docstrings.
 """
 
-from itertools import zip_longest
+import itertools as it
+import numbers as nb
+import warnings
+from collections import OrderedDict, abc
 from copy import deepcopy
 from enum import Enum
 from functools import cached_property
-import warnings
-from collections import abc, OrderedDict
 from typing import (
-    Tuple,
-    List,
-    Dict,
-    Optional,
     Any,
-    TypedDict,
-    Union,
-    TypeVar,
-    Type,
-    Iterator,
     Callable,
+    Dict,
+    Iterator,
+    List,
+    Optional,
+    Tuple,
+    Type,
+    TypedDict,
+    TypeVar,
+    Union,
 )
 
-from attr import define, field, Factory, cmp_using, setters  # type: ignore
 import numpy as np
 import numpy.typing as npt
-from scipy.sparse import coo_array
+from attr import Factory, cmp_using, define, field, setters  # type: ignore
 from numpy.lib import recfunctions as rfn
+from rich.console import Console
+from rich.tree import Tree
+from scipy.sparse import coo_array
 from typicle import Types
 from typicle.convert import cast_array
-from rich.tree import Tree
-from rich.console import Console
 
 from . import base
-
 
 __all__ = [
     "MaskAggOp",
@@ -176,6 +176,20 @@ class MaskArray(base.MaskBase, base.ArrayBase):
     """
 
     data: base.BoolVector = array_field("bool")
+    __array_interface__: Dict[str, Any] = field(init=False, repr=False)
+
+    def __attrs_post_init__(self):
+        self.__array_interface__ = self.data.__array_interface__
+
+    def __array__(self) -> base.BoolVector:
+        return self.data
+
+    @classmethod
+    def __array_wrap__(cls, array: base.BoolVector) -> "MaskArray":
+        return cls(array)
+
+    def __iter__(self) -> Iterator[bool]:
+        yield from map(bool, self.data)
 
     def copy(self) -> "MaskArray":
         return deepcopy(self)
@@ -192,9 +206,6 @@ class MaskArray(base.MaskBase, base.ArrayBase):
 
     def __len__(self) -> int:
         return len(self.data)
-
-    def __array__(self) -> base.BoolVector:
-        return self.data
 
     def __and__(self, other: base.MaskLike) -> "MaskArray":
         if isinstance(other, base.MaskBase):
@@ -577,16 +588,57 @@ class PdgArray(base.ArrayBase):
     data: base.IntVector = array_field("int")
     __lookup_table: __PdgRecords = field(init=False, repr=False)
     __mega_to_giga: float = field(init=False, repr=False)
+    __array_interface__: Dict[str, Any] = field(init=False, repr=False)
+    _HANDLED_TYPES = field(init=False, repr=False)
 
     def __attrs_post_init__(self) -> None:
         self.__lookup_table = self.__PdgRecords()
         self.__mega_to_giga: float = 1.0e-3
+        self.__array_interface__ = self.data.__array_interface__
+        self._HANDLED_TYPES = (np.ndarray, nb.Number)
+
+    @classmethod
+    def __array_wrap__(cls, array: base.IntVector) -> "PdgArray":
+        return cls(array)
+
+    def __iter__(self) -> Iterator[int]:
+        yield from map(int, self.data)
 
     def __len__(self) -> int:
         return len(self.data)
 
     def __array__(self) -> base.IntVector:
         return self.data
+
+    def __array_ufunc__(self, ufunc, method, *inputs, **kwargs):
+        out = kwargs.get("out", ())
+        for x in inputs + out:
+            # Only support operations with instances of _HANDLED_TYPES.
+            # Use ArrayLike instead of type(self) for isinstance to
+            # allow subclasses that don't override __array_ufunc__ to
+            # handle ArrayLike objects.
+            if not isinstance(x, self._HANDLED_TYPES + (PdgArray,)):
+                return NotImplemented
+
+        # Defer to the implementation of the ufunc on unwrapped values.
+        inputs = tuple(
+            x.data if isinstance(x, PdgArray) else x for x in inputs
+        )
+        if out:
+            kwargs["out"] = tuple(
+                x.data if isinstance(x, PdgArray) else x for x in out
+            )
+        result = getattr(ufunc, method)(*inputs, **kwargs)
+
+        if type(result) is tuple:
+            # multiple return values
+            return tuple(type(self)(x) for x in result)
+        elif method == "at":
+            # no return value
+            return None
+        else:
+            # one return value
+            return type(self)(result)
 
     def __bool__(self) -> bool:
         return _truthy(self)
@@ -738,6 +790,20 @@ class MomentumArray(base.ArrayBase):
     """
 
     data: base.AnyVector = array_field("pmu")
+    __array_interface__: Dict[str, Any] = field(init=False, repr=False)
+
+    def __attrs_post_init__(self):
+        self.__array_interface__ = self.data.__array_interface__
+
+    @classmethod
+    def __array_wrap__(cls, array: base.AnyVector) -> "MomentumArray":
+        return cls(array)
+
+    # def __array_ufunc__(self, ufunc, method: str, *inputs, **kwargs):
+
+    def __iter__(self) -> Iterator[Tuple[float, float, float, float]]:
+        flat_vals = map(float, it.chain.from_iterable(self.data))
+        yield from zip(*(flat_vals,) * 4, strict=True)  # type: ignore
 
     def __len__(self) -> int:
         return len(self.data)
@@ -872,6 +938,18 @@ class ColorArray(base.ArrayBase):
     """
 
     data: base.AnyVector = array_field("color")
+    __array_interface__: Dict[str, Any] = field(init=False, repr=False)
+
+    def __attrs_post_init__(self):
+        self.__array_interface__ = self.data.__array_interface__
+
+    @classmethod
+    def __array_wrap__(cls, array: base.AnyVector) -> "ColorArray":
+        return cls(array)
+
+    def __iter__(self) -> Iterator[Tuple[int, int]]:
+        flat_vals = map(int, it.chain.from_iterable(self.data))
+        yield from zip(*(flat_vals,) * 2, strict=True)  # type: ignore
 
     def copy(self):
         return deepcopy(self)
@@ -914,6 +992,17 @@ class HelicityArray(base.ArrayBase):
     """
 
     data: base.HalfIntVector = array_field("helicity")
+    __array_interface__: Dict[str, Any] = field(init=False, repr=False)
+
+    def __attrs_post_init__(self):
+        self.__array_interface__ = self.data.__array_interface__
+
+    @classmethod
+    def __array_wrap__(cls, array: base.HalfIntVector) -> "HelicityArray":
+        return cls(array)
+
+    def __iter__(self) -> Iterator[int]:
+        yield from map(int, self.data)
 
     def copy(self) -> "HelicityArray":
         """Returns a new HelicityArray instance with same data."""
@@ -951,7 +1040,7 @@ class StatusArray(base.ArrayBase):
 
     Attributes
     ----------
-    data : ndarray[int32]
+    data : ndarray[int16]
         Status codes.
 
     Notes
@@ -961,6 +1050,17 @@ class StatusArray(base.ArrayBase):
     """
 
     data: base.HalfIntVector = array_field("h_int")
+    __array_interface__: Dict[str, Any] = field(init=False, repr=False)
+
+    def __attrs_post_init__(self):
+        self.__array_interface__ = self.data.__array_interface__
+
+    @classmethod
+    def __array_wrap__(cls, array: base.HalfIntVector) -> "StatusArray":
+        return cls(array)
+
+    def __iter__(self) -> Iterator[int]:
+        yield from map(int, self.data)
 
     def copy(self) -> "StatusArray":
         """Returns a new StatusArray instance with same data."""
@@ -1198,6 +1298,18 @@ class AdjacencyList(base.AdjacencyBase):
 
     _data: base.AnyVector = array_field("edge")
     weights: base.DoubleVector = array_field("double")
+    __array_interface__: Dict[str, Any] = field(init=False, repr=False)
+
+    def __attrs_post_init__(self):
+        self.__array_interface__ = self._data.__array_interface__
+
+    @classmethod
+    def __array_wrap__(cls, array: base.AnyVector) -> "AdjacencyList":
+        return cls(array)
+
+    def __iter__(self) -> Iterator[Tuple[int, int]]:
+        flat_vals = map(int, it.chain.from_iterable(self._data))
+        yield from zip(*(flat_vals,) * 2, strict=True)  # type: ignore
 
     def __len__(self) -> int:
         return len(self._data)
@@ -1212,28 +1324,6 @@ class AdjacencyList(base.AdjacencyBase):
         if isinstance(key, base.MaskBase):
             key = key.data
         return self.__class__(np.array(self._data[key]))
-
-    def __add__(self, other_array: "AdjacencyList") -> "AdjacencyList":
-        """Combines two AdjacencyList objects by extending edge and
-        weight lists of both arrays.
-        If the same edge occurs in both AdjacencyLists, this will lead
-        to multigraph connectivity.
-        """
-        if not isinstance(other_array, self.__class__):
-            raise ValueError("Can only add AdjacencyList.")
-        this_has_weights = len(self.weights) != 0
-        other_has_weights = len(other_array.weights) != 0
-        both_weighted = this_has_weights and other_has_weights
-        both_unweighted = (not this_has_weights) and (not other_has_weights)
-        if not (both_weighted or both_unweighted):
-            raise ValueError(
-                "Mismatch between weights: both adjacency lists "
-                + "must either be weighted, or unweighted."
-            )
-        return self.__class__(
-            data=np.concatenate([self._data, other_array._data]),
-            weights=np.concatenate([self.weights, other_array.weights]),
-        )
 
     def copy(self) -> "AdjacencyList":
         return deepcopy(self)
@@ -1360,7 +1450,7 @@ class AdjacencyList(base.AdjacencyBase):
 
             data_rows = zip(*array_iterator(data))
             dicts = (dict(zip(data.keys(), row)) for row in data_rows)
-            combo = zip_longest(*orig, dicts, fillvalue=dict())
+            combo = it.zip_longest(*orig, dicts, fillvalue=dict())
             return tuple(combo)  # type: ignore
 
         # form edges with data for easier ancestry tracking

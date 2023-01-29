@@ -5,12 +5,12 @@
 Defines the base classes, types, and interface protocols used by
 graphicle's modules.
 """
+import collections.abc as cla
 from abc import ABC, abstractmethod
-from typing import Union, Any, Optional, Protocol
+from typing import Any, Optional, Protocol, Union
 
 import numpy as np
 import numpy.typing as npt
-
 
 __all__ = [
     "DoubleVector",
@@ -94,10 +94,14 @@ class EventInterface(Protocol):
         ...
 
 
-class ArrayBase(ABC):
+class ArrayBase(ABC, cla.Sequence, np.lib.mixins.NDArrayOperatorsMixin):
     @abstractmethod
     def __init__(self, data: Optional[AnyVector] = None) -> None:
         pass
+
+    @abstractmethod
+    def __array_ufunc__(self, ufunc, method, *inputs, **kwargs) -> None:
+        """Defines the way Numpy ufuncs work on the data structure."""
 
     @abstractmethod
     def __len__(self) -> int:
@@ -108,7 +112,7 @@ class ArrayBase(ABC):
         """Truthy returns ``False`` if no elements, ``True`` otherwise."""
 
     @abstractmethod
-    def __array__(self) -> npt.NDArray[Any]:
+    def __array__(self) -> AnyVector:
         """Numpy array representation of the data."""
 
     @property
@@ -155,7 +159,7 @@ class ParticleBase(ABC):
         pass
 
 
-class AdjacencyBase(ABC):
+class AdjacencyBase(ABC, cla.Sequence):
     @abstractmethod
     def __len__(self) -> int:
         pass
