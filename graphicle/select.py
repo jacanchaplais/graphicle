@@ -4,19 +4,19 @@
 
 Utilities for selecting elements from graph structured particle data.
 """
-import typing as ty
-import itertools as it
-import functools as fn
 import collections as cl
+import functools as fn
+import itertools as it
 import operator as op
+import typing as ty
 
 import numpy as np
 import pandas as pd
 from scipy.sparse.csgraph import breadth_first_tree
 
 import graphicle as gcl
-from . import base
 
+from . import base
 
 __all__ = [
     "find_vertex",
@@ -608,3 +608,13 @@ def any_overlap(masks: gcl.MaskGroup) -> bool:
     pair_checks = map(np.bitwise_and, *zip(*combos))
     overlaps: bool = np.bitwise_or.reduce(tuple(pair_checks), axis=None)
     return overlaps
+
+
+def prune_outliers(pmu: gcl.MomentumArray, radius: float) -> gcl.MaskArray:
+    eta_mid = gcl.calculate.pseudorapidity_centre(pmu)
+    phi_mid_cmplx = (pmu._xy_pol * pmu.pt).sum()
+    dphi = np.angle(pmu._xy_pol * phi_mid_cmplx.conj())
+    dr = np.hypot(pmu.eta - eta_mid, dphi)
+    # spread = np.subtract(*np.percentile(dr, (75, 25)))
+    spread = np.std(dr)
+    return gcl.MaskArray(dr < radius * spread)
