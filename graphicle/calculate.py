@@ -5,29 +5,20 @@
 Algorithms for performing common HEP calculations using graphicle data
 structures.
 """
-from typing import (
-    Tuple,
-    Optional,
-    Set,
-    List,
-    Dict,
-    Callable,
-    Union,
-    Iterable,
-)
-from functools import lru_cache, partial
 import warnings
+from functools import lru_cache, partial
+from typing import Callable, Dict, Iterable, List, Optional, Set, Tuple, Union
 
+import networkx as nx
 import numpy as np
 import numpy.lib.recfunctions as rfn
-from typicle import Types
-import networkx as nx
 import pyjet
 from pyjet import ClusterSequence, PseudoJet
+from typicle import Types
 
 import graphicle as gcl
-from . import base
 
+from . import base
 
 __all__ = [
     "azimuth_centre",
@@ -62,6 +53,12 @@ def azimuth_centre(pmu: gcl.MomentumArray, pt_weight: bool = True) -> float:
     if pt_weight is True:
         pol = pol * pmu.pt
     return float(np.angle(pol.sum()))
+
+
+def pseudorapidity_centre(pmu: gcl.MomentumArray) -> float:
+    pt_norm = pmu.pt / pmu.pt.sum()
+    eta_wt_mid = (pmu.eta * pt_norm).sum()
+    return eta_wt_mid
 
 
 def combined_mass(
