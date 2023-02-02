@@ -37,36 +37,24 @@ connectivity into a single graph representation of HEP data.
 For more details, see individual docstrings.
 """
 
+import collections as cl
+import collections.abc as cla
+import functools as fn
 import itertools as it
 import numbers as nb
+import typing as ty
 import warnings
-from collections import OrderedDict, abc
 from copy import deepcopy
 from enum import Enum
-from functools import cached_property
-from typing import (
-    Any,
-    Callable,
-    Dict,
-    Iterator,
-    List,
-    Optional,
-    Tuple,
-    Type,
-    TypedDict,
-    TypeVar,
-    Union,
-)
 
 import numpy as np
 import numpy.typing as npt
-from attr import Factory, cmp_using, define, field, setters  # type: ignore
+from attr import Factory, cmp_using, define, field, setters
 from numpy.lib import recfunctions as rfn
 from rich.console import Console
 from rich.tree import Tree
 from scipy.sparse import coo_array
 from typicle import Types
-from typicle.convert import cast_array
 
 from . import base
 
@@ -76,6 +64,7 @@ __all__ = [
     "MaskArray",
     "PdgArray",
     "MomentumArray",
+    "MomentumElement",
     "ColorArray",
     "HelicityArray",
     "StatusArray",
@@ -88,42 +77,67 @@ __all__ = [
 # SET UP ARRAY ATTRIBUTES FOR DATACLASSES #
 ###########################################
 _types = Types()
-DataType = TypeVar("DataType", bound=base.ArrayBase)
-FuncType = TypeVar("FuncType", bound=Callable[..., Any])
+DataType = ty.TypeVar("DataType", bound=base.ArrayBase)
+FuncType = ty.TypeVar("FuncType", bound=ty.Callable[..., ty.Any])
 DHUGE = np.finfo(np.dtype("<f8")).max * 0.1
 
 
-def _attach_doc(
-    parent: Union[Callable[..., Any], Type[Any]]
-) -> Callable[..., Any]:
-    def inner(func: FuncType) -> FuncType:
-        func.__doc__ = parent.__doc__
-        return func
+class MomentumElement(ty.NamedTuple):
+    """Named tuple container for the momentum of a single particle."""
 
-    return inner
+    x: float
+    y: float
+    z: float
+    e: float
 
 
 def array_field(type_name: str):
     """Prepares a field for attrs dataclass with typicle input."""
     types = Types()
-    dtype = getattr(types, type_name)
+    dtype = np.dtype(getattr(types, type_name))
     default = Factory(lambda: np.array([], dtype=dtype))
-    equality_comparison = cmp_using(np.array_equal)
 
     def converter(values: npt.ArrayLike) -> base.AnyVector:
-        data = np.array(values)
-        out_array: base.AnyVector = cast_array(data, cast_type=dtype)
-        return out_array
+        if not isinstance(values, np.ndarray):
+            data = np.array(values)
+        else:
+            data = values
+        if data.dtype != dtype:
+            if dtype.names is None:
+                return data.astype(dtype)
+            return rfn.unstructured_to_structured(data, dtype)
+        return data
 
     return field(
         default=default,
-        eq=equality_comparison,
+        eq=cmp_using(np.array_equal),
         converter=converter,
         on_setattr=setters.convert,
     )
 
 
-def _truthy(data: Union[base.ArrayBase, base.AdjacencyBase]) -> bool:
+def _array_field(dtype: npt.DTypeLike, num_cols: int = 1, repr: bool = True):
+    dtype = np.dtype(dtype)
+
+    def converter(values: npt.ArrayLike) -> npt.NDArray[ty.Any]:
+        array = np.asarray(values, dtype=dtype)
+        cols = len(array.shape) if len(array.shape) == 1 else array.shape[1]
+        if cols != num_cols:
+            raise ValueError(f"Number of columns must be equal to {num_cols}")
+        return array
+
+    return field(
+        default=Factory(
+            fn.partial(np.array, tuple(), dtype=dtype)  # type: ignore
+        ),
+        converter=converter,
+        eq=cmp_using(np.array_equal),
+        on_setattr=setters.convert,
+        repr=repr,
+    )
+
+
+def _truthy(data: ty.Union[base.ArrayBase, base.AdjacencyBase]) -> bool:
     if len(data) == 0:
         return False
     return True
@@ -176,7 +190,7 @@ class MaskArray(base.MaskBase, base.ArrayBase):
     """
 
     data: base.BoolVector = array_field("bool")
-    __array_interface__: Dict[str, Any] = field(init=False, repr=False)
+    __array_interface__: ty.Dict[str, ty.Any] = field(init=False, repr=False)
 
     def __attrs_post_init__(self):
         self.__array_interface__ = self.data.__array_interface__
@@ -188,7 +202,7 @@ class MaskArray(base.MaskBase, base.ArrayBase):
     def __array_wrap__(cls, array: base.BoolVector) -> "MaskArray":
         return cls(array)
 
-    def __iter__(self) -> Iterator[bool]:
+    def __iter__(self) -> ty.Iterator[bool]:
         yield from map(bool, self.data)
 
     def copy(self) -> "MaskArray":
@@ -297,12 +311,12 @@ def _mask_neq(mask1: base.MaskLike, mask2: base.MaskLike) -> MaskArray:
     return MaskArray(np.not_equal(mask1, mask2))
 
 
-_IN_MASK_DICT = OrderedDict[str, Union[MaskArray, base.BoolVector]]
-_MASK_DICT = OrderedDict[str, MaskArray]
+_IN_MASK_DICT = ty.OrderedDict[str, ty.Union[MaskArray, base.BoolVector]]
+_MASK_DICT = ty.OrderedDict[str, MaskArray]
 
 
 def _mask_dict_convert(masks: _IN_MASK_DICT) -> _MASK_DICT:
-    out_masks = OrderedDict()
+    out_masks = cl.OrderedDict()
     for key, val in masks.items():
         if isinstance(val, MaskArray) or isinstance(val, MaskGroup):
             mask = val
@@ -313,7 +327,7 @@ def _mask_dict_convert(masks: _IN_MASK_DICT) -> _MASK_DICT:
 
 
 @define
-class MaskGroup(base.MaskBase, abc.MutableMapping[str, base.MaskBase]):
+class MaskGroup(base.MaskBase, cla.MutableMapping[str, base.MaskBase]):
     """Data structure to compose groups of masks over particle arrays.
     Can be nested to form complex hierarchies.
 
@@ -392,10 +406,10 @@ class MaskGroup(base.MaskBase, abc.MutableMapping[str, base.MaskBase]):
             console.print(self)
         return capture.get()
 
-    def __iter__(self) -> Iterator[str]:
+    def __iter__(self) -> ty.Iterator[str]:
         return iter(self._mask_arrays)
 
-    def __getitem__(self, key) -> Union[MaskArray, "MaskGroup"]:
+    def __getitem__(self, key) -> ty.Union[MaskArray, "MaskGroup"]:
         """Subscripting for ``MaskGroup`` object.
 
         Parameters
@@ -411,10 +425,10 @@ class MaskGroup(base.MaskBase, abc.MutableMapping[str, base.MaskBase]):
         agg = self.agg_op
         if isinstance(key, list):
             return self.__class__(
-                OrderedDict({k: self._mask_arrays[k] for k in key}), agg
+                cl.OrderedDict({k: self._mask_arrays[k] for k in key}), agg
             )
         elif not isinstance(key, str):
-            masked_data = OrderedDict()
+            masked_data = cl.OrderedDict()
             for dict_key, val in self._mask_arrays.items():
                 masked_data[dict_key] = val[key]
             return self.__class__(masked_data, agg)
@@ -481,7 +495,7 @@ class MaskGroup(base.MaskBase, abc.MutableMapping[str, base.MaskBase]):
         return deepcopy(self)
 
     @property
-    def names(self) -> List[str]:
+    def names(self) -> ty.List[str]:
         return list(self._mask_arrays.keys())
 
     @property
@@ -514,7 +528,7 @@ class MaskGroup(base.MaskBase, abc.MutableMapping[str, base.MaskBase]):
             )
 
     @property
-    def dict(self) -> Dict[str, base.BoolVector]:
+    def dict(self) -> ty.Dict[str, base.BoolVector]:
         return {key: val.data for key, val in self._mask_arrays.items()}
 
     def flatten(self) -> "MaskGroup":
@@ -585,10 +599,10 @@ class PdgArray(base.ArrayBase):
 
     from mcpid.lookup import PdgRecords as __PdgRecords
 
-    data: base.IntVector = array_field("int")
+    data: base.IntVector = _array_field("<i4")
     __lookup_table: __PdgRecords = field(init=False, repr=False)
     __mega_to_giga: float = field(init=False, repr=False)
-    __array_interface__: Dict[str, Any] = field(init=False, repr=False)
+    __array_interface__: ty.Dict[str, ty.Any] = field(init=False, repr=False)
     _HANDLED_TYPES = field(init=False, repr=False)
 
     def __attrs_post_init__(self) -> None:
@@ -601,7 +615,7 @@ class PdgArray(base.ArrayBase):
     def __array_wrap__(cls, array: base.IntVector) -> "PdgArray":
         return cls(array)
 
-    def __iter__(self) -> Iterator[int]:
+    def __iter__(self) -> ty.Iterator[int]:
         yield from map(int, self.data)
 
     def __len__(self) -> int:
@@ -789,11 +803,22 @@ class MomentumArray(base.ArrayBase):
         Calculates interparticle distances with ``other`` MomentumArray.
     """
 
-    data: base.AnyVector = array_field("pmu")
-    __array_interface__: Dict[str, Any] = field(init=False, repr=False)
+    # data: base.AnyVector = array_field("pmu")
+    _data: base.DoubleVector = _array_field("<f8", num_cols=4, repr=False)
+    _dtype: np.dtype = field(init=False, repr=False)
+    __array_interface__: ty.Dict[str, ty.Any] = field(init=False, repr=False)
 
     def __attrs_post_init__(self):
-        self.__array_interface__ = self.data.__array_interface__
+        self._dtype = np.dtype(list(zip("xyze", it.repeat("<f8"))))
+        self.__array_interface__ = self._data.__array_interface__
+
+    @property
+    def data(self) -> base.AnyVector:
+        return self._data.view(self._dtype)
+
+    @data.setter
+    def data(self, values: npt.ArrayLike) -> None:
+        self._data = values  # type: ignore
 
     @classmethod
     def __array_wrap__(cls, array: base.AnyVector) -> "MomentumArray":
@@ -801,9 +826,10 @@ class MomentumArray(base.ArrayBase):
 
     # def __array_ufunc__(self, ufunc, method: str, *inputs, **kwargs):
 
-    def __iter__(self) -> Iterator[Tuple[float, float, float, float]]:
-        flat_vals = map(float, it.chain.from_iterable(self.data))
-        yield from zip(*(flat_vals,) * 4, strict=True)  # type: ignore
+    def __iter__(self) -> ty.Iterator[MomentumElement]:
+        flat_vals = map(float, self._data.flatten())
+        elems = zip(*(flat_vals,) * 4, strict=True)  # type: ignore
+        yield from it.starmap(MomentumElement, elems)
 
     def __len__(self) -> int:
         return len(self.data)
@@ -822,24 +848,24 @@ class MomentumArray(base.ArrayBase):
     def copy(self) -> "MomentumArray":
         return deepcopy(self)
 
-    @cached_property
+    @fn.cached_property
     def _xy_pol(self) -> base.ComplexVector:
         return self.data["x"] + 1.0j * self.data["y"]  # type: ignore
 
-    @cached_property
+    @fn.cached_property
     def _zt_pol(self) -> base.ComplexVector:
         return self.data["z"] + 1.0j * self.pt  # type: ignore
 
-    @cached_property
+    @fn.cached_property
     def _spatial_mag(self) -> base.DoubleVector:
         return np.abs(self._zt_pol)
 
-    @cached_property
+    @fn.cached_property
     def pt(self) -> base.DoubleVector:
         """Momentum component transverse to the beam-axis."""
         return np.abs(self._xy_pol)
 
-    @cached_property
+    @fn.cached_property
     def eta(self) -> base.DoubleVector:
         """Pseudorapidity of particles.
 
@@ -852,7 +878,7 @@ class MomentumArray(base.ArrayBase):
             arr = np.arctanh(self.data["z"] / self._spatial_mag)
         return arr  # type: ignore
 
-    @cached_property
+    @fn.cached_property
     def rapidity(self) -> base.DoubleVector:
         """Rapidity of particles."""
         e, z = self.data["e"], self.data["z"]
@@ -861,17 +887,17 @@ class MomentumArray(base.ArrayBase):
             rap = 0.5 * np.log((e + z) / (e - z))  # type: ignore
         return rap  # type: ignore
 
-    @cached_property
+    @fn.cached_property
     def phi(self) -> base.DoubleVector:
         """Azimuthal angular displacement of particles about beam-axis."""
         return np.angle(self._xy_pol)
 
-    @cached_property
+    @fn.cached_property
     def theta(self) -> base.DoubleVector:
         """Angular displacement of particles from positive beam-axis."""
         return np.angle(self._zt_pol)
 
-    @cached_property
+    @fn.cached_property
     def mass(self) -> base.DoubleVector:
         """Mass of particles."""
         e: base.DoubleVector = self.data["e"]
@@ -938,7 +964,7 @@ class ColorArray(base.ArrayBase):
     """
 
     data: base.AnyVector = array_field("color")
-    __array_interface__: Dict[str, Any] = field(init=False, repr=False)
+    __array_interface__: ty.Dict[str, ty.Any] = field(init=False, repr=False)
 
     def __attrs_post_init__(self):
         self.__array_interface__ = self.data.__array_interface__
@@ -947,7 +973,7 @@ class ColorArray(base.ArrayBase):
     def __array_wrap__(cls, array: base.AnyVector) -> "ColorArray":
         return cls(array)
 
-    def __iter__(self) -> Iterator[Tuple[int, int]]:
+    def __iter__(self) -> ty.Iterator[ty.Tuple[int, int]]:
         flat_vals = map(int, it.chain.from_iterable(self.data))
         yield from zip(*(flat_vals,) * 2, strict=True)  # type: ignore
 
@@ -992,7 +1018,7 @@ class HelicityArray(base.ArrayBase):
     """
 
     data: base.HalfIntVector = array_field("helicity")
-    __array_interface__: Dict[str, Any] = field(init=False, repr=False)
+    __array_interface__: ty.Dict[str, ty.Any] = field(init=False, repr=False)
 
     def __attrs_post_init__(self):
         self.__array_interface__ = self.data.__array_interface__
@@ -1001,7 +1027,7 @@ class HelicityArray(base.ArrayBase):
     def __array_wrap__(cls, array: base.HalfIntVector) -> "HelicityArray":
         return cls(array)
 
-    def __iter__(self) -> Iterator[int]:
+    def __iter__(self) -> ty.Iterator[int]:
         yield from map(int, self.data)
 
     def copy(self) -> "HelicityArray":
@@ -1050,7 +1076,7 @@ class StatusArray(base.ArrayBase):
     """
 
     data: base.HalfIntVector = array_field("h_int")
-    __array_interface__: Dict[str, Any] = field(init=False, repr=False)
+    __array_interface__: ty.Dict[str, ty.Any] = field(init=False, repr=False)
 
     def __attrs_post_init__(self):
         self.__array_interface__ = self.data.__array_interface__
@@ -1059,7 +1085,7 @@ class StatusArray(base.ArrayBase):
     def __array_wrap__(cls, array: base.HalfIntVector) -> "StatusArray":
         return cls(array)
 
-    def __iter__(self) -> Iterator[int]:
+    def __iter__(self) -> ty.Iterator[int]:
         yield from map(int, self.data)
 
     def copy(self) -> "StatusArray":
@@ -1083,7 +1109,7 @@ class StatusArray(base.ArrayBase):
     def in_range(
         self,
         min_status: int = 0,
-        max_status: Optional[int] = None,
+        max_status: ty.Optional[int] = None,
         sign_sensitive: bool = False,
     ) -> MaskArray:
         """Returns a boolean mask over particles with status codes
@@ -1213,12 +1239,12 @@ class ParticleSet(base.ParticleBase):
     @classmethod
     def from_numpy(
         cls,
-        pdg: Optional[base.IntVector] = None,
-        pmu: Optional[base.AnyVector] = None,
-        color: Optional[base.AnyVector] = None,
-        helicity: Optional[base.HalfIntVector] = None,
-        status: Optional[base.HalfIntVector] = None,
-        final: Optional[base.BoolVector] = None,
+        pdg: ty.Optional[base.IntVector] = None,
+        pmu: ty.Optional[base.AnyVector] = None,
+        color: ty.Optional[base.AnyVector] = None,
+        helicity: ty.Optional[base.HalfIntVector] = None,
+        status: ty.Optional[base.HalfIntVector] = None,
+        final: ty.Optional[base.BoolVector] = None,
     ) -> "ParticleSet":
         """Creates a ParticleSet instance directly from numpy arrays.
 
@@ -1247,7 +1273,7 @@ class ParticleSet(base.ParticleBase):
         """
 
         def optional(
-            data_class: Type[DataType], data: Optional[base.AnyVector]
+            data_class: ty.Type[DataType], data: ty.Optional[base.AnyVector]
         ) -> DataType:
             return data_class(data) if data is not None else data_class()
 
@@ -1264,9 +1290,9 @@ class ParticleSet(base.ParticleBase):
 #############################################
 # CONNECTIVITY INFORMATION AS COO EDGE LIST #
 #############################################
-class _AdjDict(TypedDict):
-    edges: Tuple[int, int, Dict[str, Any]]
-    nodes: Tuple[int, Dict[str, Any]]
+class _AdjDict(ty.TypedDict):
+    edges: ty.Tuple[int, int, ty.Dict[str, ty.Any]]
+    nodes: ty.Tuple[int, ty.Dict[str, ty.Any]]
 
 
 @define
@@ -1298,7 +1324,7 @@ class AdjacencyList(base.AdjacencyBase):
 
     _data: base.AnyVector = array_field("edge")
     weights: base.DoubleVector = array_field("double")
-    __array_interface__: Dict[str, Any] = field(init=False, repr=False)
+    __array_interface__: ty.Dict[str, ty.Any] = field(init=False, repr=False)
 
     def __attrs_post_init__(self):
         self.__array_interface__ = self._data.__array_interface__
@@ -1307,7 +1333,7 @@ class AdjacencyList(base.AdjacencyBase):
     def __array_wrap__(cls, array: base.AnyVector) -> "AdjacencyList":
         return cls(array)
 
-    def __iter__(self) -> Iterator[Tuple[int, int]]:
+    def __iter__(self) -> ty.Iterator[ty.Tuple[int, int]]:
         flat_vals = map(int, it.chain.from_iterable(self._data))
         yield from zip(*(flat_vals,) * 2, strict=True)  # type: ignore
 
@@ -1331,7 +1357,9 @@ class AdjacencyList(base.AdjacencyBase):
     @classmethod
     def from_matrix(
         cls,
-        adj_matrix: Union[base.DoubleVector, base.BoolVector, base.IntVector],
+        adj_matrix: ty.Union[
+            base.DoubleVector, base.BoolVector, base.IntVector
+        ],
         weighted: bool = False,
         self_loop: bool = False,
     ) -> "AdjacencyList":
@@ -1360,7 +1388,7 @@ class AdjacencyList(base.AdjacencyBase):
         return cls(**kwargs)
 
     @property
-    def matrix(self) -> Union[base.DoubleVector, base.IntVector]:
+    def matrix(self) -> ty.Union[base.DoubleVector, base.IntVector]:
         size = len(self.nodes)
         if len(self.weights) > 0:
             weights = self.weights
@@ -1388,11 +1416,11 @@ class AdjacencyList(base.AdjacencyBase):
         sort_idxs = np.argsort(np.abs(unsort_nodes))
         return unsort_nodes[sort_idxs]  # type: ignore
 
-    @cached_property
+    @fn.cached_property
     def _sparse(self) -> coo_array:
         return self.to_sparse()
 
-    def to_sparse(self, data: Optional[base.AnyVector] = None) -> coo_array:
+    def to_sparse(self, data: ty.Optional[base.AnyVector] = None) -> coo_array:
         """Converts the graph structure to a ``scipy.sparse.coo_array``
         instance.
 
@@ -1420,11 +1448,11 @@ class AdjacencyList(base.AdjacencyBase):
 
     def to_dicts(
         self,
-        edge_data: Optional[
-            Dict[str, Union[base.ArrayBase, base.AnyVector]]
+        edge_data: ty.Optional[
+            ty.Dict[str, ty.Union[base.ArrayBase, base.AnyVector]]
         ] = None,
-        node_data: Optional[
-            Dict[str, Union[base.ArrayBase, base.AnyVector]]
+        node_data: ty.Optional[
+            ty.Dict[str, ty.Union[base.ArrayBase, base.AnyVector]]
         ] = None,
     ) -> _AdjDict:
         """Returns data in dictionary format, which is more easily
@@ -1436,8 +1464,8 @@ class AdjacencyList(base.AdjacencyBase):
             node_data = dict()
 
         def make_data_dicts(
-            orig: Tuple[Any, ...],
-            data: Dict[str, Union[base.ArrayBase, base.AnyVector]],
+            orig: ty.Tuple[ty.Any, ...],
+            data: ty.Dict[str, ty.Union[base.ArrayBase, base.AnyVector]],
         ):
             def array_iterator(array_dict):
                 for array in array_dict.values():
@@ -1520,7 +1548,7 @@ class Graphicle:
     adj: AdjacencyList = AdjacencyList()
 
     @property
-    def __attr_names(self) -> Tuple[str, ...]:
+    def __attr_names(self) -> ty.Tuple[str, ...]:
         return tuple(self.__annotations__.keys())
 
     def __getitem__(self, key) -> "Graphicle":
@@ -1568,14 +1596,14 @@ class Graphicle:
     @classmethod
     def from_numpy(
         cls,
-        pdg: Optional[base.IntVector] = None,
-        pmu: Optional[base.AnyVector] = None,
-        color: Optional[base.AnyVector] = None,
-        helicity: Optional[base.HalfIntVector] = None,
-        status: Optional[base.HalfIntVector] = None,
-        final: Optional[base.BoolVector] = None,
-        edges: Optional[base.AnyVector] = None,
-        weights: Optional[base.DoubleVector] = None,
+        pdg: ty.Optional[base.IntVector] = None,
+        pmu: ty.Optional[base.AnyVector] = None,
+        color: ty.Optional[base.AnyVector] = None,
+        helicity: ty.Optional[base.HalfIntVector] = None,
+        status: ty.Optional[base.HalfIntVector] = None,
+        final: ty.Optional[base.BoolVector] = None,
+        edges: ty.Optional[base.AnyVector] = None,
+        weights: ty.Optional[base.DoubleVector] = None,
     ) -> "Graphicle":
         """Instantiates a Graphicle object from an optional collection
         of numpy arrays.
