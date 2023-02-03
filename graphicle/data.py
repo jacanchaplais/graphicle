@@ -80,19 +80,31 @@ __all__ = [
 _types = Types()
 DataType = ty.TypeVar("DataType", bound=base.ArrayBase)
 FuncType = ty.TypeVar("FuncType", bound=ty.Callable[..., ty.Any])
+EdgeLike = ty.Union[
+    base.IntVector, base.VoidVector, ty.Sequence[ty.Tuple[int, int]]
+]
 DHUGE = np.finfo(np.dtype("<f8")).max * 0.1
-_MOMENTUM_MAP = {
-    "x": {"x", "px"},
-    "y": {"y", "py"},
-    "z": {"z", "pz"},
-    "e": {"e", "pe", "tau", "t"},
-}
-_MOMENTUM_MAP = dict(
-    it.chain.from_iterable(
-        map(it.product, _MOMENTUM_MAP.values(), _MOMENTUM_MAP.keys())
+
+
+def _map_invert(mapping: ty.Dict[str, ty.Set[str]]) -> ty.Dict[str, str]:
+    return dict(
+        it.chain.from_iterable(
+            map(it.product, mapping.values(), mapping.keys())
+        )
     )
+
+
+_MOMENTUM_MAP = _map_invert(
+    {
+        "x": {"x", "px"},
+        "y": {"y", "py"},
+        "z": {"z", "pz"},
+        "e": {"e", "pe", "tau", "t"},
+    }
 )
 _MOMENTUM_ORDER = tuple("xyze")
+_EDGE_MAP = _map_invert({"in": {"in", "src"}, "out": {"out", "dst"}})
+_EDGE_ORDER = ("in", "out")
 
 
 class MomentumElement(ty.NamedTuple):
@@ -111,6 +123,15 @@ class ColorElement(ty.NamedTuple):
 
     color: int
     anticolor: int
+
+
+class VertexPair(ty.NamedTuple):
+    """Named tuple container for the color / anticolor pair of a single
+    particle.
+    """
+
+    src: int
+    dst: int
 
 
 # from https://numpy.org/doc/stable/reference/generated/numpy.lib.mixins
@@ -198,7 +219,7 @@ def array_field(type_name: str):
     )
 
 
-def _reorder_pmu(array: base.AnyVector) -> base.AnyVector:
+def _reorder_pmu(array: base.VoidVector) -> base.VoidVector:
     names = array.dtype.names
     assert names is not None
     if names == _MOMENTUM_ORDER:
@@ -791,11 +812,11 @@ class PdgArray(base.ArrayBase):
             np.isin(data, target, assume_unique=False, invert=blacklist)
         )
 
-    def __get_prop(self, field: str) -> base.AnyVector:
+    def __get_prop(self, field: str) -> base.VoidVector:
         props = self.__lookup_table.properties(self.data, [field])[field]
         return props  # type: ignore
 
-    def __get_prop_range(self, field: str) -> base.AnyVector:
+    def __get_prop_range(self, field: str) -> base.VoidVector:
         field_range = [field + "lower", field + "upper"]
         props = self.__lookup_table.properties(self.data, field_range)
         return props  # type: ignore
@@ -814,7 +835,7 @@ class PdgArray(base.ArrayBase):
         return out
 
     @property
-    def mass_bounds(self) -> base.AnyVector:
+    def mass_bounds(self) -> base.VoidVector:
         range_arr = self.__get_prop_range("mass")
         for name in range_arr.dtype.names:
             range_arr[name] *= self.__mega_to_giga
@@ -830,7 +851,7 @@ class PdgArray(base.ArrayBase):
         return out
 
     @property
-    def width_bounds(self) -> base.AnyVector:
+    def width_bounds(self) -> base.VoidVector:
         range_arr = self.__get_prop_range("width")
         for name in range_arr.dtype.names:
             range_arr[name] *= self.__mega_to_giga
@@ -910,7 +931,7 @@ class MomentumArray(base.ArrayBase):
         return _array_repr(self)
 
     @property
-    def data(self) -> base.AnyVector:
+    def data(self) -> base.VoidVector:
         return self._data.view(self.dtype).squeeze()
 
     @data.setter
@@ -931,7 +952,7 @@ class MomentumArray(base.ArrayBase):
     def __len__(self) -> int:
         return len(self.data)
 
-    def __array__(self) -> base.AnyVector:
+    def __array__(self) -> base.VoidVector:
         return self.data
 
     def __getitem__(self, key) -> "MomentumArray":
@@ -1060,7 +1081,7 @@ class ColorArray(base.ArrayBase):
         Structured array containing color / anti-color pairs.
     """
 
-    _data: base.AnyVector = _array_field("<i4", 2)
+    _data: base.VoidVector = _array_field("<i4", 2)
     __array_interface__: ty.Dict[str, ty.Any] = field(init=False, repr=False)
     dtype: np.dtype = field(init=False, repr=False)
     _HANDLED_TYPES: ty.Tuple[ty.Type, ...] = field(init=False, repr=False)
@@ -1079,7 +1100,7 @@ class ColorArray(base.ArrayBase):
     def __array_wrap__(cls, array: base.AnyVector) -> "ColorArray":
         return cls(array)
 
-    def __array__(self) -> base.AnyVector:
+    def __array__(self) -> base.VoidVector:
         return self.data
 
     def __repr__(self) -> str:
@@ -1091,7 +1112,7 @@ class ColorArray(base.ArrayBase):
         yield from it.starmap(ColorElement, elems)
 
     @property
-    def data(self) -> base.AnyVector:
+    def data(self) -> base.VoidVector:
         return self._data.view(self.dtype).squeeze()
 
     @data.setter
@@ -1162,7 +1183,7 @@ class HelicityArray(base.ArrayBase):
         yield from map(int, self.data)
 
     @property
-    def data(self) -> base.AnyVector:
+    def data(self) -> base.HalfIntVector:
         return self._data
 
     @data.setter
@@ -1249,7 +1270,7 @@ class StatusArray(base.ArrayBase):
         return _truthy(self)
 
     @property
-    def data(self) -> base.AnyVector:
+    def data(self) -> base.HalfIntVector:
         return self._data
 
     @data.setter
@@ -1394,8 +1415,8 @@ class ParticleSet(base.ParticleBase):
     def from_numpy(
         cls,
         pdg: ty.Optional[base.IntVector] = None,
-        pmu: ty.Optional[base.AnyVector] = None,
-        color: ty.Optional[base.AnyVector] = None,
+        pmu: ty.Optional[base.VoidVector] = None,
+        color: ty.Optional[base.VoidVector] = None,
         helicity: ty.Optional[base.HalfIntVector] = None,
         status: ty.Optional[base.HalfIntVector] = None,
         final: ty.Optional[base.BoolVector] = None,
@@ -1497,7 +1518,7 @@ class AdjacencyList(base.AdjacencyBase):
     def __bool__(self) -> bool:
         return _truthy(self)
 
-    def __array__(self) -> base.AnyVector:
+    def __array__(self) -> base.VoidVector:
         return self._data
 
     def __getitem__(self, key) -> "AdjacencyList":
@@ -1751,12 +1772,12 @@ class Graphicle:
     def from_numpy(
         cls,
         pdg: ty.Optional[base.IntVector] = None,
-        pmu: ty.Optional[base.AnyVector] = None,
-        color: ty.Optional[base.AnyVector] = None,
+        pmu: ty.Optional[base.VoidVector] = None,
+        color: ty.Optional[base.VoidVector] = None,
         helicity: ty.Optional[base.HalfIntVector] = None,
         status: ty.Optional[base.HalfIntVector] = None,
         final: ty.Optional[base.BoolVector] = None,
-        edges: ty.Optional[base.AnyVector] = None,
+        edges: ty.Optional[base.VoidVector] = None,
         weights: ty.Optional[base.DoubleVector] = None,
     ) -> "Graphicle":
         """Instantiates a Graphicle object from an optional collection
@@ -1834,7 +1855,7 @@ class Graphicle:
         return self.particles.final
 
     @property
-    def edges(self) -> base.AnyVector:
+    def edges(self) -> base.VoidVector:
         return self.adj.edges
 
     @property

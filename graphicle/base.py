@@ -20,6 +20,7 @@ __all__ = [
     "HalfIntVector",
     "ObjVector",
     "AnyVector",
+    "VoidVector",
     "EventInterface",
     "ArrayBase",
     "ParticleBase",
@@ -35,6 +36,7 @@ IntVector = npt.NDArray[np.int32]
 HalfIntVector = npt.NDArray[np.int16]
 ObjVector = npt.NDArray[np.object_]
 AnyVector = npt.NDArray[Any]
+VoidVector = npt.NDArray[np.void]
 MaskLike = Union["MaskBase", BoolVector]
 
 
