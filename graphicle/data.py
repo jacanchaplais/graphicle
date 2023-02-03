@@ -81,6 +81,18 @@ _types = Types()
 DataType = ty.TypeVar("DataType", bound=base.ArrayBase)
 FuncType = ty.TypeVar("FuncType", bound=ty.Callable[..., ty.Any])
 DHUGE = np.finfo(np.dtype("<f8")).max * 0.1
+_MOMENTUM_MAP = {
+    "x": {"x", "px"},
+    "y": {"y", "py"},
+    "z": {"z", "pz"},
+    "e": {"e", "pe", "tau", "t"},
+}
+_MOMENTUM_MAP = dict(
+    it.chain.from_iterable(
+        map(it.product, _MOMENTUM_MAP.values(), _MOMENTUM_MAP.keys())
+    )
+)
+_MOMENTUM_ORDER = tuple("xyze")
 
 
 class MomentumElement(ty.NamedTuple):
@@ -186,10 +198,26 @@ def array_field(type_name: str):
     )
 
 
+def _reorder_pmu(array: base.AnyVector) -> base.AnyVector:
+    names = array.dtype.names
+    assert names is not None
+    if names == _MOMENTUM_ORDER:
+        return array
+    gcl_to_ext = dict(zip(map(_MOMENTUM_MAP.__getitem__, names), names))
+    name_reorder = list(map(gcl_to_ext.__getitem__, _MOMENTUM_ORDER))
+    return array[name_reorder]
+
+
 def _array_field(dtype: npt.DTypeLike, num_cols: int = 1, repr: bool = True):
     dtype = np.dtype(dtype)
 
     def converter(values: npt.ArrayLike) -> base.AnyVector:
+        if isinstance(values, np.ndarray) and values.dtype.type == np.void:
+            names = values.dtype.names
+            assert names is not None
+            if num_cols == 4:
+                values = _reorder_pmu(values)
+            values = rfn.structured_to_unstructured(values)
         array = np.asarray(values, dtype=dtype)
         shape = array.shape
         is_flat = len(shape) == 1
