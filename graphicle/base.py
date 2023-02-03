@@ -99,9 +99,9 @@ class ArrayBase(ABC, cla.Sequence, np.lib.mixins.NDArrayOperatorsMixin):
     def __init__(self, data: Optional[AnyVector] = None) -> None:
         pass
 
-    @abstractmethod
-    def __array_ufunc__(self, ufunc, method, *inputs, **kwargs) -> None:
-        """Defines the way Numpy ufuncs work on the data structure."""
+    # @abstractmethod
+    # def __array_ufunc__(self, ufunc, method, *inputs, **kwargs) -> None:
+    #     """Defines the way Numpy ufuncs work on the data structure."""
 
     @abstractmethod
     def __len__(self) -> int:
