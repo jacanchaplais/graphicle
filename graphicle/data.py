@@ -42,6 +42,7 @@ import collections.abc as cla
 import functools as fn
 import itertools as it
 import numbers as nb
+import operator as op
 import typing as ty
 import warnings
 from copy import deepcopy
@@ -91,6 +92,75 @@ class MomentumElement(ty.NamedTuple):
     e: float
 
 
+class ColorElement(ty.NamedTuple):
+    """Named tuple container for the color / anticolor pair of a single
+    particle.
+    """
+
+    color: int
+    anticolor: int
+
+
+# from https://numpy.org/doc/stable/reference/generated/numpy.lib.mixins
+# .NDArrayOperatorsMixin.html
+def _array_ufunc(
+    instance: DataType,
+    ufunc: ty.Callable[..., ty.Any],
+    method: str,
+    *inputs: ty.Tuple[ty.Any, ...],
+    **kwargs: ty.Dict[str, ty.Any],
+) -> ty.Optional[
+    ty.Union[
+        ty.Tuple[ty.Union[DataType, base.AnyVector]],
+        ty.Union[DataType, base.AnyVector],
+    ]
+]:
+    out = kwargs.get("out", ())
+    class_type = instance.__class__
+    for x in inputs + out:  # type: ignore
+        # Only support operations with instances of _HANDLED_TYPES.
+        # Use ArrayLike instead of type(self) for isinstance to
+        # allow subclasses that don't override __array_ufunc__ to
+        # handle ArrayLike objects.
+        if not isinstance(x, instance._HANDLED_TYPES + (class_type,)):
+            return NotImplemented
+
+    # Defer to the implementation of the ufunc on unwrapped values.
+    inputs = tuple(x._data if isinstance(x, class_type) else x for x in inputs)
+    if out:
+        kwargs["out"] = tuple(
+            x._data if isinstance(x, class_type) else x for x in out
+        )
+    result = op.methodcaller(method, *inputs, **kwargs)(ufunc)
+
+    if type(result) is tuple:
+        # multiple return values
+        return tuple(class_type(x) for x in result)
+    elif method == "at":
+        # no return value
+        return None
+    else:
+        # one return value
+        if not result.shape or kwargs.get("axis", None) == 1:
+            return result
+        return class_type(result)
+
+
+def _array_repr(instance: base.ArrayBase) -> str:
+    data_str = str(instance._data)
+    data_splits = data_str.split("\n")
+    first_str = data_splits.pop(0)
+    class_name = instance.__class__.__name__
+    idnt_lvl = len(class_name) + 1
+    idnt = " " * idnt_lvl
+    dtype_str = f"dtype={instance.data.dtype}"
+    if not data_splits:
+        return f"{class_name}({first_str}, {dtype_str})"
+    dtype_str = idnt + dtype_str
+    rows = "\n".join(map(op.add, it.repeat(idnt), data_splits))
+    return f"{class_name}({first_str}\n{rows},\n{dtype_str})"
+
+
 def array_field(type_name: str):
     """Prepares a field for attrs dataclass with typicle input."""
     types = Types()
@@ -119,10 +189,15 @@ def array_field(type_name: str):
 def _array_field(dtype: npt.DTypeLike, num_cols: int = 1, repr: bool = True):
     dtype = np.dtype(dtype)
 
-    def converter(values: npt.ArrayLike) -> npt.NDArray[ty.Any]:
+    def converter(values: npt.ArrayLike) -> base.AnyVector:
         array = np.asarray(values, dtype=dtype)
-        cols = len(array.shape) if len(array.shape) == 1 else array.shape[1]
-        if cols != num_cols:
+        shape = array.shape
+        is_flat = len(shape) == 1
+        if is_flat and (num_cols == 1):
+            return array
+        cols = shape[0] if is_flat else shape[1]
+        not_empty = array.shape[0] != 0
+        if not_empty and (cols != num_cols):
             raise ValueError(f"Number of columns must be equal to {num_cols}")
         return array
 
@@ -559,7 +634,7 @@ class MaskGroup(base.MaskBase, cla.MutableMapping[str, base.MaskBase]):
 ############################
 # PDG STORAGE AND QUERYING #
 ############################
-@define
+@define(eq=False)
 class PdgArray(base.ArrayBase):
     """Returns data structure containing PDG integer codes for particle
     data.
@@ -599,7 +674,8 @@ class PdgArray(base.ArrayBase):
 
     from mcpid.lookup import PdgRecords as __PdgRecords
 
-    data: base.IntVector = _array_field("<i4")
+    _data: base.IntVector = _array_field("<i4")
+    dtype: np.dtype = field(init=False, repr=False)
     __lookup_table: __PdgRecords = field(init=False, repr=False)
     __mega_to_giga: float = field(init=False, repr=False)
     __array_interface__: ty.Dict[str, ty.Any] = field(init=False, repr=False)
@@ -608,12 +684,16 @@ class PdgArray(base.ArrayBase):
     def __attrs_post_init__(self) -> None:
         self.__lookup_table = self.__PdgRecords()
         self.__mega_to_giga: float = 1.0e-3
-        self.__array_interface__ = self.data.__array_interface__
-        self._HANDLED_TYPES = (np.ndarray, nb.Number)
+        self.__array_interface__ = self._data.__array_interface__
+        self.dtype = self._data.dtype
+        self._HANDLED_TYPES = (np.ndarray, nb.Number, cla.Sequence)
 
     @classmethod
     def __array_wrap__(cls, array: base.IntVector) -> "PdgArray":
         return cls(array)
+
+    def __repr__(self) -> str:
+        return _array_repr(self)
 
     def __iter__(self) -> ty.Iterator[int]:
         yield from map(int, self.data)
@@ -625,34 +705,7 @@ class PdgArray(base.ArrayBase):
         return self.data
 
     def __array_ufunc__(self, ufunc, method, *inputs, **kwargs):
-        out = kwargs.get("out", ())
-        for x in inputs + out:
-            # Only support operations with instances of _HANDLED_TYPES.
-            # Use ArrayLike instead of type(self) for isinstance to
-            # allow subclasses that don't override __array_ufunc__ to
-            # handle ArrayLike objects.
-            if not isinstance(x, self._HANDLED_TYPES + (PdgArray,)):
-                return NotImplemented
-
-        # Defer to the implementation of the ufunc on unwrapped values.
-        inputs = tuple(
-            x.data if isinstance(x, PdgArray) else x for x in inputs
-        )
-        if out:
-            kwargs["out"] = tuple(
-                x.data if isinstance(x, PdgArray) else x for x in out
-            )
-        result = getattr(ufunc, method)(*inputs, **kwargs)
-
-        if type(result) is tuple:
-            # multiple return values
-            return tuple(type(self)(x) for x in result)
-        elif method == "at":
-            # no return value
-            return None
-        else:
-            # one return value
-            return type(self)(result)
+        return _array_ufunc(self, ufunc, method, *inputs, **kwargs)
 
     def __bool__(self) -> bool:
         return _truthy(self)
@@ -661,6 +714,14 @@ class PdgArray(base.ArrayBase):
         if isinstance(key, base.MaskBase):
             key = key.data
         return self.__class__(np.array(self.data[key]))
+
+    @property
+    def data(self) -> base.IntVector:
+        return self._data
+
+    @data.setter
+    def data(self, values: npt.ArrayLike) -> None:
+        self._data = values  # type: ignore
 
     def copy(self) -> "PdgArray":
         return deepcopy(self)
@@ -767,7 +828,7 @@ class PdgArray(base.ArrayBase):
 ########################################
 # MOMENTUM STORAGE AND TRANSFORMATIONS #
 ########################################
-@define
+@define(eq=False)
 class MomentumArray(base.ArrayBase):
     """Data structure containing four-momentum of particle list.
 
@@ -805,16 +866,24 @@ class MomentumArray(base.ArrayBase):
 
     # data: base.AnyVector = array_field("pmu")
     _data: base.DoubleVector = _array_field("<f8", num_cols=4, repr=False)
-    _dtype: np.dtype = field(init=False, repr=False)
+    dtype: np.dtype = field(init=False, repr=False)
     __array_interface__: ty.Dict[str, ty.Any] = field(init=False, repr=False)
+    _HANDLED_TYPES: ty.Tuple[ty.Type, ...] = field(init=False, repr=False)
 
     def __attrs_post_init__(self):
-        self._dtype = np.dtype(list(zip("xyze", it.repeat("<f8"))))
+        self.dtype = np.dtype(list(zip("xyze", it.repeat("<f8"))))
         self.__array_interface__ = self._data.__array_interface__
+        self._HANDLED_TYPES = (np.ndarray, nb.Number, cla.Sequence)
+
+    def __array_ufunc__(self, ufunc, method, *inputs, **kwargs):
+        return _array_ufunc(self, ufunc, method, *inputs, **kwargs)
+
+    def __repr__(self) -> str:
+        return _array_repr(self)
 
     @property
     def data(self) -> base.AnyVector:
-        return self._data.view(self._dtype)
+        return self._data.view(self.dtype).squeeze()
 
     @data.setter
     def data(self, values: npt.ArrayLike) -> None:
@@ -943,7 +1012,7 @@ class MomentumArray(base.ArrayBase):
 #################
 # COLOR STORAGE #
 #################
-@define
+@define(eq=False)
 class ColorArray(base.ArrayBase):
     """Returns data structure of color / anti-color pairs for particle
     shower.
@@ -963,19 +1032,43 @@ class ColorArray(base.ArrayBase):
         Structured array containing color / anti-color pairs.
     """
 
-    data: base.AnyVector = array_field("color")
+    _data: base.AnyVector = _array_field("<i4", 2)
     __array_interface__: ty.Dict[str, ty.Any] = field(init=False, repr=False)
+    dtype: np.dtype = field(init=False, repr=False)
+    _HANDLED_TYPES: ty.Tuple[ty.Type, ...] = field(init=False, repr=False)
 
     def __attrs_post_init__(self):
-        self.__array_interface__ = self.data.__array_interface__
+        self.__array_interface__ = self._data.__array_interface__
+        self.dtype = np.dtype(
+            list(zip(("color", "anticolor"), it.repeat("<i4")))
+        )
+        self._HANDLED_TYPES = (np.ndarray, nb.Number, cla.Sequence)
+
+    def __array_ufunc__(self, ufunc, method, *inputs, **kwargs):
+        return _array_ufunc(self, ufunc, method, *inputs, **kwargs)
 
     @classmethod
     def __array_wrap__(cls, array: base.AnyVector) -> "ColorArray":
         return cls(array)
 
-    def __iter__(self) -> ty.Iterator[ty.Tuple[int, int]]:
+    def __array__(self) -> base.AnyVector:
+        return self.data
+
+    def __repr__(self) -> str:
+        return _array_repr(self)
+
+    def __iter__(self) -> ty.Iterator[ColorElement]:
         flat_vals = map(int, it.chain.from_iterable(self.data))
-        yield from zip(*(flat_vals,) * 2, strict=True)  # type: ignore
+        elems = zip(*(flat_vals,) * 2, strict=True)  # type: ignore
+        yield from it.starmap(ColorElement, elems)
+
+    @property
+    def data(self) -> base.AnyVector:
+        return self._data.view(self.dtype).squeeze()
+
+    @data.setter
+    def data(self, values: npt.ArrayLike) -> None:
+        self._data = values  # type: ignore
 
     def copy(self):
         return deepcopy(self)
@@ -988,9 +1081,6 @@ class ColorArray(base.ArrayBase):
     def __len__(self) -> int:
         return len(self.data)
 
-    def __array__(self) -> base.AnyVector:
-        return self.data
-
     def __bool__(self) -> bool:
         return _truthy(self)
 
@@ -998,7 +1088,7 @@ class ColorArray(base.ArrayBase):
 ####################
 # HELICITY STORAGE #
 ####################
-@define
+@define(eq=False)
 class HelicityArray(base.ArrayBase):
     """Data structure containing helicity / polarisation values for
     particle set.
@@ -1017,18 +1107,39 @@ class HelicityArray(base.ArrayBase):
         Helicity values.
     """
 
-    data: base.HalfIntVector = array_field("helicity")
+    _data: base.HalfIntVector = _array_field("<i2")
+    dtype: np.dtype = field(init=False, repr=False)
     __array_interface__: ty.Dict[str, ty.Any] = field(init=False, repr=False)
+    _HANDLED_TYPES: ty.Tuple[ty.Type, ...] = field(init=False, repr=False)
 
     def __attrs_post_init__(self):
-        self.__array_interface__ = self.data.__array_interface__
+        self.__array_interface__ = self._data.__array_interface__
+        self.dtype = self._data.dtype
+        self._HANDLED_TYPES = (np.ndarray, nb.Number, cla.Sequence)
+
+    def __array_ufunc__(self, ufunc, method, *inputs, **kwargs):
+        return _array_ufunc(self, ufunc, method, *inputs, **kwargs)
 
     @classmethod
     def __array_wrap__(cls, array: base.HalfIntVector) -> "HelicityArray":
         return cls(array)
 
+    def __array__(self) -> base.HalfIntVector:
+        return self.data
+
+    def __repr__(self) -> str:
+        return _array_repr(self)
+
     def __iter__(self) -> ty.Iterator[int]:
         yield from map(int, self.data)
+
+    @property
+    def data(self) -> base.AnyVector:
+        return self._data
+
+    @data.setter
+    def data(self, values: npt.ArrayLike) -> None:
+        self._data = values  # type: ignore
 
     def copy(self) -> "HelicityArray":
         """Returns a new HelicityArray instance with same data."""
@@ -1042,9 +1153,6 @@ class HelicityArray(base.ArrayBase):
     def __len__(self) -> int:
         return len(self.data)
 
-    def __array__(self) -> base.HalfIntVector:
-        return self.data
-
     def __bool__(self) -> bool:
         return _truthy(self)
 
@@ -1052,7 +1160,7 @@ class HelicityArray(base.ArrayBase):
 ####################################
 # STATUS CODE STORAGE AND QUERYING #
 ####################################
-@define
+@define(eq=False)
 class StatusArray(base.ArrayBase):
     """Data structure containing status values for particle set.
 
@@ -1075,22 +1183,31 @@ class StatusArray(base.ArrayBase):
     produced the data.
     """
 
-    data: base.HalfIntVector = array_field("h_int")
+    _data: base.HalfIntVector = _array_field("<i2")
     __array_interface__: ty.Dict[str, ty.Any] = field(init=False, repr=False)
+    dtype: np.dtype = field(init=False, repr=False)
+    _HANDLED_TYPES: ty.Tuple[ty.Type, ...] = field(init=False, repr=False)
 
     def __attrs_post_init__(self):
-        self.__array_interface__ = self.data.__array_interface__
+        self.__array_interface__ = self._data.__array_interface__
+        self.dtype = self._data.dtype
+        self._HANDLED_TYPES = (np.ndarray, nb.Number, cla.Sequence)
+
+    def __array_ufunc__(self, ufunc, method, *inputs, **kwargs):
+        return _array_ufunc(self, ufunc, method, *inputs, **kwargs)
 
     @classmethod
     def __array_wrap__(cls, array: base.HalfIntVector) -> "StatusArray":
         return cls(array)
 
+    def __array__(self) -> base.HalfIntVector:
+        return self.data
+
+    def __repr__(self) -> str:
+        return _array_repr(self)
+
     def __iter__(self) -> ty.Iterator[int]:
         yield from map(int, self.data)
-
-    def copy(self) -> "StatusArray":
-        """Returns a new StatusArray instance with same data."""
-        return deepcopy(self)
 
     def __getitem__(self, key) -> "StatusArray":
         if isinstance(key, base.MaskBase):
@@ -1100,11 +1217,20 @@ class StatusArray(base.ArrayBase):
     def __len__(self) -> int:
         return len(self.data)
 
-    def __array__(self) -> base.HalfIntVector:
-        return self.data
-
     def __bool__(self) -> bool:
         return _truthy(self)
+
+    @property
+    def data(self) -> base.AnyVector:
+        return self._data
+
+    @data.setter
+    def data(self, values: npt.ArrayLike) -> None:
+        self._data = values  # type: ignore
+
+    def copy(self) -> "StatusArray":
+        """Returns a new StatusArray instance with same data."""
+        return deepcopy(self)
 
     def in_range(
         self,
@@ -1196,8 +1322,8 @@ class ParticleSet(base.ParticleBase):
         Boolean array indicating final state in particle set.
     """
 
-    pdg: PdgArray = PdgArray()
-    pmu: MomentumArray = MomentumArray()
+    pdg: PdgArray = field(default=Factory(fn.partial(PdgArray, tuple())))
+    pmu: MomentumArray = field(default=Factory(fn.partial(PdgArray, tuple())))
     color: ColorArray = ColorArray()
     helicity: HelicityArray = HelicityArray()
     status: StatusArray = StatusArray()
