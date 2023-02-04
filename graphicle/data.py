@@ -1508,9 +1508,10 @@ class AdjacencyList(base.AdjacencyBase):
     def __array_wrap__(cls, array: base.AnyVector) -> "AdjacencyList":
         return cls(array)
 
-    def __iter__(self) -> ty.Iterator[ty.Tuple[int, int]]:
+    def __iter__(self) -> ty.Iterator[VertexPair]:
         flat_vals = map(int, it.chain.from_iterable(self._data))
-        yield from zip(*(flat_vals,) * 2, strict=True)  # type: ignore
+        elems = zip(*(flat_vals,) * 2, strict=True)  # type: ignore
+        yield from it.starmap(VertexPair, elems)
 
     def __len__(self) -> int:
         return len(self._data)
