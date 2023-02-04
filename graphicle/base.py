@@ -6,11 +6,10 @@ Defines the base classes, types, and interface protocols used by
 graphicle's modules.
 """
 from abc import ABC, abstractmethod
-from typing import Union, Any, Optional, Protocol
+from typing import Any, Optional, Protocol, TypeVar, Union
 
 import numpy as np
 import numpy.typing as npt
-
 
 __all__ = [
     "DoubleVector",
@@ -20,6 +19,7 @@ __all__ = [
     "HalfIntVector",
     "ObjVector",
     "AnyVector",
+    "DoubleUfunc",
     "EventInterface",
     "ArrayBase",
     "ParticleBase",
@@ -36,6 +36,7 @@ HalfIntVector = npt.NDArray[np.int16]
 ObjVector = npt.NDArray[np.object_]
 AnyVector = npt.NDArray[Any]
 MaskLike = Union["MaskBase", BoolVector]
+DoubleUfunc = TypeVar("DoubleUfunc", DoubleVector, np.float64)
 
 
 class EventInterface(Protocol):

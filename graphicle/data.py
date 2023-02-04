@@ -37,38 +37,37 @@ connectivity into a single graph representation of HEP data.
 For more details, see individual docstrings.
 """
 
-from itertools import zip_longest
+import warnings
+from collections import OrderedDict, abc
 from copy import deepcopy
 from enum import Enum
 from functools import cached_property
-import warnings
-from collections import abc, OrderedDict
+from itertools import zip_longest
 from typing import (
-    Tuple,
-    List,
-    Dict,
-    Optional,
     Any,
-    TypedDict,
-    Union,
-    TypeVar,
-    Type,
-    Iterator,
     Callable,
+    Dict,
+    Iterator,
+    List,
+    Optional,
+    Tuple,
+    Type,
+    TypedDict,
+    TypeVar,
+    Union,
 )
 
-from attr import define, field, Factory, cmp_using, setters  # type: ignore
 import numpy as np
 import numpy.typing as npt
-from scipy.sparse import coo_array
+from attr import Factory, cmp_using, define, field, setters  # type: ignore
 from numpy.lib import recfunctions as rfn
+from rich.console import Console
+from rich.tree import Tree
+from scipy.sparse import coo_array
 from typicle import Types
 from typicle.convert import cast_array
-from rich.tree import Tree
-from rich.console import Console
 
 from . import base
-
 
 __all__ = [
     "MaskAggOp",
@@ -808,11 +807,9 @@ class MomentumArray(base.ArrayBase):
     @cached_property
     def mass(self) -> base.DoubleVector:
         """Mass of particles."""
-        e: base.DoubleVector = self.data["e"]
-        p = self._spatial_mag
-        sq_diff = e * e - p * p
-        sign = np.sign(sq_diff)
-        return sign * np.sqrt(np.abs(sq_diff))  # type: ignore
+        from .calculate import _root_diff_two_squares
+
+        return _root_diff_two_squares(self.data["e"], self._spatial_mag)
 
     def delta_R(self, other: "MomentumArray") -> base.DoubleVector:
         """Calculates the Euclidean inter-particle distances in the

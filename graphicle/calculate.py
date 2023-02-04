@@ -5,29 +5,22 @@
 Algorithms for performing common HEP calculations using graphicle data
 structures.
 """
-from typing import (
-    Tuple,
-    Optional,
-    Set,
-    List,
-    Dict,
-    Callable,
-    Union,
-    Iterable,
-)
-from functools import lru_cache, partial
+import math
 import warnings
+from functools import lru_cache, partial
+from typing import Callable, Dict, Iterable, List, Optional, Set, Tuple, Union
 
+import networkx as nx
+import numba as nb
 import numpy as np
 import numpy.lib.recfunctions as rfn
-from typicle import Types
-import networkx as nx
 import pyjet
 from pyjet import ClusterSequence, PseudoJet
+from typicle import Types
 
 import graphicle as gcl
-from . import base
 
+from . import base
 
 __all__ = [
     "azimuth_centre",
@@ -323,3 +316,32 @@ def cluster_pmu(
         mask[list(map(lambda pcl: pcl.idx, jet))] = True  # type: ignore
         cluster_mask[f"{i}"] = mask
     return cluster_mask
+
+
+@nb.vectorize([nb.float64(nb.float64, nb.float64)])
+def _root_diff_two_squares(
+    x1: base.DoubleUfunc, x2: base.DoubleUfunc
+) -> base.DoubleUfunc:
+    """Numpy ufunc to calculate the square rooted difference of two
+    squares.
+
+    Equivalent to ``sqrt(x1**2 - x2**2)``, element-wise. If `x1` or
+    `x2` is scalar_like (ie. unambiguously cast-able to a scalar type),
+    it is broadcast for use with each element of the other argument.
+
+    Parameters
+    ----------
+    x1, x2 : array_like
+        Double precision floating point, or sequence thereof.
+
+    Returns
+    -------
+    z : ndarray | float
+        Root difference of two squares.
+        This is a scalar if both `x1` and `x2` are scalars.
+    """
+    diff = x1 - x2
+    sign = math.copysign(1, diff)
+    sqrt_diff = sign * math.sqrt(abs(diff))
+    sqrt_sum = math.sqrt(x1 + x2)
+    return sqrt_diff * sqrt_sum  # type: ignore
