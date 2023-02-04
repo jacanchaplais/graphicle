@@ -325,9 +325,14 @@ def _root_diff_two_squares(
     """Numpy ufunc to calculate the square rooted difference of two
     squares.
 
-    Equivalent to ``sqrt(x1**2 - x2**2)``, element-wise. If `x1` or
-    `x2` is scalar_like (ie. unambiguously cast-able to a scalar type),
-    it is broadcast for use with each element of the other argument.
+    Equivalent to ``sign * sqrt(abs(x1**2 - x2**2))``, element-wise.
+    Where `sign` is the +1 or -1 sign associated with the value of the
+    squared difference. This means that root negative squared
+    differences are permitted, but produce negative, rather than
+    imaginary, values.
+    If `x1` or `x2` is scalar_like (ie. unambiguously cast-able to a
+    scalar type), it is broadcast for use with each element of the other
+    argument.
 
     Parameters
     ----------
@@ -341,7 +346,6 @@ def _root_diff_two_squares(
         This is a scalar if both `x1` and `x2` are scalars.
     """
     diff = x1 - x2
-    sign = math.copysign(1, diff)
-    sqrt_diff = sign * math.sqrt(abs(diff))
+    sqrt_diff = math.copysign(math.sqrt(abs(diff)), diff)
     sqrt_sum = math.sqrt(x1 + x2)
     return sqrt_diff * sqrt_sum  # type: ignore
