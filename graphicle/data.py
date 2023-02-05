@@ -966,22 +966,26 @@ class MomentumArray(base.ArrayBase):
     def copy(self) -> "MomentumArray":
         return deepcopy(self)
 
-    @fn.cached_property
+    @property
     def _xy_pol(self) -> base.ComplexVector:
-        return self.data["x"] + 1.0j * self.data["y"]  # type: ignore
+        return self._data[:, :2].view(dtype=np.complex128).reshape(-1)
 
     @fn.cached_property
     def _zt_pol(self) -> base.ComplexVector:
-        return self.data["z"] + 1.0j * self.pt  # type: ignore
+        return (
+            np.stack((self.data["z"], np.abs(self._xy_pol)), axis=-1)
+            .view(dtype=np.complex128)
+            .reshape(-1)
+        )
 
     @fn.cached_property
     def _spatial_mag(self) -> base.DoubleVector:
         return np.abs(self._zt_pol)
 
-    @fn.cached_property
+    @property
     def pt(self) -> base.DoubleVector:
         """Momentum component transverse to the beam-axis."""
-        return np.abs(self._xy_pol)
+        return self._zt_pol.imag
 
     @fn.cached_property
     def eta(self) -> base.DoubleVector:
