@@ -968,13 +968,13 @@ class MomentumArray(base.ArrayBase):
 
     @property
     def _xy_pol(self) -> base.ComplexVector:
-        return self._data[:, :2].view(dtype=np.complex128).reshape(-1)
+        return self._data[:, :2].view(dtype="<c16").reshape(-1)
 
     @fn.cached_property
     def _zt_pol(self) -> base.ComplexVector:
         return (
             np.stack((self.data["z"], np.abs(self._xy_pol)), axis=-1)
-            .view(dtype=np.complex128)
+            .view(dtype="<c16")
             .reshape(-1)
         )
 
