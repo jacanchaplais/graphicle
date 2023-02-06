@@ -60,7 +60,7 @@ def azimuth_centre(pmu: gcl.MomentumArray, pt_weight: bool = True) -> float:
 
 
 def combined_mass(
-    pmu: gcl.MomentumArray | np.ndarray,
+    pmu: gcl.MomentumArray | base.VoidVector,
     weight: base.DoubleVector | None = None,
 ) -> float:
     """Returns the combined mass of the particles represented in the
@@ -114,7 +114,7 @@ def combined_mass(
     return mass
 
 
-def _diffuse(colors: list[np.ndarray], feats: list[np.ndarray]):
+def _diffuse(colors: list[base.AnyVector], feats: list[base.AnyVector]):
     color_shape = colors[0].shape
     av_color = np.zeros((color_shape[0], color_shape[1]), dtype="<f8")
     color_stack = np.dstack(colors)  # len_basis x feat_dim x num_in
@@ -138,7 +138,7 @@ def _trace_vector(
     feat_dim: int,
     is_structured: bool,
     exclusive: bool = False,
-) -> np.ndarray:
+) -> base.AnyVector:
     len_basis = len(basis)
     feat_fmt = rfn.structured_to_unstructured if is_structured else lambda x: x
     color = np.zeros((len_basis, feat_dim), dtype=_types.double)
@@ -147,7 +147,7 @@ def _trace_vector(
         if exclusive is True:
             return color
     in_edges = nx_graph.in_edges(vertex, data=True)
-    colors_in: list[np.ndarray] = []
+    colors_in: list[base.AnyVector] = []
     feats = []
     for edge in in_edges:
         feats.append(feat_fmt(edge[2]["feat"]))
@@ -164,11 +164,11 @@ def _trace_vector(
 
 def flow_trace(
     graph: gcl.Graphicle,
-    mask: base.MaskBase | np.ndarray,
-    prop: base.ArrayBase | np.ndarray,
+    mask: base.MaskBase | base.BoolVector,
+    prop: base.ArrayBase | base.AnyVector,
     exclusive: bool = False,
     target: set[int] | None = None,
-) -> dict[str, np.ndarray]:
+) -> dict[str, base.DoubleVector]:
     """Performs flow tracing from specified particles in an event, back
     to the hard partons.
 
@@ -242,7 +242,7 @@ def flow_trace(
     )
     _trace_vector.cache_clear()
     traces = dict()
-    array_fmt: Callable[[np.ndarray], np.ndarray] = (
+    array_fmt: Callable[[base.AnyVector], base.AnyVector] = (
         partial(rfn.unstructured_to_structured, dtype=dtype)  # type: ignore
         if is_structured
         else lambda x: x.squeeze()
