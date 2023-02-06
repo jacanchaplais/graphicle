@@ -680,6 +680,29 @@ class MaskGroup(base.MaskBase, cla.MutableMapping[str, base.MaskBase]):
         return self.__class__(dict(leaves(self)), "or")  # type: ignore
 
 
+def _array_eq(
+    instance: base.ArrayBase, other: ty.Union[base.ArrayBase, base.AnyVector]
+) -> MaskArray:
+    other_data = other
+    dtype = instance.data.dtype
+    if isinstance(other, base.ArrayBase):
+        other_data = other.data
+    elif (dtype.type == np.void) and not (
+        isinstance(other, np.ndarray) and (other.dtype == np.void)
+    ):
+        dt_set = set(map(op.itemgetter(1), dtype.descr))
+        assert len(dt_set) == 1
+        if (not isinstance(other, cla.Sequence)) or (
+            len(other) != len(dtype.names)  # type: ignore
+        ):
+            raise ValueError(
+                f"Cannot compare {other} against {instance.__class__.__name__}"
+                ", incompatible shape or type."
+            )
+        other_data = np.array(other, dtype=dt_set.pop()).view(dtype)
+    return MaskArray(instance.data == other_data)
+
+
 ############################
 # PDG STORAGE AND QUERYING #
 ############################
@@ -758,6 +781,11 @@ class PdgArray(base.ArrayBase):
 
     def __bool__(self) -> bool:
         return _truthy(self)
+
+    def __eq__(
+        self, other: ty.Union[base.ArrayBase, base.AnyVector]
+    ) -> MaskArray:
+        return _array_eq(self, other)
 
     def __getitem__(self, key) -> "PdgArray":
         if isinstance(key, base.MaskBase):
@@ -961,6 +989,11 @@ class MomentumArray(base.ArrayBase):
     def __bool__(self) -> bool:
         return _truthy(self)
 
+    def __eq__(
+        self, other: ty.Union[base.ArrayBase, base.AnyVector]
+    ) -> MaskArray:
+        return _array_eq(self, other)
+
     def copy(self) -> "MomentumArray":
         return deepcopy(self)
 
@@ -1133,6 +1166,11 @@ class ColorArray(base.ArrayBase):
     def __bool__(self) -> bool:
         return _truthy(self)
 
+    def __eq__(
+        self, other: ty.Union[base.ArrayBase, base.AnyVector]
+    ) -> MaskArray:
+        return _array_eq(self, other)
+
 
 ####################
 # HELICITY STORAGE #
@@ -1205,6 +1243,11 @@ class HelicityArray(base.ArrayBase):
     def __bool__(self) -> bool:
         return _truthy(self)
 
+    def __eq__(
+        self, other: ty.Union[base.ArrayBase, base.AnyVector]
+    ) -> MaskArray:
+        return _array_eq(self, other)
+
 
 ####################################
 # STATUS CODE STORAGE AND QUERYING #
@@ -1268,6 +1311,11 @@ class StatusArray(base.ArrayBase):
 
     def __bool__(self) -> bool:
         return _truthy(self)
+
+    def __eq__(
+        self, other: ty.Union[base.ArrayBase, base.AnyVector]
+    ) -> MaskArray:
+        return _array_eq(self, other)
 
     @property
     def data(self) -> base.HalfIntVector:
