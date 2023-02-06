@@ -57,7 +57,7 @@ from rich.tree import Tree
 from scipy.sparse import coo_array
 from typicle import Types
 
-from . import base
+from . import base, calculate
 
 __all__ = [
     "MaskAggOp",
@@ -1020,9 +1020,9 @@ class MomentumArray(base.ArrayBase):
     @fn.cached_property
     def mass(self) -> base.DoubleVector:
         """Mass of particles."""
-        from .calculate import _root_diff_two_squares
-
-        return _root_diff_two_squares(self.data["e"], self._spatial_mag)
+        return calculate._root_diff_two_squares(
+            self.data["e"], self._spatial_mag
+        )
 
     def delta_R(self, other: "MomentumArray") -> base.DoubleVector:
         """Calculates the Euclidean inter-particle distances in the

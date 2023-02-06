@@ -5,10 +5,12 @@
 Algorithms for performing common HEP calculations using graphicle data
 structures.
 """
+from __future__ import annotations
+
 import math
 import warnings
 from functools import lru_cache, partial
-from typing import Callable, Dict, Iterable, List, Optional, Set, Tuple, Union
+from typing import Callable, Iterable
 
 import networkx as nx
 import numba as nb
@@ -58,8 +60,8 @@ def azimuth_centre(pmu: gcl.MomentumArray, pt_weight: bool = True) -> float:
 
 
 def combined_mass(
-    pmu: Union[gcl.MomentumArray, np.ndarray],
-    weight: Optional[base.DoubleVector] = None,
+    pmu: gcl.MomentumArray | np.ndarray,
+    weight: base.DoubleVector | None = None,
 ) -> float:
     """Returns the combined mass of the particles represented in the
     provided MomentumArray.
@@ -112,7 +114,7 @@ def combined_mass(
     return mass
 
 
-def _diffuse(colors: List[np.ndarray], feats: List[np.ndarray]):
+def _diffuse(colors: list[np.ndarray], feats: list[np.ndarray]):
     color_shape = colors[0].shape
     av_color = np.zeros((color_shape[0], color_shape[1]), dtype="<f8")
     color_stack = np.dstack(colors)  # len_basis x feat_dim x num_in
@@ -132,7 +134,7 @@ def _diffuse(colors: List[np.ndarray], feats: List[np.ndarray]):
 def _trace_vector(
     nx_graph: nx.DiGraph,
     vertex: int,
-    basis: Tuple[int, ...],
+    basis: tuple[int, ...],
     feat_dim: int,
     is_structured: bool,
     exclusive: bool = False,
@@ -145,7 +147,7 @@ def _trace_vector(
         if exclusive is True:
             return color
     in_edges = nx_graph.in_edges(vertex, data=True)
-    colors_in: List[np.ndarray] = []
+    colors_in: list[np.ndarray] = []
     feats = []
     for edge in in_edges:
         feats.append(feat_fmt(edge[2]["feat"]))
@@ -162,11 +164,11 @@ def _trace_vector(
 
 def flow_trace(
     graph: gcl.Graphicle,
-    mask: Union[base.MaskBase, np.ndarray],
-    prop: Union[base.ArrayBase, np.ndarray],
+    mask: base.MaskBase | np.ndarray,
+    prop: base.ArrayBase | np.ndarray,
     exclusive: bool = False,
-    target: Optional[Set[int]] = None,
-) -> Dict[str, np.ndarray]:
+    target: set[int] | None = None,
+) -> dict[str, np.ndarray]:
     """Performs flow tracing from specified particles in an event, back
     to the hard partons.
 
@@ -255,8 +257,8 @@ def cluster_pmu(
     pmu: gcl.MomentumArray,
     radius: float,
     p_val: float,
-    pt_cut: Optional[float] = None,
-    eta_cut: Optional[float] = None,
+    pt_cut: float | None = None,
+    eta_cut: float | None = None,
 ) -> gcl.MaskGroup:
     """Clusters particles using the generalised-kt algorithm.
 
