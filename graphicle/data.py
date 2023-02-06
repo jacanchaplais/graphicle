@@ -942,8 +942,6 @@ class MomentumArray(base.ArrayBase):
     def __array_wrap__(cls, array: base.AnyVector) -> "MomentumArray":
         return cls(array)
 
-    # def __array_ufunc__(self, ufunc, method: str, *inputs, **kwargs):
-
     def __iter__(self) -> ty.Iterator[MomentumElement]:
         flat_vals = map(float, self._data.flatten())
         elems = zip(*(flat_vals,) * 4, strict=True)  # type: ignore
