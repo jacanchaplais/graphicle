@@ -369,6 +369,9 @@ class MaskArray(base.MaskBase, base.ArrayBase):
     def __array_wrap__(cls, array: base.BoolVector) -> "MaskArray":
         return cls(array)
 
+    def __array_ufunc__(self, ufunc, method, *inputs, **kwargs):
+        return _array_ufunc(self, ufunc, method, *inputs, **kwargs)
+
     def __iter__(self) -> ty.Iterator[bool]:
         yield from map(bool, self.data)
 
