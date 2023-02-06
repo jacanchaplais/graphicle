@@ -67,10 +67,12 @@ __all__ = [
     "MomentumArray",
     "MomentumElement",
     "ColorArray",
+    "ColorElement",
     "HelicityArray",
     "StatusArray",
     "ParticleSet",
     "AdjacencyList",
+    "VertexPair",
     "Graphicle",
 ]
 
