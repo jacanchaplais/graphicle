@@ -41,7 +41,7 @@ import collections as cl
 import collections.abc as cla
 import functools as fn
 import itertools as it
-import numbers as nb
+import numbers as nm
 import operator as op
 import typing as ty
 import warnings
@@ -181,6 +181,43 @@ def _array_ufunc(
         return class_type(result)
 
 
+def _array_eq_prep(
+    instance: base.ArrayBase, other: ty.Union[base.ArrayBase, base.AnyVector]
+) -> ty.Tuple[base.AnyVector, base.AnyVector]:
+    other_data = other
+    dtype = instance.data.dtype
+    if isinstance(other, base.ArrayBase):
+        other_data = other.data
+    elif (dtype.type == np.void) and not (
+        isinstance(other, np.ndarray) and (other.dtype == np.void)
+    ):
+        dt_set = set(map(op.itemgetter(1), dtype.descr))
+        assert len(dt_set) == 1
+        if (not isinstance(other, cla.Sequence)) or (
+            len(other) != len(dtype.names)  # type: ignore
+        ):
+            raise ValueError(
+                f"Cannot compare {other} against {instance.__class__.__name__}"
+                ", incompatible shape or type."
+            )
+        other_data = np.array(other, dtype=dt_set.pop()).view(dtype)
+    return instance.data, other_data  # type: ignore
+
+
+def _array_eq(
+    instance: base.ArrayBase, other: ty.Union[base.ArrayBase, base.AnyVector]
+) -> "MaskArray":
+    x, y = _array_eq_prep(instance, other)
+    return MaskArray(x == y)
+
+
+def _array_ne(
+    instance: base.ArrayBase, other: ty.Union[base.ArrayBase, base.AnyVector]
+) -> "MaskArray":
+    x, y = _array_eq_prep(instance, other)
+    return MaskArray(x != y)
+
+
 def _array_repr(instance: base.ArrayBase) -> str:
     data_str = str(instance._data)
     data_splits = data_str.split("\n")
@@ -315,11 +352,15 @@ class MaskArray(base.MaskBase, base.ArrayBase):
         MaskArray(data=array([False,  True, False]))
     """
 
-    data: base.BoolVector = array_field("bool")
+    _data: base.BoolVector = _array_field("<?")
+    dtype: np.dtype = field(init=False, repr=False)
     __array_interface__: ty.Dict[str, ty.Any] = field(init=False, repr=False)
+    _HANDLED_TYPES: ty.Tuple[ty.Type, ...] = field(init=False, repr=False)
 
     def __attrs_post_init__(self):
-        self.__array_interface__ = self.data.__array_interface__
+        self.dtype = self._data.dtype
+        self.__array_interface__ = self._data.__array_interface__
+        self._HANDLED_TYPES = (np.ndarray, nm.Number, cla.Sequence)
 
     def __array__(self) -> base.BoolVector:
         return self.data
@@ -333,6 +374,9 @@ class MaskArray(base.MaskBase, base.ArrayBase):
 
     def copy(self) -> "MaskArray":
         return deepcopy(self)
+
+    def __repr__(self) -> str:
+        return _array_repr(self)
 
     def __getitem__(self, key) -> "MaskArray":
         if isinstance(key, base.MaskBase):
@@ -382,6 +426,16 @@ class MaskArray(base.MaskBase, base.ArrayBase):
 
     def __bool__(self) -> bool:
         return _truthy(self)
+
+    @property
+    def data(self) -> base.BoolVector:
+        return self._data
+
+    @data.setter
+    def data(
+        self, values: ty.Union[base.BoolVector, ty.Sequence[bool]]
+    ) -> None:
+        self._data = values  # type: ignore
 
 
 def _mask_compat(*masks: base.MaskLike) -> bool:
@@ -682,43 +736,6 @@ class MaskGroup(base.MaskBase, cla.MutableMapping[str, base.MaskBase]):
         return self.__class__(dict(leaves(self)), "or")  # type: ignore
 
 
-def _array_eq_prep(
-    instance: base.ArrayBase, other: ty.Union[base.ArrayBase, base.AnyVector]
-) -> ty.Tuple[base.AnyVector, base.AnyVector]:
-    other_data = other
-    dtype = instance.data.dtype
-    if isinstance(other, base.ArrayBase):
-        other_data = other.data
-    elif (dtype.type == np.void) and not (
-        isinstance(other, np.ndarray) and (other.dtype == np.void)
-    ):
-        dt_set = set(map(op.itemgetter(1), dtype.descr))
-        assert len(dt_set) == 1
-        if (not isinstance(other, cla.Sequence)) or (
-            len(other) != len(dtype.names)  # type: ignore
-        ):
-            raise ValueError(
-                f"Cannot compare {other} against {instance.__class__.__name__}"
-                ", incompatible shape or type."
-            )
-        other_data = np.array(other, dtype=dt_set.pop()).view(dtype)
-    return instance.data, other_data  # type: ignore
-
-
-def _array_eq(
-    instance: base.ArrayBase, other: ty.Union[base.ArrayBase, base.AnyVector]
-) -> MaskArray:
-    x, y = _array_eq_prep(instance, other)
-    return MaskArray(x == y)
-
-
-def _array_ne(
-    instance: base.ArrayBase, other: ty.Union[base.ArrayBase, base.AnyVector]
-) -> MaskArray:
-    x, y = _array_eq_prep(instance, other)
-    return MaskArray(x != y)
-
-
 ############################
 # PDG STORAGE AND QUERYING #
 ############################
@@ -774,7 +791,7 @@ class PdgArray(base.ArrayBase):
         self.__mega_to_giga: float = 1.0e-3
         self.__array_interface__ = self._data.__array_interface__
         self.dtype = self._data.dtype
-        self._HANDLED_TYPES = (np.ndarray, nb.Number, cla.Sequence)
+        self._HANDLED_TYPES = (np.ndarray, nm.Number, cla.Sequence)
 
     @classmethod
     def __array_wrap__(cls, array: base.IntVector) -> "PdgArray":
@@ -802,6 +819,11 @@ class PdgArray(base.ArrayBase):
         self, other: ty.Union[base.ArrayBase, base.AnyVector]
     ) -> MaskArray:
         return _array_eq(self, other)
+
+    def __ne__(
+        self, other: ty.Union[base.ArrayBase, base.AnyVector]
+    ) -> MaskArray:
+        return _array_ne(self, other)
 
     def __getitem__(self, key) -> "PdgArray":
         if isinstance(key, base.MaskBase):
@@ -966,7 +988,7 @@ class MomentumArray(base.ArrayBase):
     def __attrs_post_init__(self):
         self.dtype = np.dtype(list(zip("xyze", it.repeat("<f8"))))
         self.__array_interface__ = self._data.__array_interface__
-        self._HANDLED_TYPES = (np.ndarray, nb.Number, cla.Sequence)
+        self._HANDLED_TYPES = (np.ndarray, nm.Number, cla.Sequence)
 
     def __array_ufunc__(self, ufunc, method, *inputs, **kwargs):
         return _array_ufunc(self, ufunc, method, *inputs, **kwargs)
@@ -1009,6 +1031,11 @@ class MomentumArray(base.ArrayBase):
         self, other: ty.Union[base.ArrayBase, base.AnyVector]
     ) -> MaskArray:
         return _array_eq(self, other)
+
+    def __ne__(
+        self, other: ty.Union[base.ArrayBase, base.AnyVector]
+    ) -> MaskArray:
+        return _array_ne(self, other)
 
     def copy(self) -> "MomentumArray":
         return deepcopy(self)
@@ -1140,7 +1167,7 @@ class ColorArray(base.ArrayBase):
         self.dtype = np.dtype(
             list(zip(("color", "anticolor"), it.repeat("<i4")))
         )
-        self._HANDLED_TYPES = (np.ndarray, nb.Number, cla.Sequence)
+        self._HANDLED_TYPES = (np.ndarray, nm.Number, cla.Sequence)
 
     def __array_ufunc__(self, ufunc, method, *inputs, **kwargs):
         return _array_ufunc(self, ufunc, method, *inputs, **kwargs)
@@ -1187,6 +1214,11 @@ class ColorArray(base.ArrayBase):
     ) -> MaskArray:
         return _array_eq(self, other)
 
+    def __ne__(
+        self, other: ty.Union[base.ArrayBase, base.AnyVector]
+    ) -> MaskArray:
+        return _array_ne(self, other)
+
 
 ####################
 # HELICITY STORAGE #
@@ -1218,7 +1250,7 @@ class HelicityArray(base.ArrayBase):
     def __attrs_post_init__(self):
         self.__array_interface__ = self._data.__array_interface__
         self.dtype = self._data.dtype
-        self._HANDLED_TYPES = (np.ndarray, nb.Number, cla.Sequence)
+        self._HANDLED_TYPES = (np.ndarray, nm.Number, cla.Sequence)
 
     def __array_ufunc__(self, ufunc, method, *inputs, **kwargs):
         return _array_ufunc(self, ufunc, method, *inputs, **kwargs)
@@ -1264,6 +1296,11 @@ class HelicityArray(base.ArrayBase):
     ) -> MaskArray:
         return _array_eq(self, other)
 
+    def __ne__(
+        self, other: ty.Union[base.ArrayBase, base.AnyVector]
+    ) -> MaskArray:
+        return _array_ne(self, other)
+
 
 ####################################
 # STATUS CODE STORAGE AND QUERYING #
@@ -1299,7 +1336,7 @@ class StatusArray(base.ArrayBase):
     def __attrs_post_init__(self):
         self.__array_interface__ = self._data.__array_interface__
         self.dtype = self._data.dtype
-        self._HANDLED_TYPES = (np.ndarray, nb.Number, cla.Sequence)
+        self._HANDLED_TYPES = (np.ndarray, nm.Number, cla.Sequence)
 
     def __array_ufunc__(self, ufunc, method, *inputs, **kwargs):
         return _array_ufunc(self, ufunc, method, *inputs, **kwargs)
@@ -1332,6 +1369,11 @@ class StatusArray(base.ArrayBase):
         self, other: ty.Union[base.ArrayBase, base.AnyVector]
     ) -> MaskArray:
         return _array_eq(self, other)
+
+    def __ne__(
+        self, other: ty.Union[base.ArrayBase, base.AnyVector]
+    ) -> MaskArray:
+        return _array_ne(self, other)
 
     @property
     def data(self) -> base.HalfIntVector:

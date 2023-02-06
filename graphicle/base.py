@@ -6,8 +6,8 @@ Defines the base classes, types, and interface protocols used by
 graphicle's modules.
 """
 import collections.abc as cla
+import typing as ty
 from abc import ABC, abstractmethod
-from typing import Any, Optional, Protocol, TypeVar, Union
 
 import numpy as np
 import numpy.typing as npt
@@ -36,13 +36,14 @@ BoolVector = npt.NDArray[np.bool_]
 IntVector = npt.NDArray[np.int32]
 HalfIntVector = npt.NDArray[np.int16]
 ObjVector = npt.NDArray[np.object_]
-AnyVector = npt.NDArray[Any]
+AnyVector = npt.NDArray[ty.Any]
 VoidVector = npt.NDArray[np.void]
-MaskLike = Union["MaskBase", BoolVector]
-DoubleUfunc = TypeVar("DoubleUfunc", DoubleVector, np.float64)
+MaskLike = ty.Union["MaskBase", BoolVector]
+DoubleUfunc = ty.TypeVar("DoubleUfunc", DoubleVector, np.float64)
+DataType = ty.TypeVar("DataType")
 
 
-class EventInterface(Protocol):
+class EventInterface(ty.Protocol):
     """Defines the interface for a generic event object expected by
     graphicle's routines. Attributes are stored as numpy arrays, with
     each element corresponding to a particle in an event. Attributes
@@ -100,12 +101,12 @@ class EventInterface(Protocol):
 
 class ArrayBase(ABC, cla.Sequence, np.lib.mixins.NDArrayOperatorsMixin):
     @abstractmethod
-    def __init__(self, data: Optional[AnyVector] = None) -> None:
+    def __init__(self, data: ty.Optional[AnyVector] = None) -> None:
         pass
 
     @abstractmethod
-    def __len__(self) -> int:
-        """Number of elements in array."""
+    def __iter__(self) -> ty.Iterator[ty.Any]:
+        """Iterator exposing contained data as Python native."""
 
     @abstractmethod
     def __bool__(self) -> bool:
@@ -114,6 +115,24 @@ class ArrayBase(ABC, cla.Sequence, np.lib.mixins.NDArrayOperatorsMixin):
     @abstractmethod
     def __array__(self) -> AnyVector:
         """Numpy array representation of the data."""
+
+    @property
+    @abstractmethod
+    def dtype(self) -> AnyVector:
+        """Numpy array representation of the data."""
+
+    @abstractmethod
+    def __eq__(self) -> "MaskBase":
+        """Equality comparison."""
+
+    @abstractmethod
+    def __ne__(self) -> "MaskBase":
+        """Non equality comparison."""
+
+    @property
+    @abstractmethod
+    def _data(self) -> AnyVector:
+        pass
 
     @property
     @abstractmethod
@@ -201,7 +220,7 @@ class MaskBase(ABC):
         pass
 
     @abstractmethod
-    def __array__(self) -> npt.NDArray[Any]:
+    def __array__(self) -> npt.NDArray[ty.Any]:
         """Numpy array representation of the data."""
 
     @abstractmethod
