@@ -172,6 +172,8 @@ def _array_ufunc(
     elif method == "at":
         # no return value
         return None
+    elif isinstance(result, np.ndarray) and (result.dtype == np.bool_):
+        return MaskArray(result)
     else:
         # one return value
         if not result.shape or kwargs.get("axis", None) == 1:
@@ -680,9 +682,9 @@ class MaskGroup(base.MaskBase, cla.MutableMapping[str, base.MaskBase]):
         return self.__class__(dict(leaves(self)), "or")  # type: ignore
 
 
-def _array_eq(
+def _array_eq_prep(
     instance: base.ArrayBase, other: ty.Union[base.ArrayBase, base.AnyVector]
-) -> MaskArray:
+) -> ty.Tuple[base.AnyVector, base.AnyVector]:
     other_data = other
     dtype = instance.data.dtype
     if isinstance(other, base.ArrayBase):
@@ -700,7 +702,21 @@ def _array_eq(
                 ", incompatible shape or type."
             )
         other_data = np.array(other, dtype=dt_set.pop()).view(dtype)
-    return MaskArray(instance.data == other_data)
+    return instance.data, other_data  # type: ignore
+
+
+def _array_eq(
+    instance: base.ArrayBase, other: ty.Union[base.ArrayBase, base.AnyVector]
+) -> MaskArray:
+    x, y = _array_eq_prep(instance, other)
+    return MaskArray(x == y)
+
+
+def _array_ne(
+    instance: base.ArrayBase, other: ty.Union[base.ArrayBase, base.AnyVector]
+) -> MaskArray:
+    x, y = _array_eq_prep(instance, other)
+    return MaskArray(x != y)
 
 
 ############################
