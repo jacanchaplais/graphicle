@@ -67,10 +67,12 @@ __all__ = [
     "MomentumArray",
     "MomentumElement",
     "ColorArray",
+    "ColorElement",
     "HelicityArray",
     "StatusArray",
     "ParticleSet",
     "AdjacencyList",
+    "VertexPair",
     "Graphicle",
 ]
 
@@ -108,7 +110,10 @@ _EDGE_ORDER = ("in", "out")
 
 
 class MomentumElement(ty.NamedTuple):
-    """Named tuple container for the momentum of a single particle."""
+    """Named tuple container for the momentum of a single particle.
+
+    :group: datastructure
+    """
 
     x: float
     y: float
@@ -119,6 +124,8 @@ class MomentumElement(ty.NamedTuple):
 class ColorElement(ty.NamedTuple):
     """Named tuple container for the color / anticolor pair of a single
     particle.
+
+    :group: datastructure
     """
 
     color: int
@@ -128,6 +135,8 @@ class ColorElement(ty.NamedTuple):
 class VertexPair(ty.NamedTuple):
     """Named tuple container for the color / anticolor pair of a single
     particle.
+
+    :group: datastructure
     """
 
     src: int
