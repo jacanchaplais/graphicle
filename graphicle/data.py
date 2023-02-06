@@ -1020,11 +1020,9 @@ class MomentumArray(base.ArrayBase):
     @fn.cached_property
     def mass(self) -> base.DoubleVector:
         """Mass of particles."""
-        e: base.DoubleVector = self.data["e"]
-        p = self._spatial_mag
-        sq_diff = e * e - p * p
-        sign = np.sign(sq_diff)
-        return sign * np.sqrt(np.abs(sq_diff))  # type: ignore
+        from .calculate import _root_diff_two_squares
+
+        return _root_diff_two_squares(self.data["e"], self._spatial_mag)
 
     def delta_R(self, other: "MomentumArray") -> base.DoubleVector:
         """Calculates the Euclidean inter-particle distances in the

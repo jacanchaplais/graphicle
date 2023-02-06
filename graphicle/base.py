@@ -7,7 +7,7 @@ graphicle's modules.
 """
 import collections.abc as cla
 from abc import ABC, abstractmethod
-from typing import Any, Optional, Protocol, Union
+from typing import Any, Optional, Protocol, TypeVar, Union
 
 import numpy as np
 import numpy.typing as npt
@@ -21,6 +21,7 @@ __all__ = [
     "ObjVector",
     "AnyVector",
     "VoidVector",
+    "DoubleUfunc",
     "EventInterface",
     "ArrayBase",
     "ParticleBase",
@@ -38,6 +39,7 @@ ObjVector = npt.NDArray[np.object_]
 AnyVector = npt.NDArray[Any]
 VoidVector = npt.NDArray[np.void]
 MaskLike = Union["MaskBase", BoolVector]
+DoubleUfunc = TypeVar("DoubleUfunc", DoubleVector, np.float64)
 
 
 class EventInterface(Protocol):
