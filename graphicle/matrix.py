@@ -75,7 +75,7 @@ def cut_adj(
     else:
         np.fill_diagonal(adj, 1.0)
     if weighted is False:
-        adj = adj.astype(_types.bool)
+        adj = adj.astype("<?")
     return adj
 
 
