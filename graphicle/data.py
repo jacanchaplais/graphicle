@@ -363,12 +363,6 @@ def _truthy(data: ty.Union[base.ArrayBase, base.AdjacencyBase]) -> bool:
 ##################################
 # COMPOSITE MASK DATA STRUCTURES #
 ##################################
-class MaskAggOp(Enum):
-    AND = "and"
-    OR = "or"
-    NONE = None
-
-
 @define
 class MaskArray(base.MaskBase, base.ArrayBase):
     """Boolean mask over Graphicle data structures.
@@ -565,6 +559,15 @@ def _mask_dict_convert(masks: _IN_MASK_DICT) -> _MASK_DICT:
     return out_masks
 
 
+class MaskAggOp(Enum):
+    AND = "and"
+    OR = "or"
+    NONE = "none"
+
+
+AggStringLiterals = ty.Literal["or", "and", "none"]
+
+
 @define
 class MaskGroup(base.MaskBase, cla.MutableMapping[str, base.MaskBase]):
     """Data structure to compose groups of masks over particle arrays.
@@ -578,18 +581,17 @@ class MaskGroup(base.MaskBase, cla.MutableMapping[str, base.MaskBase]):
         Dictionary of MaskArray objects to be composed.
     agg_op : str or MaskAggOp
         Defines the aggregation operation when accessing the `data`
-        attribute. Options include "and" and "or".
-        Default is "and".
+        attribute. Options are "and", "or", "none". Default is "and".
 
     Attributes
     ----------
-    data : np.ndarray
+    data : ndarray[bool_]
         Combination of all masks in group via bitwise AND reduction.
     names : list[str]
         Provides the string values of the keys to the top-level nested
         ``MaskBase`` objects as a list. Will be deprecated in future.
         ``MaskGroup.keys()`` is preferred.
-    bitwise_or : np.ndarray[bool_]
+    bitwise_or : ndarray[bool_]
         Bitwise ``OR`` reduction over the nested masks.
     bitwise_or : np.ndarray[bool_]
         Bitwise ``AND`` reduction over the nested masks.
@@ -609,7 +611,18 @@ class MaskGroup(base.MaskBase, cla.MutableMapping[str, base.MaskBase]):
     _mask_arrays: _MASK_DICT = field(
         repr=False, factory=dict, converter=_mask_dict_convert
     )
-    agg_op: MaskAggOp = field(converter=MaskAggOp, default=MaskAggOp.AND)
+    _agg_op: AggStringLiterals = field(
+        default="and",
+        converter=lambda x: x.value if isinstance(x, MaskAggOp) else x,
+    )
+
+    @property
+    def agg_op(self) -> MaskAggOp:
+        return MaskAggOp(self._agg_op.lower())
+
+    @agg_op.setter
+    def agg_op(self, agg_op: AggStringLiterals) -> None:
+        self._agg_op = agg_op
 
     @classmethod
     def from_numpy_structured(cls, arr: np.ndarray) -> "MaskGroup":
@@ -661,7 +674,7 @@ class MaskGroup(base.MaskBase, cla.MutableMapping[str, base.MaskBase]):
             the ``MaskGroup`` whose components each individually have
             the passed slice applied.
         """
-        agg = self.agg_op
+        agg = self._agg_op
         if isinstance(key, list):
             return self.__class__(
                 cl.OrderedDict({k: self._mask_arrays[k] for k in key}), agg
@@ -1503,7 +1516,7 @@ class StatusArray(base.ArrayBase):
                 "outgoing": data == 23,
                 "outgoing_nonperturbative_diffraction": data == 24,
             },
-            agg_op=MaskAggOp.OR,
+            agg_op="or",
         )
         return masks
 
