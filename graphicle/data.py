@@ -153,10 +153,36 @@ def _array_ufunc(
     **kwargs: ty.Dict[str, ty.Any],
 ) -> ty.Optional[
     ty.Union[
-        ty.Tuple[ty.Union[DataType, base.AnyVector]],
-        ty.Union[DataType, base.AnyVector],
+        ty.Tuple[ty.Union[DataType, base.AnyVector, "MaskArray"], ...],
+        ty.Union[DataType, base.AnyVector, "MaskArray"],
     ]
 ]:
+    """Defines the behaviour of ``ArrayBase`` objects when passed to a
+    numpy ufunc.
+
+    Parameters
+    ----------
+    instance : ArrayBase
+        Array object defined by graphicle.
+    ufunc : callable
+        Numpy ufunc being called on ``instance``.
+    method : str
+        Method applied to ``ufunc``, eg. 'reduce' for ``np.add.reduce``,
+        of which ``np.sum`` is an alias.
+    *inputs : tuple[Any]
+        Positional arguments of the ufunc.
+    **kwargs : dict[str, Any]
+        Keyword arguments of the ufunc.
+
+    Returns
+    -------
+    output : arrays or scalars, or tuple thereof, or None
+        Output of passed ufunc. Type depends on ``method``, ``inputs``,
+        and ``instance``. If ``method`` is 'reduce' on ``instance``
+        with a flat underlying array, then ``output`` will be scalar.
+        If ``ufunc`` maps an array to booleans, ``output`` will be a
+        ``MaskArray``.
+    """
     out = kwargs.get("out", ())
     class_type = instance.__class__
     for x in inputs + out:  # type: ignore
@@ -193,6 +219,9 @@ def _array_ufunc(
 def _array_eq_prep(
     instance: base.ArrayBase, other: ty.Union[base.ArrayBase, base.AnyVector]
 ) -> ty.Tuple[base.AnyVector, base.AnyVector]:
+    """Ensures that the two objects being prepared for comparison are
+    compatible, enabling numpy's vectorised equality operation.
+    """
     other_data = other
     dtype = instance.data.dtype
     if isinstance(other, base.ArrayBase):
@@ -228,6 +257,9 @@ def _array_ne(
 
 
 def _array_repr(instance: base.ArrayBase) -> str:
+    """Provides a common string representation for ``ArrayBase``
+    implementations.
+    """
     data_str = str(instance._data)
     data_splits = data_str.split("\n")
     first_str = data_splits.pop(0)
@@ -268,6 +300,10 @@ def array_field(type_name: str):
 
 
 def _reorder_pmu(array: base.VoidVector) -> base.VoidVector:
+    """Ensures passed structured arrays of 4-momenta have their fields
+    mapped in the same order as graphicle's ``MomentumArray`` underlying
+    convention.
+    """
     names = array.dtype.names
     assert names is not None
     if names == _MOMENTUM_ORDER:
