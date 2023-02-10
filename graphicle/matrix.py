@@ -1,12 +1,12 @@
-from typing import Optional
+from typing import Literal, Optional
 
 import numpy as np
 import numpy.typing as npt
 from typicle import Types
 
 import graphicle as gcl
-from . import base
 
+from . import base
 
 __all__ = ["cut_adj", "knn_adj", "fc_adj", "delta_R_aff"]
 
@@ -16,7 +16,7 @@ _types = Types()
 def cut_adj(
     matrix: base.DoubleVector,
     cut: float,
-    mode: str = "max",
+    mode: Literal["max", "min"] = "max",
     self_loop: bool = False,
     weighted: bool = False,
 ) -> base.DoubleVector:
@@ -148,7 +148,7 @@ def knn_adj(
 
 
 def fc_adj(
-    num_nodes: int, self_loop: bool = False, dtype: npt.DTypeLike = _types.bool
+    num_nodes: int, self_loop: bool = False, dtype: npt.DTypeLike = "<?"
 ) -> base.DoubleVector:
     """Create a fully connected adjacency matrix.
 
@@ -200,6 +200,35 @@ def parton_hadron_distance(
     hadron_pmu: gcl.MomentumArray,
     pt_exp: float = -0.1,
 ) -> base.DoubleVector:
+    """Calculates pairwise transverse-momentum (pt) weighted distances
+    between two sets of 4-momenta. The pt weighting is raised to the
+    power given by ``pt_exp``.
+
+    Parameters
+    ----------
+    parton_pmu, hadron_pmu : MomentumArray
+        Sets of 4-momenta for which to calculate the pairwise delta R.
+    pt_exp : float
+        Power associated with pt weighting. Default is ``-0.1``.
+
+    Returns
+    -------
+    dists : ndarray[double]
+        Distance matrix between ``parton_pmu`` and ``hadron_pmu``,
+        whose number of rows and columns equal to the input sizes,
+        respectively.
+
+    Notes
+    -----
+    If using this function as a distance strategy when forming clusters,
+    non-negative values of ``pt_exp`` will result in an IR unsafe
+    algorithm.
+
+    This function was created to be a distance strategy for
+    ``select.partition_descendants()``. The intent of these routines
+    has not yet fully stabilised, so the implementation and function
+    signature may change in future releases.
+    """
     dR = parton_pmu.delta_R(hadron_pmu)
     pt_weight = np.power(parton_pmu.pt, pt_exp)
     return pt_weight[:, np.newaxis] * dR
