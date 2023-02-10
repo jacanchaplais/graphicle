@@ -277,9 +277,52 @@ def _reorder_pmu(array: base.VoidVector) -> base.VoidVector:
     return array[name_reorder]
 
 
-def _array_field(dtype: npt.DTypeLike, num_cols: int = 1, repr: bool = True):
+def _row_contiguous(func: ty.Callable[..., base.AnyVector]):
+    """Decorator to ensure that numpy arrays returned from functions are
+    row-contiguous.
+
+    Parameters
+    ----------
+    func : callable returning ndarray
+
+    Notes
+    -----
+    In general, graphicle tries to avoid memory copying. Instead, views
+    on the underlying data are used where possible. However, when
+    interfacing with a vendor which provides numpy arrays which are
+    column-contiguous, such as pandas, the assumed row-layout views will
+    fail. In these cases, the data will be copied into row-contiguous
+    arrays before returning. If already row-contiguous, the original
+    array is returned with no copying.
+    """
+
+    @fn.wraps(func)
+    def inner(*args, **kwargs):
+        return np.ascontiguousarray(func(*args, **kwargs))
+
+    return inner
+
+
+def _array_field(dtype: npt.DTypeLike, num_cols: int = 1):
+    """Abstracts out the dataclass field constructor for wrapped arrays,
+    providing standardised data cleaning, conversion, and comparison.
+
+    Parameters
+    ----------
+    dtype : dtype-like
+        Data type the underlying array should have. This should not be
+        a structured type, as these should be exposed to the user via
+        views.
+    num_cols : int
+        The number of columns the wrapped array will have.
+
+    Returns
+    -------
+    field : dataclass field
+    """
     dtype = np.dtype(dtype)
 
+    @_row_contiguous
     def converter(values: npt.ArrayLike) -> base.AnyVector:
         if isinstance(values, np.ndarray) and values.dtype.type == np.void:
             names = values.dtype.names
@@ -289,9 +332,10 @@ def _array_field(dtype: npt.DTypeLike, num_cols: int = 1, repr: bool = True):
             values = rfn.structured_to_unstructured(values)
         array = np.asarray(values, dtype=dtype)
         shape = array.shape
-        is_flat = len(shape) == 1
+        len_shape = len(shape)
+        is_flat = (len_shape == 1) or (len_shape == 0)
         if is_flat and (num_cols == 1):
-            return array
+            return array.reshape(-1)
         cols = shape[0] if is_flat else shape[1]
         not_empty = array.shape[0] != 0
         if not_empty and (cols != num_cols):
@@ -305,11 +349,12 @@ def _array_field(dtype: npt.DTypeLike, num_cols: int = 1, repr: bool = True):
         converter=converter,
         eq=cmp_using(np.array_equal),
         on_setattr=setters.convert,
-        repr=repr,
+        repr=False,
     )
 
 
 def _truthy(data: ty.Union[base.ArrayBase, base.AdjacencyBase]) -> bool:
+    """Defines the truthy value of the graphicle data structures."""
     if len(data) == 0:
         return False
     return True
@@ -363,16 +408,18 @@ class MaskArray(base.MaskBase, base.ArrayBase):
 
     _data: base.BoolVector = _array_field("<?")
     dtype: np.dtype = field(init=False, repr=False)
-    __array_interface__: ty.Dict[str, ty.Any] = field(init=False, repr=False)
     _HANDLED_TYPES: ty.Tuple[ty.Type, ...] = field(init=False, repr=False)
 
     def __attrs_post_init__(self):
         self.dtype = self._data.dtype
-        self.__array_interface__ = self._data.__array_interface__
         self._HANDLED_TYPES = (np.ndarray, nm.Number, cla.Sequence)
 
+    @property
+    def __array_interface__(self) -> ty.Dict[str, ty.Any]:
+        return self._data.__array_interface__
+
     def __array__(self) -> base.BoolVector:
-        return self.data
+        return self._data
 
     @classmethod
     def __array_wrap__(cls, array: base.BoolVector) -> "MaskArray":
@@ -795,15 +842,17 @@ class PdgArray(base.ArrayBase):
     dtype: np.dtype = field(init=False, repr=False)
     __lookup_table: __PdgRecords = field(init=False, repr=False)
     __mega_to_giga: float = field(init=False, repr=False)
-    __array_interface__: ty.Dict[str, ty.Any] = field(init=False, repr=False)
     _HANDLED_TYPES = field(init=False, repr=False)
 
     def __attrs_post_init__(self) -> None:
         self.__lookup_table = self.__PdgRecords()
         self.__mega_to_giga: float = 1.0e-3
-        self.__array_interface__ = self._data.__array_interface__
         self.dtype = self._data.dtype
         self._HANDLED_TYPES = (np.ndarray, nm.Number, cla.Sequence)
+
+    @property
+    def __array_interface__(self) -> ty.Dict[str, ty.Any]:
+        return self._data.__array_interface__
 
     @classmethod
     def __array_wrap__(cls, array: base.IntVector) -> "PdgArray":
@@ -992,15 +1041,17 @@ class MomentumArray(base.ArrayBase):
     """
 
     # data: base.AnyVector = array_field("pmu")
-    _data: base.DoubleVector = _array_field("<f8", num_cols=4, repr=False)
+    _data: base.DoubleVector = _array_field("<f8", num_cols=4)
     dtype: np.dtype = field(init=False, repr=False)
-    __array_interface__: ty.Dict[str, ty.Any] = field(init=False, repr=False)
     _HANDLED_TYPES: ty.Tuple[ty.Type, ...] = field(init=False, repr=False)
 
     def __attrs_post_init__(self):
         self.dtype = np.dtype(list(zip("xyze", it.repeat("<f8"))))
-        self.__array_interface__ = self._data.__array_interface__
         self._HANDLED_TYPES = (np.ndarray, nm.Number, cla.Sequence)
+
+    @property
+    def __array_interface__(self) -> ty.Dict[str, ty.Any]:
+        return self._data.__array_interface__
 
     def __array_ufunc__(self, ufunc, method, *inputs, **kwargs):
         return _array_ufunc(self, ufunc, method, *inputs, **kwargs)
@@ -1010,7 +1061,7 @@ class MomentumArray(base.ArrayBase):
 
     @property
     def data(self) -> base.VoidVector:
-        return self._data.view(self.dtype).squeeze()
+        return self._data.view(self.dtype).reshape(-1)
 
     @data.setter
     def data(self, values: npt.ArrayLike) -> None:
@@ -1026,7 +1077,7 @@ class MomentumArray(base.ArrayBase):
         yield from it.starmap(MomentumElement, elems)
 
     def __len__(self) -> int:
-        return len(self.data)
+        return self._data.shape[0]
 
     def __array__(self) -> base.VoidVector:
         return self.data
@@ -1034,7 +1085,7 @@ class MomentumArray(base.ArrayBase):
     def __getitem__(self, key) -> "MomentumArray":
         if isinstance(key, base.MaskBase):
             key = key.data
-        return self.__class__(np.array(self.data[key]))
+        return self.__class__(self._data[key])
 
     def __bool__(self) -> bool:
         return _truthy(self)
@@ -1054,14 +1105,16 @@ class MomentumArray(base.ArrayBase):
 
     @property
     def _xy_pol(self) -> base.ComplexVector:
-        return self._data[..., :2].view(dtype="<c16").squeeze(-1)
+        return self._data[..., :2].view(dtype="<c16").reshape(-1)
 
     @fn.cached_property
     def _zt_pol(self) -> base.ComplexVector:
         return (
-            np.stack((self.data["z"], np.abs(self._xy_pol)), axis=-1)
+            np.stack(
+                (self.data["z"].reshape(-1), np.abs(self._xy_pol)), axis=-1
+            )
             .view(dtype="<c16")
-            .squeeze(-1)
+            .reshape(-1)
         )
 
     @fn.cached_property
@@ -1170,16 +1223,18 @@ class ColorArray(base.ArrayBase):
     """
 
     _data: base.VoidVector = _array_field("<i4", 2)
-    __array_interface__: ty.Dict[str, ty.Any] = field(init=False, repr=False)
     dtype: np.dtype = field(init=False, repr=False)
     _HANDLED_TYPES: ty.Tuple[ty.Type, ...] = field(init=False, repr=False)
 
     def __attrs_post_init__(self):
-        self.__array_interface__ = self._data.__array_interface__
         self.dtype = np.dtype(
             list(zip(("color", "anticolor"), it.repeat("<i4")))
         )
         self._HANDLED_TYPES = (np.ndarray, nm.Number, cla.Sequence)
+
+    @property
+    def __array_interface__(self) -> ty.Dict[str, ty.Any]:
+        return self._data.__array_interface__
 
     def __array_ufunc__(self, ufunc, method, *inputs, **kwargs):
         return _array_ufunc(self, ufunc, method, *inputs, **kwargs)
@@ -1201,7 +1256,7 @@ class ColorArray(base.ArrayBase):
 
     @property
     def data(self) -> base.VoidVector:
-        return self._data.view(self.dtype).squeeze()
+        return self._data.view(self.dtype).reshape(-1)
 
     @data.setter
     def data(self, values: npt.ArrayLike) -> None:
@@ -1213,10 +1268,10 @@ class ColorArray(base.ArrayBase):
     def __getitem__(self, key) -> "ColorArray":
         if isinstance(key, base.MaskBase):
             key = key.data
-        return self.__class__(np.array(self.data[key]))
+        return self.__class__(self._data[key])
 
     def __len__(self) -> int:
-        return len(self.data)
+        return self._data.shape[0]
 
     def __bool__(self) -> bool:
         return _truthy(self)
@@ -1256,13 +1311,15 @@ class HelicityArray(base.ArrayBase):
 
     _data: base.HalfIntVector = _array_field("<i2")
     dtype: np.dtype = field(init=False, repr=False)
-    __array_interface__: ty.Dict[str, ty.Any] = field(init=False, repr=False)
     _HANDLED_TYPES: ty.Tuple[ty.Type, ...] = field(init=False, repr=False)
 
     def __attrs_post_init__(self):
-        self.__array_interface__ = self._data.__array_interface__
         self.dtype = self._data.dtype
         self._HANDLED_TYPES = (np.ndarray, nm.Number, cla.Sequence)
+
+    @property
+    def __array_interface__(self) -> ty.Dict[str, ty.Any]:
+        return self._data.__array_interface__
 
     def __array_ufunc__(self, ufunc, method, *inputs, **kwargs):
         return _array_ufunc(self, ufunc, method, *inputs, **kwargs)
@@ -1341,14 +1398,16 @@ class StatusArray(base.ArrayBase):
     """
 
     _data: base.HalfIntVector = _array_field("<i2")
-    __array_interface__: ty.Dict[str, ty.Any] = field(init=False, repr=False)
     dtype: np.dtype = field(init=False, repr=False)
     _HANDLED_TYPES: ty.Tuple[ty.Type, ...] = field(init=False, repr=False)
 
     def __attrs_post_init__(self):
-        self.__array_interface__ = self._data.__array_interface__
         self.dtype = self._data.dtype
         self._HANDLED_TYPES = (np.ndarray, nm.Number, cla.Sequence)
+
+    @property
+    def __array_interface__(self) -> ty.Dict[str, ty.Any]:
+        return self._data.__array_interface__
 
     def __array_ufunc__(self, ufunc, method, *inputs, **kwargs):
         return _array_ufunc(self, ufunc, method, *inputs, **kwargs)
