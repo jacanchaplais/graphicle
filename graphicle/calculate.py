@@ -312,7 +312,7 @@ def cluster_pmu(
     if eta_cut is not None:
         jets = filter(lambda jet: abs(jet.eta) < eta_cut, jets)
     cluster_mask = gcl.MaskGroup()
-    cluster_mask.agg_op = gcl.data.MaskAggOp.OR
+    cluster_mask.agg_op = "or"
     for i, jet in enumerate(jets):
         mask = np.zeros_like(pmu_pyjet, dtype="<?")
         mask[list(map(lambda pcl: pcl.idx, jet))] = True  # type: ignore

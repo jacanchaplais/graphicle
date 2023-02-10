@@ -4,19 +4,19 @@
 
 Utilities for selecting elements from graph structured particle data.
 """
-import typing as ty
-import itertools as it
-import functools as fn
 import collections as cl
+import functools as fn
+import itertools as it
 import operator as op
+import typing as ty
 
 import numpy as np
 import pandas as pd
 from scipy.sparse.csgraph import breadth_first_tree
 
 import graphicle as gcl
-from . import base
 
+from . import base
 
 __all__ = [
     "find_vertex",
@@ -380,7 +380,7 @@ def hard_descendants(
         pcl_out_vtxs = map(int, pcls.edges["out"])
         hard_vtxs.extend(list(zip(pdg_keys, pcl_out_vtxs)))
     # find the descendants of those vertices
-    masks = gcl.MaskGroup(agg_op=gcl.data.MaskAggOp.OR)
+    masks = gcl.MaskGroup(agg_op="or")
     for pdg_key, vtx in hard_vtxs:
         masks[pdg_key] = vertex_descendants(graph.adj, vtx)
     return masks
