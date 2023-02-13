@@ -79,7 +79,7 @@ def fastjet_clusters(
     -------
     clusters : list[MaskArray]
         List containing masks over the input data for each jet
-        clustering.
+        clustering, in order of descending transverse momentum.
 
     Notes
     -----
