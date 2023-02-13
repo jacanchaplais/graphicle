@@ -1069,8 +1069,14 @@ class MomentumArray(base.ArrayBase):
     ----------
     data : ndarray[float64]
         Structured array containing four momenta.
-    x, y, z, energy : ndarray[float64]
-        Momentum components as one dimensional arrays.
+    x : ndarray[float64]
+        x-component of momentum.
+    y : ndarray[float64]
+        y-component of momentum.
+    z : ndarray[float64]
+        z-component of momentum.
+    energy : ndarray[float64]
+        Energy component of momentum.
     pt : ndarray[float64]
         Transverse component of particle momenta.
     rapidity : ndarray[float64]
