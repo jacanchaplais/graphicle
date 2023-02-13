@@ -12,6 +12,7 @@ import warnings
 from functools import lru_cache, partial
 from typing import Callable, Iterable
 
+import deprecation
 import networkx as nx
 import numba as nb
 import numpy as np
@@ -253,6 +254,11 @@ def flow_trace(
     return traces
 
 
+@deprecation.deprecated(
+    deprecated_in="0.2.3",
+    removed_in="0.3.0",
+    details="Use ``graphicle.select.fastjet_clusters()`` instead.",
+)
 def cluster_pmu(
     pmu: gcl.MomentumArray,
     radius: float,
