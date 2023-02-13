@@ -1069,6 +1069,8 @@ class MomentumArray(base.ArrayBase):
     ----------
     data : ndarray[float64]
         Structured array containing four momenta.
+    x, y, z, energy : ndarray[float64]
+        Momentum components as one dimensional arrays.
     pt : ndarray[float64]
         Transverse component of particle momenta.
     rapidity : ndarray[float64]
@@ -1149,30 +1151,52 @@ class MomentumArray(base.ArrayBase):
         return _array_ne(self, other)
 
     def copy(self) -> "MomentumArray":
-        return deepcopy(self)
+        return self.__class__(self._data)
 
     @property
     def _xy_pol(self) -> base.ComplexVector:
+        """Complex polar vector of momentum components in the x-y plane."""
         return self._data[..., :2].view(dtype="<c16").reshape(-1)
 
     @fn.cached_property
     def _zt_pol(self) -> base.ComplexVector:
+        """Complex polar vector of momentum components in the
+        longitudinal-transverse plane.
+        """
         return (
-            np.stack(
-                (self.data["z"].reshape(-1), np.abs(self._xy_pol)), axis=-1
-            )
+            np.stack((self.z, np.abs(self._xy_pol)), axis=-1)
             .view(dtype="<c16")
             .reshape(-1)
         )
 
     @fn.cached_property
     def _spatial_mag(self) -> base.DoubleVector:
-        return np.abs(self._zt_pol)
+        return np.abs(self._zt_pol).reshape(-1)
+
+    @property
+    def x(self) -> base.DoubleVector:
+        """Momentum component along x-axis."""
+        return self.data["x"].reshape(-1)
+
+    @property
+    def y(self) -> base.DoubleVector:
+        """Momentum component along y-axis."""
+        return self.data["y"].reshape(-1)
+
+    @property
+    def z(self) -> base.DoubleVector:
+        """Momentum component along longitudinal / z-axis."""
+        return self.data["z"].reshape(-1)
+
+    @property
+    def energy(self) -> base.DoubleVector:
+        """Energy component of momentum."""
+        return self.data["e"].reshape(-1)
 
     @property
     def pt(self) -> base.DoubleVector:
         """Momentum component transverse to the beam-axis."""
-        return self._zt_pol.imag
+        return self._zt_pol.imag.reshape(-1)
 
     @fn.cached_property
     def eta(self) -> base.DoubleVector:
@@ -1184,34 +1208,33 @@ class MomentumArray(base.ArrayBase):
         """
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            arr = np.arctanh(self.data["z"] / self._spatial_mag)
-        return arr  # type: ignore
+            arr = np.arctanh(self.z / self._spatial_mag)
+        return arr.reshape(-1)
 
     @fn.cached_property
     def rapidity(self) -> base.DoubleVector:
         """Rapidity of particles."""
-        e, z = self.data["e"], self.data["z"]
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            rap = 0.5 * np.log((e + z) / (e - z))  # type: ignore
-        return rap  # type: ignore
+            rap = 0.5 * np.log((self.energy + self.z) / (self.energy - self.z))
+        return rap.reshape(-1)
 
     @fn.cached_property
     def phi(self) -> base.DoubleVector:
         """Azimuthal angular displacement of particles about beam-axis."""
-        return np.angle(self._xy_pol)
+        return np.angle(self._xy_pol).reshape(-1)
 
     @fn.cached_property
     def theta(self) -> base.DoubleVector:
         """Angular displacement of particles from positive beam-axis."""
-        return np.angle(self._zt_pol)
+        return np.angle(self._zt_pol).reshape(-1)
 
     @fn.cached_property
     def mass(self) -> base.DoubleVector:
         """Mass of particles."""
         return calculate._root_diff_two_squares(
-            self.data["e"], self._spatial_mag
-        )
+            self.energy, self._spatial_mag
+        ).reshape(-1)
 
     def delta_R(self, other: "MomentumArray") -> base.DoubleVector:
         """Calculates the Euclidean inter-particle distances in the
