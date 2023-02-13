@@ -1757,10 +1757,10 @@ class AdjacencyList(base.AdjacencyBase):
 
     _data: base.AnyVector = array_field("edge")
     weights: base.DoubleVector = array_field("double")
-    __array_interface__: ty.Dict[str, ty.Any] = field(init=False, repr=False)
 
-    def __attrs_post_init__(self):
-        self.__array_interface__ = self._data.__array_interface__
+    @property
+    def __array_interface__(self) -> ty.Dict[str, ty.Any]:
+        return self._data.__array_interface__
 
     @classmethod
     def __array_wrap__(cls, array: base.AnyVector) -> "AdjacencyList":
