@@ -78,7 +78,7 @@ def fastjet_clusters(
     Returns
     -------
     clusters : list[MaskArray]
-        Deque containing masks over the input data for each jet
+        List containing masks over the input data for each jet
         clustering.
 
     Notes
