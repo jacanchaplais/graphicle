@@ -85,10 +85,8 @@ def fastjet_clusters(
     -----
     This is a wrapper around FastJet's implementation.
 
-    Standard settings:
-        kt algorithm: p_val = 1
-        Cambridge/Aachen algorithm: p_val = 0
-        anti-kt algorithm: p_val = -1
+    ``p_val`` set to ``-1`` gives anti-kT, ``0`` gives Cambridge-Aachen,
+    and ``1`` gives kT clusterings.
 
     .. versionadded:: 0.2.3
     Migrated from ``graphicle.calculate.cluster_pmu()``.
