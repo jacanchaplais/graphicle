@@ -1582,6 +1582,9 @@ class StatusArray(base.ArrayBase):
 #########################################
 # COMPOSITE OF PARTICLE DATA STRUCTURES #
 #########################################
+DsetPair = ty.Tuple[ty.Iterator[str], ty.Iterator[base.ArrayBase]]
+
+
 @define
 class ParticleSet(base.ParticleBase):
     """Composite of data structures containing particle set description.
@@ -1619,45 +1622,52 @@ class ParticleSet(base.ParticleBase):
         Boolean array indicating final state in particle set.
     """
 
-    pdg: PdgArray = field(default=Factory(fn.partial(PdgArray, tuple())))
-    pmu: MomentumArray = field(default=Factory(fn.partial(PdgArray, tuple())))
-    color: ColorArray = ColorArray()
-    helicity: HelicityArray = HelicityArray()
-    status: StatusArray = StatusArray()
-    final: MaskArray = MaskArray()
+    pdg: PdgArray = field(default=Factory(PdgArray))
+    pmu: MomentumArray = field(default=Factory(MomentumArray))
+    color: ColorArray = field(default=Factory(ColorArray))
+    helicity: HelicityArray = field(default=Factory(HelicityArray))
+    status: StatusArray = field(default=Factory(StatusArray))
+    final: MaskArray = field(default=Factory(MaskArray))
 
     @property
-    def __dsets(self):
-        for dset_name in tuple(self.__annotations__.keys()):
-            yield {"name": dset_name, "data": getattr(self, dset_name)}
+    def _dsets(self) -> DsetPair:
+        names = self.__annotations__.keys()
+        props = map(getattr, it.repeat(self), names)
+        return iter(names), props
+
+    @property
+    def _nonempty_dsets(self) -> DsetPair:
+        """Returns non-empty name and array iterators. Uses
+        ``itertools.tee()`` under the hood, so don't use if you intend
+        to iterate over them separately.
+        """
+        names, data = self._dsets
+        data, data_ = it.tee(data)
+        pairs, pairs_ = it.tee(it.compress(zip(names, data), map(bool, data_)))
+        nonempty_names = map(op.itemgetter(0), pairs)
+        nonempty_data = map(op.itemgetter(1), pairs_)
+        return nonempty_names, nonempty_data
 
     def __getitem__(self, key) -> "ParticleSet":
-        kwargs = dict()
-        for dset in self.__dsets:
-            name = dset["name"]
-            data = dset["data"]
-            if len(data) > 0:
-                kwargs.update({name: data[key]})
-        return self.__class__(**kwargs)
+        names, data = self._nonempty_dsets
+        data_sliced = map(op.getitem, data, it.repeat(key))
+        return self.__class__(**dict(zip(names, data_sliced)))
 
     def __bool__(self) -> bool:
-        for dset in self.__dsets:
-            if dset["data"]:
-                return True
-        return False
+        return any(map(bool, self._dsets[1]))
 
     def __repr__(self) -> str:
-        dset_repr = (repr(dset["data"]) for dset in self.__dsets)
-        dset_str = ",\n".join(dset_repr)
+        data = self._dsets[1]
+        dset_str = ",\n".join(map(repr, data))
         return f"ParticleSet(\n{dset_str}\n)"
 
     def __len__(self) -> int:
-        filled_dsets = filter(lambda dset: len(dset["data"]) > 0, self.__dsets)
-        dset = next(filled_dsets)
-        return len(dset)
+        return next(filter(fn.partial(op.lt, 0), map(len, self._dsets[1])), 0)
 
     def copy(self) -> "ParticleSet":
-        return deepcopy(self)
+        names, data = self._nonempty_dsets
+        copies = map(op.methodcaller("copy"), data)
+        return self.__class__(**dict(zip(names, copies)))
 
     @classmethod
     def from_numpy(
@@ -1968,8 +1978,8 @@ class Graphicle:
         Vertex at which the hard process is initiated.
     """
 
-    particles: ParticleSet = ParticleSet()
-    adj: AdjacencyList = AdjacencyList()
+    particles: ParticleSet = field(default=Factory(ParticleSet))
+    adj: AdjacencyList = field(default=Factory(AdjacencyList))
 
     @property
     def __attr_names(self) -> ty.Tuple[str, ...]:
