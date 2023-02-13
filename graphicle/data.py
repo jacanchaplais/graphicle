@@ -1098,9 +1098,6 @@ class MomentumArray(base.ArrayBase):
     -------
     delta_R()
         Calculates interparticle distances with ``other`` MomentumArray.
-
-    .. versionchanged:: 0.2.3
-    Added momentum components as attributes.
     """
 
     # data: base.AnyVector = array_field("pmu")
