@@ -1583,6 +1583,47 @@ class StatusArray(base.ArrayBase):
 # COMPOSITE OF PARTICLE DATA STRUCTURES #
 #########################################
 DsetPair = ty.Tuple[ty.Iterator[str], ty.Iterator[base.ArrayBase]]
+CompositeType = ty.Union["ParticleSet", "Graphicle"]
+CompositeGeneric = ty.TypeVar("CompositeGeneric", "ParticleSet", "Graphicle")
+
+
+def _dsets(instance: CompositeType) -> DsetPair:
+    names = instance.__annotations__.keys()
+    props = map(getattr, it.repeat(instance), names)
+    return iter(names), props
+
+
+def _nonempty_dsets(instance: CompositeType) -> DsetPair:
+    """Returns non-empty name and array iterators. Uses
+    ``itertools.tee()`` under the hood, so don't use if you intend
+    to iterate over them separately.
+    """
+    names, data = _dsets(instance)
+    data, data_ = it.tee(data)
+    pairs, pairs_ = it.tee(it.compress(zip(names, data), map(bool, data_)))
+    nonempty_names = map(op.itemgetter(0), pairs)
+    nonempty_data = map(op.itemgetter(1), pairs_)
+    return nonempty_names, nonempty_data
+
+
+def _composite_getitem(instance: CompositeGeneric, key) -> CompositeGeneric:
+    names, data = _nonempty_dsets(instance)
+    data_sliced = map(op.getitem, data, it.repeat(key))
+    return instance.__class__(**dict(zip(names, data_sliced)))
+
+
+def _composite_bool(instance: CompositeType) -> bool:
+    return any(map(bool, _dsets(instance)[1]))
+
+
+def _composite_len(instance: CompositeType) -> int:
+    return next(filter(fn.partial(op.lt, 0), map(len, _dsets(instance)[1])), 0)
+
+
+def _composite_copy(instance: CompositeGeneric) -> CompositeGeneric:
+    names, data = _nonempty_dsets(instance)
+    copies = map(op.methodcaller("copy"), data)
+    return instance.__class__(**dict(zip(names, copies)))
 
 
 @define
@@ -1629,45 +1670,22 @@ class ParticleSet(base.ParticleBase):
     status: StatusArray = field(default=Factory(StatusArray))
     final: MaskArray = field(default=Factory(MaskArray))
 
-    @property
-    def _dsets(self) -> DsetPair:
-        names = self.__annotations__.keys()
-        props = map(getattr, it.repeat(self), names)
-        return iter(names), props
-
-    @property
-    def _nonempty_dsets(self) -> DsetPair:
-        """Returns non-empty name and array iterators. Uses
-        ``itertools.tee()`` under the hood, so don't use if you intend
-        to iterate over them separately.
-        """
-        names, data = self._dsets
-        data, data_ = it.tee(data)
-        pairs, pairs_ = it.tee(it.compress(zip(names, data), map(bool, data_)))
-        nonempty_names = map(op.itemgetter(0), pairs)
-        nonempty_data = map(op.itemgetter(1), pairs_)
-        return nonempty_names, nonempty_data
-
     def __getitem__(self, key) -> "ParticleSet":
-        names, data = self._nonempty_dsets
-        data_sliced = map(op.getitem, data, it.repeat(key))
-        return self.__class__(**dict(zip(names, data_sliced)))
+        return _composite_getitem(self, key)
 
     def __bool__(self) -> bool:
-        return any(map(bool, self._dsets[1]))
+        return _composite_bool(self)
 
     def __repr__(self) -> str:
-        data = self._dsets[1]
+        data = _dsets(self)[1]
         dset_str = ",\n".join(map(repr, data))
         return f"ParticleSet(\n{dset_str}\n)"
 
     def __len__(self) -> int:
-        return next(filter(fn.partial(op.lt, 0), map(len, self._dsets[1])), 0)
+        return _composite_len(self)
 
     def copy(self) -> "ParticleSet":
-        names, data = self._nonempty_dsets
-        copies = map(op.methodcaller("copy"), data)
-        return self.__class__(**dict(zip(names, copies)))
+        return _composite_copy(self)
 
     @classmethod
     def from_numpy(
@@ -1981,26 +1999,17 @@ class Graphicle:
     particles: ParticleSet = field(default=Factory(ParticleSet))
     adj: AdjacencyList = field(default=Factory(AdjacencyList))
 
-    @property
-    def __attr_names(self) -> ty.Tuple[str, ...]:
-        return tuple(self.__annotations__.keys())
-
     def __getitem__(self, key) -> "Graphicle":
-        kwargs = dict()
-        for name in self.__attr_names:
-            data = getattr(self, name)
-            if len(data) != 0:
-                kwargs.update({name: data[key]})
-        return self.__class__(**kwargs)
+        return _composite_getitem(self, key)
 
     def __bool__(self) -> bool:
-        for name in self.__attr_names:
-            if getattr(self, name):
-                return True
-        return False
+        return _composite_bool(self)
+
+    def __len__(self) -> int:
+        return _composite_len(self)
 
     def copy(self) -> "Graphicle":
-        return deepcopy(self)
+        return _composite_copy(self)
 
     @classmethod
     def from_event(cls, event: base.EventInterface) -> "Graphicle":
