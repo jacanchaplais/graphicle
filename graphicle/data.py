@@ -51,6 +51,7 @@ from enum import Enum
 import numpy as np
 import numpy.typing as npt
 from attr import Factory, cmp_using, define, field, setters
+from mcpid.lookup import PdgRecords
 from numpy.lib import recfunctions as rfn
 from rich.console import Console
 from rich.tree import Tree
@@ -80,6 +81,8 @@ __all__ = [
 # SET UP ARRAY ATTRIBUTES FOR DATACLASSES #
 ###########################################
 _types = Types()
+_LOOKUP_TABLE = PdgRecords()
+
 DataType = ty.TypeVar("DataType", bound=base.ArrayBase)
 FuncType = ty.TypeVar("FuncType", bound=ty.Callable[..., ty.Any])
 EdgeLike = ty.Union[
@@ -462,7 +465,7 @@ class MaskArray(base.MaskBase, base.ArrayBase):
         yield from map(bool, self.data)
 
     def copy(self) -> "MaskArray":
-        return deepcopy(self)
+        return self.__class__(self._data.copy())
 
     def __repr__(self) -> str:
         return _array_repr(self)
@@ -470,7 +473,7 @@ class MaskArray(base.MaskBase, base.ArrayBase):
     def __getitem__(self, key) -> "MaskArray":
         if isinstance(key, base.MaskBase):
             key = key.data
-        return self.__class__(np.array(self.data[key]))
+        return self.__class__(self._data[key])
 
     def __setitem__(self, key, val) -> None:
         if isinstance(key, base.MaskBase):
@@ -661,7 +664,7 @@ class MaskGroup(base.MaskBase, cla.MutableMapping[str, base.MaskBase]):
         self._agg_op = agg_op
 
     @classmethod
-    def from_numpy_structured(cls, arr: np.ndarray) -> "MaskGroup":
+    def from_numpy_structured(cls, arr: base.VoidVector) -> "MaskGroup":
         return cls(
             dict(  # type: ignore
                 map(lambda name: (name, arr[name]), arr.dtype.names)
@@ -885,16 +888,12 @@ class PdgArray(base.ArrayBase):
         Charge parity for each particle.
     """
 
-    from mcpid.lookup import PdgRecords as __PdgRecords
-
     _data: base.IntVector = _array_field("<i4")
     dtype: np.dtype = field(init=False, repr=False)
-    __lookup_table: __PdgRecords = field(init=False, repr=False)
     __mega_to_giga: float = field(init=False, repr=False)
     _HANDLED_TYPES = field(init=False, repr=False)
 
     def __attrs_post_init__(self) -> None:
-        self.__lookup_table = self.__PdgRecords()
         self.__mega_to_giga: float = 1.0e-3
         self.dtype = self._data.dtype
         self._HANDLED_TYPES = (np.ndarray, nm.Number, cla.Sequence)
@@ -938,7 +937,7 @@ class PdgArray(base.ArrayBase):
     def __getitem__(self, key) -> "PdgArray":
         if isinstance(key, base.MaskBase):
             key = key.data
-        return self.__class__(np.array(self.data[key]))
+        return self.__class__(self._data[key])
 
     @property
     def data(self) -> base.IntVector:
@@ -949,7 +948,7 @@ class PdgArray(base.ArrayBase):
         self._data = values  # type: ignore
 
     def copy(self) -> "PdgArray":
-        return deepcopy(self)
+        return self.__class__(self._data)
 
     def mask(
         self,
@@ -989,12 +988,12 @@ class PdgArray(base.ArrayBase):
         )
 
     def __get_prop(self, field: str) -> base.VoidVector:
-        props = self.__lookup_table.properties(self.data, [field])[field]
+        props = _LOOKUP_TABLE.properties(self.data, [field])[field]
         return props  # type: ignore
 
     def __get_prop_range(self, field: str) -> base.VoidVector:
         field_range = [field + "lower", field + "upper"]
-        props = self.__lookup_table.properties(self.data, field_range)
+        props = _LOOKUP_TABLE.properties(self.data, field_range)
         return props  # type: ignore
 
     @property
@@ -1070,6 +1069,14 @@ class MomentumArray(base.ArrayBase):
     ----------
     data : ndarray[float64]
         Structured array containing four momenta.
+    x : ndarray[float64]
+        x component of momentum.
+    y : ndarray[float64]
+        y component of momentum.
+    z : ndarray[float64]
+        z component of momentum.
+    energy : ndarray[float64]
+        Energy component of momentum.
     pt : ndarray[float64]
         Transverse component of particle momenta.
     rapidity : ndarray[float64]
@@ -1150,30 +1157,52 @@ class MomentumArray(base.ArrayBase):
         return _array_ne(self, other)
 
     def copy(self) -> "MomentumArray":
-        return deepcopy(self)
+        return self.__class__(self._data)
 
     @property
     def _xy_pol(self) -> base.ComplexVector:
+        """Complex polar vector of momentum components in the x-y plane."""
         return self._data[..., :2].view(dtype="<c16").reshape(-1)
 
     @fn.cached_property
     def _zt_pol(self) -> base.ComplexVector:
+        """Complex polar vector of momentum components in the
+        longitudinal-transverse plane.
+        """
         return (
-            np.stack(
-                (self.data["z"].reshape(-1), np.abs(self._xy_pol)), axis=-1
-            )
+            np.stack((self.z, np.abs(self._xy_pol)), axis=-1)
             .view(dtype="<c16")
             .reshape(-1)
         )
 
     @fn.cached_property
     def _spatial_mag(self) -> base.DoubleVector:
-        return np.abs(self._zt_pol)
+        return np.abs(self._zt_pol).reshape(-1)
+
+    @property
+    def x(self) -> base.DoubleVector:
+        """Momentum component along x-axis."""
+        return self.data["x"].reshape(-1)
+
+    @property
+    def y(self) -> base.DoubleVector:
+        """Momentum component along y-axis."""
+        return self.data["y"].reshape(-1)
+
+    @property
+    def z(self) -> base.DoubleVector:
+        """Momentum component along longitudinal / z-axis."""
+        return self.data["z"].reshape(-1)
+
+    @property
+    def energy(self) -> base.DoubleVector:
+        """Energy component of momentum."""
+        return self.data["e"].reshape(-1)
 
     @property
     def pt(self) -> base.DoubleVector:
         """Momentum component transverse to the beam-axis."""
-        return self._zt_pol.imag
+        return self._zt_pol.imag.reshape(-1)
 
     @fn.cached_property
     def eta(self) -> base.DoubleVector:
@@ -1185,34 +1214,33 @@ class MomentumArray(base.ArrayBase):
         """
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            arr = np.arctanh(self.data["z"] / self._spatial_mag)
-        return arr  # type: ignore
+            arr = np.arctanh(self.z / self._spatial_mag)
+        return arr.reshape(-1)
 
     @fn.cached_property
     def rapidity(self) -> base.DoubleVector:
         """Rapidity of particles."""
-        e, z = self.data["e"], self.data["z"]
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            rap = 0.5 * np.log((e + z) / (e - z))  # type: ignore
-        return rap  # type: ignore
+            rap = 0.5 * np.log((self.energy + self.z) / (self.energy - self.z))
+        return rap.reshape(-1)
 
     @fn.cached_property
     def phi(self) -> base.DoubleVector:
         """Azimuthal angular displacement of particles about beam-axis."""
-        return np.angle(self._xy_pol)
+        return np.angle(self._xy_pol).reshape(-1)
 
     @fn.cached_property
     def theta(self) -> base.DoubleVector:
         """Angular displacement of particles from positive beam-axis."""
-        return np.angle(self._zt_pol)
+        return np.angle(self._zt_pol).reshape(-1)
 
     @fn.cached_property
     def mass(self) -> base.DoubleVector:
         """Mass of particles."""
         return calculate._root_diff_two_squares(
-            self.data["e"], self._spatial_mag
-        )
+            self.energy, self._spatial_mag
+        ).reshape(-1)
 
     def delta_R(self, other: "MomentumArray") -> base.DoubleVector:
         """Calculates the Euclidean inter-particle distances in the
@@ -1311,8 +1339,8 @@ class ColorArray(base.ArrayBase):
     def data(self, values: npt.ArrayLike) -> None:
         self._data = values  # type: ignore
 
-    def copy(self):
-        return deepcopy(self)
+    def copy(self) -> "ColorArray":
+        return self.__class__(self._data)
 
     def __getitem__(self, key) -> "ColorArray":
         if isinstance(key, base.MaskBase):
@@ -1396,12 +1424,12 @@ class HelicityArray(base.ArrayBase):
 
     def copy(self) -> "HelicityArray":
         """Returns a new HelicityArray instance with same data."""
-        return deepcopy(self)
+        return self.__class__(self._data)
 
     def __getitem__(self, key) -> "HelicityArray":
         if isinstance(key, base.MaskBase):
             key = key.data
-        return self.__class__(np.array(self.data[key]))
+        return self.__class__(self._data[key])
 
     def __len__(self) -> int:
         return len(self.data)
@@ -1477,7 +1505,7 @@ class StatusArray(base.ArrayBase):
     def __getitem__(self, key) -> "StatusArray":
         if isinstance(key, base.MaskBase):
             key = key.data
-        return self.__class__(np.array(self.data[key]))
+        return self.__class__(self._data[key])
 
     def __len__(self) -> int:
         return len(self.data)
@@ -1505,7 +1533,7 @@ class StatusArray(base.ArrayBase):
 
     def copy(self) -> "StatusArray":
         """Returns a new StatusArray instance with same data."""
-        return deepcopy(self)
+        return self.__class__(self._data)
 
     def in_range(
         self,
@@ -1560,6 +1588,50 @@ class StatusArray(base.ArrayBase):
 #########################################
 # COMPOSITE OF PARTICLE DATA STRUCTURES #
 #########################################
+DsetPair = ty.Tuple[ty.Iterator[str], ty.Iterator[base.ArrayBase]]
+CompositeType = ty.Union["ParticleSet", "Graphicle"]
+CompositeGeneric = ty.TypeVar("CompositeGeneric", "ParticleSet", "Graphicle")
+
+
+def _dsets(instance: CompositeType) -> DsetPair:
+    names = instance.__annotations__.keys()
+    props = map(getattr, it.repeat(instance), names)
+    return iter(names), props
+
+
+def _nonempty_dsets(instance: CompositeType) -> DsetPair:
+    """Returns non-empty name and array iterators. Uses
+    ``itertools.tee()`` under the hood, so don't use if you intend
+    to iterate over them separately.
+    """
+    names, data = _dsets(instance)
+    data, data_ = it.tee(data)
+    pairs, pairs_ = it.tee(it.compress(zip(names, data), map(bool, data_)))
+    nonempty_names = map(op.itemgetter(0), pairs)
+    nonempty_data = map(op.itemgetter(1), pairs_)
+    return nonempty_names, nonempty_data
+
+
+def _composite_getitem(instance: CompositeGeneric, key) -> CompositeGeneric:
+    names, data = _nonempty_dsets(instance)
+    data_sliced = map(op.getitem, data, it.repeat(key))
+    return instance.__class__(**dict(zip(names, data_sliced)))
+
+
+def _composite_bool(instance: CompositeType) -> bool:
+    return any(map(bool, _dsets(instance)[1]))
+
+
+def _composite_len(instance: CompositeType) -> int:
+    return next(filter(fn.partial(op.lt, 0), map(len, _dsets(instance)[1])), 0)
+
+
+def _composite_copy(instance: CompositeGeneric) -> CompositeGeneric:
+    names, data = _nonempty_dsets(instance)
+    copies = map(op.methodcaller("copy"), data)
+    return instance.__class__(**dict(zip(names, copies)))
+
+
 @define
 class ParticleSet(base.ParticleBase):
     """Composite of data structures containing particle set description.
@@ -1597,45 +1669,29 @@ class ParticleSet(base.ParticleBase):
         Boolean array indicating final state in particle set.
     """
 
-    pdg: PdgArray = field(default=Factory(fn.partial(PdgArray, tuple())))
-    pmu: MomentumArray = field(default=Factory(fn.partial(PdgArray, tuple())))
-    color: ColorArray = ColorArray()
-    helicity: HelicityArray = HelicityArray()
-    status: StatusArray = StatusArray()
-    final: MaskArray = MaskArray()
-
-    @property
-    def __dsets(self):
-        for dset_name in tuple(self.__annotations__.keys()):
-            yield {"name": dset_name, "data": getattr(self, dset_name)}
+    pdg: PdgArray = field(default=Factory(PdgArray))
+    pmu: MomentumArray = field(default=Factory(MomentumArray))
+    color: ColorArray = field(default=Factory(ColorArray))
+    helicity: HelicityArray = field(default=Factory(HelicityArray))
+    status: StatusArray = field(default=Factory(StatusArray))
+    final: MaskArray = field(default=Factory(MaskArray))
 
     def __getitem__(self, key) -> "ParticleSet":
-        kwargs = dict()
-        for dset in self.__dsets:
-            name = dset["name"]
-            data = dset["data"]
-            if len(data) > 0:
-                kwargs.update({name: data[key]})
-        return self.__class__(**kwargs)
+        return _composite_getitem(self, key)
 
     def __bool__(self) -> bool:
-        for dset in self.__dsets:
-            if dset["data"]:
-                return True
-        return False
+        return _composite_bool(self)
 
     def __repr__(self) -> str:
-        dset_repr = (repr(dset["data"]) for dset in self.__dsets)
-        dset_str = ",\n".join(dset_repr)
+        data = _dsets(self)[1]
+        dset_str = ",\n".join(map(repr, data))
         return f"ParticleSet(\n{dset_str}\n)"
 
     def __len__(self) -> int:
-        filled_dsets = filter(lambda dset: len(dset["data"]) > 0, self.__dsets)
-        dset = next(filled_dsets)
-        return len(dset)
+        return _composite_len(self)
 
     def copy(self) -> "ParticleSet":
-        return deepcopy(self)
+        return _composite_copy(self)
 
     @classmethod
     def from_numpy(
@@ -1725,10 +1781,10 @@ class AdjacencyList(base.AdjacencyBase):
 
     _data: base.AnyVector = array_field("edge")
     weights: base.DoubleVector = array_field("double")
-    __array_interface__: ty.Dict[str, ty.Any] = field(init=False, repr=False)
 
-    def __attrs_post_init__(self):
-        self.__array_interface__ = self._data.__array_interface__
+    @property
+    def __array_interface__(self) -> ty.Dict[str, ty.Any]:
+        return self._data.__array_interface__
 
     @classmethod
     def __array_wrap__(cls, array: base.AnyVector) -> "AdjacencyList":
@@ -1946,29 +2002,20 @@ class Graphicle:
         Vertex at which the hard process is initiated.
     """
 
-    particles: ParticleSet = ParticleSet()
-    adj: AdjacencyList = AdjacencyList()
-
-    @property
-    def __attr_names(self) -> ty.Tuple[str, ...]:
-        return tuple(self.__annotations__.keys())
+    particles: ParticleSet = field(default=Factory(ParticleSet))
+    adj: AdjacencyList = field(default=Factory(AdjacencyList))
 
     def __getitem__(self, key) -> "Graphicle":
-        kwargs = dict()
-        for name in self.__attr_names:
-            data = getattr(self, name)
-            if len(data) != 0:
-                kwargs.update({name: data[key]})
-        return self.__class__(**kwargs)
+        return _composite_getitem(self, key)
 
     def __bool__(self) -> bool:
-        for name in self.__attr_names:
-            if getattr(self, name):
-                return True
-        return False
+        return _composite_bool(self)
+
+    def __len__(self) -> int:
+        return _composite_len(self)
 
     def copy(self) -> "Graphicle":
-        return deepcopy(self)
+        return _composite_copy(self)
 
     @classmethod
     def from_event(cls, event: base.EventInterface) -> "Graphicle":
