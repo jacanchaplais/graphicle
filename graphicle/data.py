@@ -51,6 +51,7 @@ from enum import Enum
 import numpy as np
 import numpy.typing as npt
 from attr import Factory, cmp_using, define, field, setters
+from mcpid.lookup import PdgRecords
 from numpy.lib import recfunctions as rfn
 from rich.console import Console
 from rich.tree import Tree
@@ -80,6 +81,8 @@ __all__ = [
 # SET UP ARRAY ATTRIBUTES FOR DATACLASSES #
 ###########################################
 _types = Types()
+_LOOKUP_TABLE = PdgRecords()
+
 DataType = ty.TypeVar("DataType", bound=base.ArrayBase)
 FuncType = ty.TypeVar("FuncType", bound=ty.Callable[..., ty.Any])
 EdgeLike = ty.Union[
@@ -885,16 +888,12 @@ class PdgArray(base.ArrayBase):
         Charge parity for each particle.
     """
 
-    from mcpid.lookup import PdgRecords as __PdgRecords
-
     _data: base.IntVector = _array_field("<i4")
     dtype: np.dtype = field(init=False, repr=False)
-    __lookup_table: __PdgRecords = field(init=False, repr=False)
     __mega_to_giga: float = field(init=False, repr=False)
     _HANDLED_TYPES = field(init=False, repr=False)
 
     def __attrs_post_init__(self) -> None:
-        self.__lookup_table = self.__PdgRecords()
         self.__mega_to_giga: float = 1.0e-3
         self.dtype = self._data.dtype
         self._HANDLED_TYPES = (np.ndarray, nm.Number, cla.Sequence)
@@ -989,12 +988,12 @@ class PdgArray(base.ArrayBase):
         )
 
     def __get_prop(self, field: str) -> base.VoidVector:
-        props = self.__lookup_table.properties(self.data, [field])[field]
+        props = _LOOKUP_TABLE.properties(self.data, [field])[field]
         return props  # type: ignore
 
     def __get_prop_range(self, field: str) -> base.VoidVector:
         field_range = [field + "lower", field + "upper"]
-        props = self.__lookup_table.properties(self.data, field_range)
+        props = _LOOKUP_TABLE.properties(self.data, field_range)
         return props  # type: ignore
 
     @property
