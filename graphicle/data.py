@@ -668,7 +668,7 @@ class MaskGroup(base.MaskBase, cla.MutableMapping[str, base.MaskBase]):
         self._agg_op = agg_op
 
     @classmethod
-    def from_numpy_structured(cls, arr: np.ndarray) -> "MaskGroup":
+    def from_numpy_structured(cls, arr: base.VoidVector) -> "MaskGroup":
         return cls(
             dict(  # type: ignore
                 map(lambda name: (name, arr[name]), arr.dtype.names)
@@ -1073,8 +1073,14 @@ class MomentumArray(base.ArrayBase):
     ----------
     data : ndarray[float64]
         Structured array containing four momenta.
-    x, y, z, energy : ndarray[float64]
-        Momentum components as one dimensional arrays.
+    x : ndarray[float64]
+        x component of momentum.
+    y : ndarray[float64]
+        y component of momentum.
+    z : ndarray[float64]
+        z component of momentum.
+    energy : ndarray[float64]
+        Energy component of momentum.
     pt : ndarray[float64]
         Transverse component of particle momenta.
     rapidity : ndarray[float64]
