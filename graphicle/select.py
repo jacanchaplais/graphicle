@@ -91,7 +91,7 @@ def fastjet_clusters(
         anti-kt algorithm: p_val = -1
 
     .. versionadded:: 0.2.3
-    Provides an interface to FastJet clustering.
+    Migrated from ``graphicle.calculate.cluster_pmu()``.
     """
     pmu_pyjet = pmu.data[["e", "x", "y", "z"]]
     pmu_pyjet.dtype.names = "E", "px", "py", "pz"
