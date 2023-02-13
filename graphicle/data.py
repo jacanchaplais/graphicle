@@ -462,7 +462,7 @@ class MaskArray(base.MaskBase, base.ArrayBase):
         yield from map(bool, self.data)
 
     def copy(self) -> "MaskArray":
-        return deepcopy(self)
+        return self.__class__(self._data.copy())
 
     def __repr__(self) -> str:
         return _array_repr(self)
@@ -470,7 +470,7 @@ class MaskArray(base.MaskBase, base.ArrayBase):
     def __getitem__(self, key) -> "MaskArray":
         if isinstance(key, base.MaskBase):
             key = key.data
-        return self.__class__(np.array(self.data[key]))
+        return self.__class__(self._data[key])
 
     def __setitem__(self, key, val) -> None:
         if isinstance(key, base.MaskBase):
@@ -938,7 +938,7 @@ class PdgArray(base.ArrayBase):
     def __getitem__(self, key) -> "PdgArray":
         if isinstance(key, base.MaskBase):
             key = key.data
-        return self.__class__(np.array(self.data[key]))
+        return self.__class__(self._data[key])
 
     @property
     def data(self) -> base.IntVector:
@@ -949,7 +949,7 @@ class PdgArray(base.ArrayBase):
         self._data = values  # type: ignore
 
     def copy(self) -> "PdgArray":
-        return deepcopy(self)
+        return self.__class__(self._data)
 
     def mask(
         self,
@@ -1311,8 +1311,8 @@ class ColorArray(base.ArrayBase):
     def data(self, values: npt.ArrayLike) -> None:
         self._data = values  # type: ignore
 
-    def copy(self):
-        return deepcopy(self)
+    def copy(self) -> "ColorArray":
+        return self.__class__(self._data)
 
     def __getitem__(self, key) -> "ColorArray":
         if isinstance(key, base.MaskBase):
@@ -1396,12 +1396,12 @@ class HelicityArray(base.ArrayBase):
 
     def copy(self) -> "HelicityArray":
         """Returns a new HelicityArray instance with same data."""
-        return deepcopy(self)
+        return self.__class__(self._data)
 
     def __getitem__(self, key) -> "HelicityArray":
         if isinstance(key, base.MaskBase):
             key = key.data
-        return self.__class__(np.array(self.data[key]))
+        return self.__class__(self._data[key])
 
     def __len__(self) -> int:
         return len(self.data)
@@ -1477,7 +1477,7 @@ class StatusArray(base.ArrayBase):
     def __getitem__(self, key) -> "StatusArray":
         if isinstance(key, base.MaskBase):
             key = key.data
-        return self.__class__(np.array(self.data[key]))
+        return self.__class__(self._data[key])
 
     def __len__(self) -> int:
         return len(self.data)
@@ -1505,7 +1505,7 @@ class StatusArray(base.ArrayBase):
 
     def copy(self) -> "StatusArray":
         """Returns a new StatusArray instance with same data."""
-        return deepcopy(self)
+        return self.__class__(self._data)
 
     def in_range(
         self,
