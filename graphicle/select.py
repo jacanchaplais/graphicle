@@ -200,6 +200,7 @@ def _partition_vertex(
     final: gcl.MaskArray,
     pmu: gcl.MomentumArray,
     dist_strat: DistFunc,
+    # radius: float,
 ) -> gcl.MaskArray:
     """Prunes input ``mask`` representing hard parton descendants based
     on if final state hadrons are closer to them or background,
@@ -207,13 +208,38 @@ def _partition_vertex(
 
     Parameters
     ----------
-    mask : gcl.MaskArray
+    mask : MaskArray
+        Hard parton descendants.
+    pcls_in : MaskArray or ndarray[bool_]
+        The particles entering the hadronisation vertex.
+    vtx_desc : MaskArray
+        Particles descending from the hadronisation vertex.
+    final : MaskArray
+        Final state particles.
+    pmu : MomentumArray
+        Four momenta.
+    dist_strat : callable
+        Callable which takes two ``MomentumArray`` instances, and
+        returns a double array with number of rows and columns equal to
+        the lengths of the input momenta, respectively. Output should
+        represent pairwise distance between particles incident on the
+        hadronisation vertex, and the final state descendants.
+
+    Returns
+    -------
+    filtered_mask : MaskArray
+        Input ``MaskArray``, filtered to remove background incident on
+        the same hadronisation vertex.
     """
     mask = mask.copy()
     parton_pmu = pmu[pcls_in]
     final_from_vtx = vtx_desc & final
     hadron_pmu = pmu[final_from_vtx]
     dist = dist_strat(parton_pmu, hadron_pmu)
+    # dist_mask = np.zeros_like(dist, "<?")
+    # parton_idxs = np.flatnonzero(mask[pcls_in])
+    # dist_mask[parton_idxs, :] = dist[parton_idxs, :] > radius
+    # dist[dist_mask] *= 1.0E+6
     alloc = np.argmin(dist, axis=0)
     final_from_hard = np.in1d(alloc, np.flatnonzero(mask[pcls_in]))
     mask.data[final_from_vtx] = final_from_hard
@@ -224,6 +250,7 @@ def partition_descendants(
     graph: gcl.Graphicle,
     hier: gcl.MaskGroup,
     pt_exp: float = -0.1,
+    # radius: float = 0.4,
 ) -> gcl.MaskGroup:
     """Partitions the final state descendants with mixed hard partonic
     heritage, by aligning them with their nearest ancestor.
@@ -263,7 +290,12 @@ def partition_descendants(
                 if vtx_id not in graph.edges["out"][mask.data]:
                     continue
                 mask.data = _partition_vertex(
-                    mask, pcls_in, vtx_desc, graph.final, graph.pmu, dist_strat
+                    mask,
+                    pcls_in,
+                    vtx_desc,
+                    graph.final,
+                    graph.pmu,
+                    dist_strat,  # radius
                 ).data
     return hier
 
@@ -610,11 +642,48 @@ def any_overlap(masks: gcl.MaskGroup) -> bool:
     return overlaps
 
 
-def prune_outliers(pmu: gcl.MomentumArray, radius: float) -> gcl.MaskArray:
-    eta_mid = gcl.calculate.pseudorapidity_centre(pmu)
-    phi_mid_cmplx = (pmu._xy_pol * pmu.pt).sum()
-    dphi = np.angle(pmu._xy_pol * phi_mid_cmplx.conj())
-    dr = np.hypot(pmu.eta - eta_mid, dphi)
-    # spread = np.subtract(*np.percentile(dr, (75, 25)))
-    spread = np.std(dr)
-    return gcl.MaskArray(dr < radius * spread)
+def centroid_prune(
+    pmu: gcl.MomentumArray,
+    radius: float,
+    mask: ty.Optional[gcl.MaskArray] = None,
+    centre: ty.Optional[ty.Tuple[float, float]] = None,
+) -> gcl.MaskArray:
+    """For a given ``MomentumArray``, calculate the distance every
+    particle is from a centroid location, and return a ``MaskArray`` for
+    all of the particles which are within a given ``radius``.
+    If ``centre`` is not provided, the transverse momentum weighted
+    centroid will be used.
+
+    Parameters
+    ----------
+    pmu : MomentumArray
+        Four-momenta for a set of particles.
+    radius : float
+        Euclidean distance in the azimuth-pseudorapidity plane from the
+        centroid, beyond which particles will be filtered out.
+    centre : tuple[float, float]
+        Pseudorapidity and azimuth coordinates for a user-defined
+        centroid.
+
+    Returns
+    -------
+    prune_mask : MaskArray
+        Mask which retains only the particles within ``radius`` of the
+        centroid.
+    """
+    if mask is not None:
+        pmu = pmu[mask]
+        event_mask = np.zeros_like(mask, "<?")
+    if centre is None:
+        eta_mid = (pmu.eta * pmu.pt).sum() / pmu.pt.sum()
+        phi_sum_ = (pmu._xy_pol * pmu.pt).sum()
+        phi_mid_ = phi_sum_ / np.abs(phi_sum_)
+    else:
+        eta_mid, phi_mid = centre
+        phi_mid_ = np.exp(complex(0, phi_mid))
+    dist = np.hypot(pmu.eta - eta_mid, np.angle(pmu._xy_pol * phi_mid_.conj()))
+    is_within = dist < radius
+    if mask is None:
+        return gcl.MaskArray(is_within)
+    event_mask[mask] = is_within
+    return gcl.MaskArray(event_mask)
