@@ -5,11 +5,15 @@
 Algorithms for performing common HEP calculations using graphicle data
 structures.
 """
+from __future__ import annotations
+
+import math
 import warnings
 from functools import lru_cache, partial
-from typing import Callable, Dict, Iterable, List, Optional, Set, Tuple, Union
+from typing import Callable, Iterable
 
 import networkx as nx
+import numba as nb
 import numpy as np
 import numpy.lib.recfunctions as rfn
 import pyjet
@@ -62,8 +66,8 @@ def pseudorapidity_centre(pmu: gcl.MomentumArray) -> float:
 
 
 def combined_mass(
-    pmu: Union[gcl.MomentumArray, np.ndarray],
-    weight: Optional[base.DoubleVector] = None,
+    pmu: gcl.MomentumArray | base.VoidVector,
+    weight: base.DoubleVector | None = None,
 ) -> float:
     """Returns the combined mass of the particles represented in the
     provided MomentumArray.
@@ -116,7 +120,7 @@ def combined_mass(
     return mass
 
 
-def _diffuse(colors: List[np.ndarray], feats: List[np.ndarray]):
+def _diffuse(colors: list[base.AnyVector], feats: list[base.AnyVector]):
     color_shape = colors[0].shape
     av_color = np.zeros((color_shape[0], color_shape[1]), dtype="<f8")
     color_stack = np.dstack(colors)  # len_basis x feat_dim x num_in
@@ -136,11 +140,11 @@ def _diffuse(colors: List[np.ndarray], feats: List[np.ndarray]):
 def _trace_vector(
     nx_graph: nx.DiGraph,
     vertex: int,
-    basis: Tuple[int, ...],
+    basis: tuple[int, ...],
     feat_dim: int,
     is_structured: bool,
     exclusive: bool = False,
-) -> np.ndarray:
+) -> base.AnyVector:
     len_basis = len(basis)
     feat_fmt = rfn.structured_to_unstructured if is_structured else lambda x: x
     color = np.zeros((len_basis, feat_dim), dtype=_types.double)
@@ -149,7 +153,7 @@ def _trace_vector(
         if exclusive is True:
             return color
     in_edges = nx_graph.in_edges(vertex, data=True)
-    colors_in: List[np.ndarray] = []
+    colors_in: list[base.AnyVector] = []
     feats = []
     for edge in in_edges:
         feats.append(feat_fmt(edge[2]["feat"]))
@@ -166,11 +170,11 @@ def _trace_vector(
 
 def flow_trace(
     graph: gcl.Graphicle,
-    mask: Union[base.MaskBase, np.ndarray],
-    prop: Union[base.ArrayBase, np.ndarray],
+    mask: base.MaskBase | base.BoolVector,
+    prop: base.ArrayBase | base.AnyVector,
     exclusive: bool = False,
-    target: Optional[Set[int]] = None,
-) -> Dict[str, np.ndarray]:
+    target: set[int] | None = None,
+) -> dict[str, base.DoubleVector]:
     """Performs flow tracing from specified particles in an event, back
     to the hard partons.
 
@@ -244,7 +248,7 @@ def flow_trace(
     )
     _trace_vector.cache_clear()
     traces = dict()
-    array_fmt: Callable[[np.ndarray], np.ndarray] = (
+    array_fmt: Callable[[base.AnyVector], base.AnyVector] = (
         partial(rfn.unstructured_to_structured, dtype=dtype)  # type: ignore
         if is_structured
         else lambda x: x.squeeze()
@@ -255,12 +259,17 @@ def flow_trace(
     return traces
 
 
+@deprecation.deprecated(
+    deprecated_in="0.2.3",
+    removed_in="0.3.0",
+    details="Use ``graphicle.select.fastjet_clusters()`` instead.",
+)
 def cluster_pmu(
     pmu: gcl.MomentumArray,
     radius: float,
     p_val: float,
-    pt_cut: Optional[float] = None,
-    eta_cut: Optional[float] = None,
+    pt_cut: float | None = None,
+    eta_cut: float | None = None,
 ) -> gcl.MaskGroup:
     """Clusters particles using the generalised-kt algorithm.
 
@@ -314,9 +323,42 @@ def cluster_pmu(
     if eta_cut is not None:
         jets = filter(lambda jet: abs(jet.eta) < eta_cut, jets)
     cluster_mask = gcl.MaskGroup()
-    cluster_mask.agg_op = gcl.data.MaskAggOp.OR
+    cluster_mask.agg_op = "or"
     for i, jet in enumerate(jets):
         mask = np.zeros_like(pmu_pyjet, dtype="<?")
         mask[list(map(lambda pcl: pcl.idx, jet))] = True  # type: ignore
         cluster_mask[f"{i}"] = mask
     return cluster_mask
+
+
+@nb.vectorize([nb.float64(nb.float64, nb.float64)])
+def _root_diff_two_squares(
+    x1: base.DoubleUfunc, x2: base.DoubleUfunc
+) -> base.DoubleUfunc:
+    """Numpy ufunc to calculate the square rooted difference of two
+    squares.
+
+    Equivalent to ``sign * sqrt(abs(x1**2 - x2**2))``, element-wise.
+    Where `sign` is the +1 or -1 sign associated with the value of the
+    squared difference. This means that root negative squared
+    differences are permitted, but produce negative, rather than
+    imaginary, values.
+    If `x1` or `x2` is scalar_like (ie. unambiguously cast-able to a
+    scalar type), it is broadcast for use with each element of the other
+    argument.
+
+    Parameters
+    ----------
+    x1, x2 : array_like
+        Double precision floating point, or sequence thereof.
+
+    Returns
+    -------
+    z : ndarray | float
+        Root difference of two squares.
+        This is a scalar if both `x1` and `x2` are scalars.
+    """
+    diff = x1 - x2
+    sqrt_diff = math.copysign(math.sqrt(abs(diff)), diff)
+    sqrt_sum = math.sqrt(x1 + x2)
+    return sqrt_diff * sqrt_sum  # type: ignore

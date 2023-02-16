@@ -11,7 +11,10 @@ import operator as op
 import typing as ty
 
 import numpy as np
+import numpy.lib.recfunctions as rfn
 import pandas as pd
+import pyjet
+from pyjet import ClusterSequence, PseudoJet
 from scipy.sparse.csgraph import breadth_first_tree
 
 import graphicle as gcl
@@ -26,12 +29,91 @@ __all__ = [
     "hierarchy",
     "partition_descendants",
     "hadron_vertices",
+    "fastjet_clusters",
 ]
 
 
 DistFunc = ty.Callable[
     [gcl.MomentumArray, gcl.MomentumArray], base.DoubleVector
 ]
+
+
+def fastjet_clusters(
+    pmu: gcl.MomentumArray,
+    radius: float,
+    p_val: float,
+    pt_cut: ty.Optional[float] = None,
+    eta_cut: ty.Optional[float] = None,
+    top_k: ty.Optional[int] = None,
+) -> ty.List[gcl.MaskArray]:
+    """Clusters particles using the FastJet implementation of the
+    generalised-kt algorithm.
+
+    :group: select
+
+    Parameters
+    ----------
+    pmu: gcl.MomentumArray
+        The momenta of each particle in the point cloud.
+    radius : float
+        The radius of the clusters to be produced.
+    p_val : float
+        The exponent parameter determining the transverse momentum (pt)
+        dependence of iterative pseudojet merges. Positive values
+        cluster low pt particles first, positive values cluster high pt
+        particles first, and a value of zero corresponds to no pt
+        dependence.
+    pt_cut : float, optional
+        Jet transverse momentum threshold, below which jets will be
+        discarded.
+    eta_cut : float, optional
+        Jet pseudorapidity threshold, above which jets will be
+        discarded.
+    top_k : int, optional
+        Only return a maximum ``top_k`` number of jets, sorted by
+        transverse momentum. ie. if ``top_k`` is 3, only 3 jets with
+        highest pt will be given. If ``top_k`` exceeds the number of
+        jets reconstructed, all of the jets will be included.
+
+    Returns
+    -------
+    clusters : list[MaskArray]
+        List containing masks over the input data for each jet
+        clustering, in order of descending transverse momentum.
+
+    Notes
+    -----
+    This is a wrapper around FastJet's implementation.
+
+    ``p_val`` set to ``-1`` gives anti-kT, ``0`` gives Cambridge-Aachen,
+    and ``1`` gives kT clusterings.
+
+    .. versionadded:: 0.2.3
+    Migrated from ``graphicle.calculate.cluster_pmu()``.
+    """
+    pmu_pyjet = pmu.data[["e", "x", "y", "z"]]
+    pmu_pyjet.dtype.names = "E", "px", "py", "pz"
+    pmu_pyjet_idx = rfn.append_fields(
+        pmu_pyjet, "idx", np.arange(len(pmu_pyjet))
+    )
+    sequence: ClusterSequence = pyjet.cluster(
+        pmu_pyjet_idx, R=radius, p=p_val, ep=True
+    )
+    jets: ty.Iterable[PseudoJet] = sequence.inclusive_jets()
+    if pt_cut is not None:
+        jets = filter(lambda jet: jet.pt > pt_cut, jets)
+    if eta_cut is not None:
+        jets = filter(lambda jet: abs(jet.eta) < eta_cut, jets)
+    if top_k is not None:
+        jets = it.islice(jets, top_k)
+    jet_idxs = map(lambda j: list(map(op.attrgetter("idx"), j)), jets)
+    mask_empty = gcl.MaskArray(np.zeros_like(pmu_pyjet, dtype="<?"))
+    clusters: ty.List[gcl.MaskArray] = []
+    for jet_idx in jet_idxs:
+        mask = mask_empty.copy()
+        mask[jet_idx] = True
+        clusters.append(mask)
+    return clusters
 
 
 def find_vertex(
@@ -412,7 +494,7 @@ def hard_descendants(
         pcl_out_vtxs = map(int, pcls.edges["out"])
         hard_vtxs.extend(list(zip(pdg_keys, pcl_out_vtxs)))
     # find the descendants of those vertices
-    masks = gcl.MaskGroup(agg_op=gcl.data.MaskAggOp.OR)
+    masks = gcl.MaskGroup(agg_op="or")
     for pdg_key, vtx in hard_vtxs:
         masks[pdg_key] = vertex_descendants(graph.adj, vtx)
     return masks
