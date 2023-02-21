@@ -370,9 +370,7 @@ def _array_field(dtype: npt.DTypeLike, num_cols: int = 1):
 
 def _truthy(data: ty.Union[base.ArrayBase, base.AdjacencyBase]) -> bool:
     """Defines the truthy value of the graphicle data structures."""
-    if len(data) == 0:
-        return False
-    return True
+    return not (len(data) == 0)
 
 
 ##################################
