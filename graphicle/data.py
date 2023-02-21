@@ -83,7 +83,7 @@ __all__ = [
 _types = Types()
 _LOOKUP_TABLE = PdgRecords()
 
-DataType = ty.TypeVar("DataType", bound=base.ArrayBase)
+DataType = ty.TypeVar("DataType", base.ArrayBase, base.AdjacencyBase)
 FuncType = ty.TypeVar("FuncType", bound=ty.Callable[..., ty.Any])
 EdgeLike = ty.Union[
     base.IntVector, base.VoidVector, ty.Sequence[ty.Tuple[int, int]]
@@ -259,7 +259,7 @@ def _array_ne(
     return MaskArray(x != y)
 
 
-def _array_repr(instance: base.ArrayBase) -> str:
+def _array_repr(instance: ty.Union[base.ArrayBase, base.AdjacencyBase]) -> str:
     """Provides a common string representation for ``ArrayBase``
     implementations.
     """
@@ -275,31 +275,6 @@ def _array_repr(instance: base.ArrayBase) -> str:
     dtype_str = idnt + dtype_str
     rows = "\n".join(map(op.add, it.repeat(idnt), data_splits))
     return f"{class_name}({first_str}\n{rows},\n{dtype_str})"
-
-
-def array_field(type_name: str):
-    """Prepares a field for attrs dataclass with typicle input."""
-    types = Types()
-    dtype = np.dtype(getattr(types, type_name))
-    default = Factory(lambda: np.array([], dtype=dtype))
-
-    def converter(values: npt.ArrayLike) -> base.AnyVector:
-        if not isinstance(values, np.ndarray):
-            data = np.array(values)
-        else:
-            data = values
-        if data.dtype != dtype:
-            if dtype.names is None:
-                return data.astype(dtype)
-            return rfn.unstructured_to_structured(data, dtype)
-        return data
-
-    return field(
-        default=default,
-        eq=cmp_using(np.array_equal),
-        converter=converter,
-        on_setattr=setters.convert,
-    )
 
 
 def _reorder_pmu(array: base.VoidVector) -> base.VoidVector:
@@ -1779,16 +1754,28 @@ class AdjacencyList(base.AdjacencyBase):
         Adjacency matrix representation.
     """
 
-    _data: base.AnyVector = array_field("edge")
-    weights: base.DoubleVector = array_field("double")
+    _data: base.AnyVector = _array_field("<i4", 2)
+    weights: base.DoubleVector = _array_field("<f8")
+    dtype: np.dtype = field(init=False, repr=False)
+    _HANDLED_TYPES: ty.Tuple[ty.Type, ...] = field(init=False, repr=False)
+
+    def __attrs_post_init__(self):
+        self.dtype = np.dtype(list(zip(("in", "out"), ("<i4",) * 2)))
+        self._HANDLED_TYPES = (np.ndarray, nm.Number, cla.Sequence)
 
     @property
     def __array_interface__(self) -> ty.Dict[str, ty.Any]:
         return self._data.__array_interface__
 
+    def __array_ufunc__(self, ufunc, method, *inputs, **kwargs):
+        return _array_ufunc(self, ufunc, method, *inputs, **kwargs)
+
     @classmethod
     def __array_wrap__(cls, array: base.AnyVector) -> "AdjacencyList":
         return cls(array)
+
+    def __repr__(self) -> str:
+        return _array_repr(self)
 
     def __iter__(self) -> ty.Iterator[VertexPair]:
         flat_vals = map(int, it.chain.from_iterable(self._data))
@@ -1807,7 +1794,7 @@ class AdjacencyList(base.AdjacencyBase):
     def __getitem__(self, key) -> "AdjacencyList":
         if isinstance(key, base.MaskBase):
             key = key.data
-        return self.__class__(np.array(self._data[key]))
+        return self.__class__(self._data[key])
 
     def copy(self) -> "AdjacencyList":
         return deepcopy(self)
@@ -1853,14 +1840,26 @@ class AdjacencyList(base.AdjacencyBase):
             dtype = self.weights.dtype
         else:
             weights = np.array(1)
-            dtype = _types.int
+            dtype = "<i4"
         adj = np.zeros((size, size), dtype=dtype)
-        adj[self.edges["in"], self.edges["out"]] = weights
+        abs_edges = self._edge_relabel
+        adj[abs_edges[:, 0], abs_edges[:, 1]] = weights
         return adj
 
     @property
-    def edges(self) -> base.AnyVector:
-        return self._data
+    def _edge_relabel(self) -> base.IntVector:
+        _, inv = np.unique(self._data, return_inverse=True)
+        size = np.max(inv) + 1
+        new_idxs = np.arange(size, dtype="<i4")
+        return new_idxs[inv].reshape(-1, 2)
+
+    @property
+    def data(self) -> base.VoidVector:
+        return self._data.view(self.dtype).reshape(-1)
+
+    @property
+    def edges(self) -> base.VoidVector:
+        return self.data
 
     @property
     def nodes(self) -> base.IntVector:
@@ -1869,8 +1868,7 @@ class AdjacencyList(base.AdjacencyBase):
         Positive sign conventionally means final state particle.
         """
         # extract nodes from edge list
-        unstruc_edges = rfn.structured_to_unstructured(self._data)
-        unsort_nodes = np.unique(unstruc_edges)
+        unsort_nodes = np.unique(self._data)
         sort_idxs = np.argsort(np.abs(unsort_nodes))
         return unsort_nodes[sort_idxs]  # type: ignore
 
@@ -1895,12 +1893,12 @@ class AdjacencyList(base.AdjacencyBase):
             COO-formatted sparse array, where rows are "in" and cols
             are "out" indices for ``AdjacencyList.edges``.
         """
-        out = self._data["out"]
-        size = np.max(out) + 1
+        abs_edges = self._edge_relabel
+        size = np.max(abs_edges) + 1
         if data is None:
-            data = np.sign(self._data["out"]) == 1
+            data = np.sign(self.data["out"]) == 1
         return coo_array(
-            (data, (np.abs(self._data["in"]), np.abs(self._data["out"]))),
+            (data, (abs_edges[:, 0], abs_edges[:, 1])),
             shape=(size, size),
         )
 
