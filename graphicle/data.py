@@ -77,6 +77,7 @@ __all__ = [
     "Graphicle",
 ]
 
+
 ###########################################
 # SET UP ARRAY ATTRIBUTES FOR DATACLASSES #
 ###########################################
@@ -1849,9 +1850,7 @@ class AdjacencyList(base.AdjacencyBase):
     @property
     def _edge_relabel(self) -> base.IntVector:
         _, inv = np.unique(self._data, return_inverse=True)
-        size = np.max(inv) + 1
-        new_idxs = np.arange(size, dtype="<i4")
-        return new_idxs[inv].reshape(-1, 2)
+        return inv.reshape(-1, 2)
 
     @property
     def data(self) -> base.VoidVector:
