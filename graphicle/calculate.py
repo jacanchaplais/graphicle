@@ -12,13 +12,13 @@ import warnings
 from functools import lru_cache, partial
 from typing import Callable, Iterable
 
+import deprecation
 import networkx as nx
 import numba as nb
 import numpy as np
 import numpy.lib.recfunctions as rfn
 import pyjet
 from pyjet import ClusterSequence, PseudoJet
-from typicle import Types
 
 import graphicle as gcl
 
@@ -30,8 +30,6 @@ __all__ = [
     "flow_trace",
     "cluster_pmu",
 ]
-
-_types = Types()
 
 
 def azimuth_centre(pmu: gcl.MomentumArray, pt_weight: bool = True) -> float:
@@ -147,7 +145,7 @@ def _trace_vector(
 ) -> base.AnyVector:
     len_basis = len(basis)
     feat_fmt = rfn.structured_to_unstructured if is_structured else lambda x: x
-    color = np.zeros((len_basis, feat_dim), dtype=_types.double)
+    color = np.zeros((len_basis, feat_dim), dtype="<f8")
     if vertex in basis:
         color[basis.index(vertex)] = 1.0
         if exclusive is True:
