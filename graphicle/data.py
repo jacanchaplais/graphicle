@@ -1847,7 +1847,7 @@ class AdjacencyList(base.AdjacencyBase):
         adj[abs_edges[:, 0], abs_edges[:, 1]] = weights
         return adj
 
-    @property
+    @fn.cached_property
     def _edge_relabel(self) -> base.IntVector:
         _, inv = np.unique(self._data, return_inverse=True)
         return inv.reshape(-1, 2)
