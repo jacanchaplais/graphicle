@@ -178,7 +178,7 @@ class ParticleBase(ABC):
         pass
 
 
-class AdjacencyBase(ABC, cla.Sequence):
+class AdjacencyBase(ABC, cla.Sequence, np.lib.mixins.NDArrayOperatorsMixin):
     @abstractmethod
     def __len__(self) -> int:
         pass
