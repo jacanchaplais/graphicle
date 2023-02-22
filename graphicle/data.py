@@ -1873,8 +1873,7 @@ class AdjacencyList(base.AdjacencyBase):
 
         For both the weighted and unweighted case, if several edges
         connect vertex pairs, their entries will be summed to produce
-        the dense matrix. In the weighted case, this may cause loss of
-        information.
+        the dense matrix. This may cause loss of information.
         """
         if self.weights.size > 0:
             adj = self._sparse_weighted
