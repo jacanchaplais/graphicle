@@ -1853,6 +1853,16 @@ class AdjacencyList(base.AdjacencyBase):
         return inv.reshape(-1, 2)
 
     @property
+    def leaves(self) -> MaskArray:
+        """A mask to select the leaves of the DAG."""
+        sparse_copy = self._sparse.copy()
+        sparse_copy.data[...] = True
+        out_degree = sparse_copy.sum(axis=1)
+        zero_idxs = np.flatnonzero(out_degree == 0)
+        leaf_mask = np.in1d(sparse_copy.col, zero_idxs)
+        return MaskArray(leaf_mask)
+
+    @property
     def data(self) -> base.VoidVector:
         return self._data.view(self.dtype).reshape(-1)
 
