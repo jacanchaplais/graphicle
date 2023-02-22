@@ -1753,6 +1753,19 @@ class AdjacencyList(base.AdjacencyBase):
         Scalar value embedded on each edge.
     matrix : ndarray
         Adjacency matrix representation.
+    leaves : MaskArray
+        Provides a mask for selecting the leaves of a DAG / tree.
+
+        .. versionadded:: 0.2.4
+    data : ndarray
+        Underlying array data. Identical to ``edges`` attribute,
+        included for consistency with ``base.ArrayBase`` numpy
+        interfaces.
+
+        .. versionadded:: 0.2.4
+
+    Methods
+    -------
     """
 
     _data: base.AnyVector = _array_field("<i4", 2)
