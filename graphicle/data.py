@@ -756,8 +756,12 @@ class MaskGroup(base.MaskBase, cla.MutableMapping[str, base.MaskBase]):
     def __ne__(self, other: base.MaskLike) -> "MaskArray":
         return _mask_neq(self, other)
 
-    def copy(self):
-        return deepcopy(self)
+    def copy(self) -> "MaskGroup":
+        mask_copies = map(op.methodcaller("copy"), self._mask_arrays.values())
+        return self.__class__(
+            cl.OrderedDict(zip(self._mask_arrays.keys(), mask_copies)),
+            agg_op=self._agg_op,  # type: ignore
+        )
 
     @property
     def names(self) -> ty.List[str]:
