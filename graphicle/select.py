@@ -50,10 +50,10 @@ def fastjet_clusters(
     """Clusters particles using the FastJet implementation of the
     generalised-kt algorithm.
 
+    :group: select
+
     .. versionadded:: 0.2.3
        Migrated from ``graphicle.calculate.cluster_pmu()``.
-
-    :group: select
 
     Parameters
     ----------
@@ -125,9 +125,9 @@ def find_vertex(
     """Locate vertices with the inward and outward particles of the
     passed pdg codes.
 
-    .. versionadded:: 0.1.0
-
     :group: select
+
+    .. versionadded:: 0.1.0
 
     Parameters
     ----------
@@ -201,12 +201,12 @@ def vertex_descendants(adj: gcl.AdjacencyList, vertex: int) -> gcl.MaskArray:
     """Return a mask over a graphicle object, identifying which
     particles descend from a given interaction vertex.
 
+    :group: select
+
     .. versionadded:: 0.1.0
 
     .. versionchanged:: 0.1.11
-       Speed improvements by replacing NetworkX with SciPy.
-
-    :group: select
+       Performance enhancements.
 
     Parameters
     ----------
@@ -235,9 +235,9 @@ def hadron_vertices(
 ) -> ty.Tuple[int, ...]:
     """Locates the hadronisation vertices in the generation DAG.
 
-    .. versionadded:: 0.1.11
-
     :group: select
+
+    .. versionadded:: 0.1.11
 
     Parameters
     ----------
@@ -321,9 +321,9 @@ def partition_descendants(
     """Partitions the final state descendants with mixed hard partonic
     heritage, by aligning them with their nearest ancestor.
 
-    .. versionadded:: 0.1.11
-
     :group: select
+
+    .. versionadded:: 0.1.11
 
     Parameters
     ----------
@@ -441,13 +441,13 @@ def hard_descendants(
     """Returns a MaskGroup over the particles in the graph, where True
     indicates a particle descends from a specific hard parton.
 
+    :group: select
+
     .. versionadded:: 0.1.0
 
     .. versionchanged:: 0.1.11
        Target parameter now optional. Using default implies all hard
        partons.
-
-    :group: select
 
     Parameters
     ----------
@@ -496,9 +496,9 @@ def hierarchy(
     structure, such that partons which are descendants of other hard
     partons are accessible, and nested within their parents.
 
-    .. versionadded:: 0.1.11
-
     :group: select
+
+    .. versionadded:: 0.1.11
 
     Parameters
     ----------
@@ -671,9 +671,9 @@ def leaf_masks(mask_tree: gcl.MaskGroup) -> gcl.MaskGroup:
     """Find the leaves of the hard process, when organised into a
     hierarchical tree from ``hierarchy()``.
 
-    .. versionadded:: 0.1.11
-
     :group: select
+
+    .. versionadded:: 0.1.11
 
     Parameters
     ----------
@@ -696,9 +696,9 @@ def any_overlap(masks: gcl.MaskGroup) -> bool:
     """Given a MaskGroup object, checks if any of the masks overlap
     with each other.
 
-    .. versionadded:: 0.1.0
-
     :group: select
+
+    .. versionadded:: 0.1.0
 
     Parameters
     ----------
