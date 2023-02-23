@@ -8,7 +8,13 @@ import graphicle as gcl
 
 from . import base
 
-__all__ = ["cut_adj", "knn_adj", "fc_adj", "delta_R_aff"]
+__all__ = [
+    "cut_adj",
+    "knn_adj",
+    "fc_adj",
+    "delta_R_aff",
+    "parton_hadron_distance",
+]
 
 _types = Types()
 
@@ -24,35 +30,37 @@ def cut_adj(
     towards the neighbours within a cut range, determined from the input
     affinity matrix.
 
-    The cut represents the limiting value of the affinity matrix for
+    The ``cut`` represents the limiting value of the affinity matrix for
     elements to form edges in the adjacency matrix.
 
     :group: matrix
 
+    .. versionadded:: 0.1.0
+
     Parameters
     ----------
-    matrix : array
+    matrix : ndarray[float64]
         Particle affinities.
     cut : float
         Value beyond which affinities are not sufficient to form edges.
-    mode : str
+    mode : {'max', 'min'}
         Sets whether affinities should be above or below cut.
-        'max' implies matrix < cut, 'min' implies matrix > cut.
+        'max' implies ``matrix < cut``, 'min' implies ``matrix > cut``.
         Default is 'max'.
     self_loop : bool
-        If False will remove self-edges. Default is False.
+        If ``False`` will remove self-edges. Default is ``False``.
     weighted : bool
-        If True edges weighted by affinity, if False edge is binary.
-        Default is False.
+        If ``True`` edges weighted by affinity, if ``False`` edge is
+        binary. Default is ``False``.
 
     Returns
     -------
-    adj : array
+    adj : ndarray[bool_] or ndarray[float64]
         Adjacency matrix representing particle connectivity.
 
     Notes
     -----
-    If weighted is False, the returned adjacency matrix will be boolean.
+    If weighted is ``False``, the returned adjacency matrix will be boolean.
     """
     # form the cut mask
     if mode == "max":
@@ -87,37 +95,40 @@ def knn_adj(
     row: bool = True,
     dtype: Optional[npt.DTypeLike] = None,
 ) -> base.DoubleVector:
-    """Produce a directed adjacency matrix with outward edges
-    towards the k nearest neighbours, determined from the input
-    affinity matrix.
+    """Produce a directed adjacency matrix with outward edges towards
+    the ``k`` nearest neighbours, determined from the input affinity
+    ``matrix``.
 
     :group: matrix
 
+    .. versionadded:: 0.1.0
+
     Parameters
     ----------
-    matrix : 2d numpy array
-        Particle affinities.
+    matrix : ndarray[float64]
+        2D matrix of Particle affinities.
     k : int
         Number of nearest neighbours in result.
     weighted : bool
-        If True edges weighted by affinity, if False edge is binary.
-        Default is False.
+        If ``True`` edges weighted by affinity, if ``False`` edge is
+        binary. Default is ``False``.
     self_loop : bool
-        If False will remove self-edges. Default is False.
+        If ``False`` will remove self-edges. Default is ``False``.
     row : bool
-        If True outward edges given by rows, if False cols. Default is
-        True.
+        If ``True`` outward edges given by rows, if ``False`` cols.
+        Default is ``True``.
     dtype : dtype-like, optional
-        Type of output. Must be floating point if weighted is True.
+        Type of output. Must be floating point if weighted is ``True``.
 
     Returns
     -------
-    adj : array
+    adj : ndarray[bool_] or ndarray[float64]
         Adjacency matrix representing particle connectivity.
 
     Notes
     -----
-    If weighted is False, the returned adjacency matrix will be boolean.
+    If weighted is ``False``, the returned adjacency matrix will be
+    boolean.
     """
     axis = 0  # calculate everything row-wise
     if self_loop is False:
@@ -154,6 +165,8 @@ def fc_adj(
 
     :group: matrix
 
+    .. versionadded:: 0.1.0
+
     Parameters
     ----------
     num_nodes : int
@@ -163,6 +176,12 @@ def fc_adj(
         ``False``.
     dtype : dtype-like
         The dtype of the output array. Default is ``np.bool_``.
+
+    Returns
+    -------
+    adj : ndarray[bool_] or ndarray[float64]
+        Fully connected Adjacency matrix representing particle
+        connectivity.
     """
     adj = np.ones((num_nodes, num_nodes), dtype=dtype)
     if self_loop is False:
@@ -172,25 +191,27 @@ def fc_adj(
 
 def delta_R_aff(pmu: gcl.MomentumArray) -> base.DoubleVector:
     """Returns the inter-particle Euclidean distances between particles
-    internally within the given MomentumArray.
+    internally within the given ``MomentumArray``.
 
     :group: matrix
 
+    .. versionadded:: 0.1.0
+
     Parameters
     ----------
-    pmu : gcl.MomentumArray
-        Four-momenta.
+    pmu : MomentumArray
+        Four-momenta of particle set.
 
     Returns
     -------
-    delta_R_matrix : np.ndarray[double]
+    delta_R_matrix : ndarray[float64]
         Square symmetric matrix representing the Euclidean distance
         between every pair of particles in the eta-phi plane.
 
     Notes
     -----
     Infinite values may be encountered if particles are travelling
-    parallel to the beam axis, __ie.__ with infinite pseudorapidity.
+    parallel to the beam axis, *ie.* with infinite pseudorapidity.
     """
     return pmu.delta_R(pmu)
 
@@ -204,6 +225,10 @@ def parton_hadron_distance(
     between two sets of 4-momenta. The pt weighting is raised to the
     power given by ``pt_exp``.
 
+    :group: matrix
+
+    .. versionadded:: 0.1.11
+
     Parameters
     ----------
     parton_pmu, hadron_pmu : MomentumArray
@@ -213,7 +238,7 @@ def parton_hadron_distance(
 
     Returns
     -------
-    dists : ndarray[double]
+    dists : ndarray[float64]
         Distance matrix between ``parton_pmu`` and ``hadron_pmu``,
         whose number of rows and columns equal to the input sizes,
         respectively.

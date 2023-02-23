@@ -37,6 +37,8 @@ def azimuth_centre(pmu: gcl.MomentumArray, pt_weight: bool = True) -> float:
 
     :group: calculate
 
+    .. versionadded:: 0.1.7
+
     Parameters
     ----------
     pmu : MomentumArray
@@ -68,7 +70,7 @@ def combined_mass(
     weight: base.DoubleVector | None = None,
 ) -> float:
     """Returns the combined mass of the particles represented in the
-    provided MomentumArray.
+    provided ``MomentumArray``.
 
     This is done by summing the four momenta, optionally weighting the
     components, and then taking the inner product of the result with
@@ -76,25 +78,27 @@ def combined_mass(
 
     :group: calculate
 
+    .. versionadded:: 0.1.0
+
     Parameters
     ----------
-    pmu : MomentumArray, ndarray
+    pmu : MomentumArray or ndarray[void]
         Momenta of particles comprising a jet, or an analagous combined
         object. If a numpy array is passed, it must be structured with
-        fields (x, y, z, e).
-    weight : array, optional
+        fields with names ``('x', 'y', 'z', 'e')``.
+    weight : ndarray[float64], optional
         Weights for each particle when reconstructing the jet momentum.
         May be either structured or unstructured. If unstructured,
-        ensure the columns are in the order (x, y, z, e).
+        ensure the columns are in the order ``('x', 'y', 'z', 'e')``.
 
     Notes
     -----
-    This does not mask the MomentumArray for you. All filters and cuts
-    must be applied before passing to this function.
+    This does not mask the ``MomentumArray`` for you. All filters and
+    cuts must be applied before passing to this function.
 
     In the event of a squared mass below zero (due to numerical
     fluctuations for very low mass reconstructions), this function will
-    simply return 0.0.
+    simply return ``0.0``.
     """
     # sanitizing and combining the inputs
     if isinstance(pmu, gcl.MomentumArray):
@@ -178,37 +182,37 @@ def flow_trace(
 
     :group: calculate
 
+    .. versionadded:: 0.1.0
+
     Parameters
     ----------
     graph : Graphicle
         Full particle event, containing hard partons, showering and
         hadronisation.
-    mask : MaskArray, MaskGroup, ndarray
+    mask : MaskArray or MaskGroup or ndarray[bool_]
         Boolean mask identifying which particles should have their
         ancestry traced.
-    prop : ArrayBase, ndarray
-        Property to trace back, eg. 4-momentum, charge.
-        Must be the same shape as arrays stored in graph.
-        Can be structured, unstructured, or a graphicle array, though
-        unstructured arrays must be 1d.
+    prop : ArrayBase or ndarray[any]
+        Property to trace back, *eg.* 4-momentum, charge, *etc*. Must be
+        the same shape as arrays stored in graph. Can be structured,
+        unstructured, or a graphicle array, though unstructured arrays
+        must be 1D.
     exclusive : bool
-        If True, double counting from descendant particles in the hard
-        event will be switched off.
-        eg. for event t > b W+, descendants of b will show no
-        contribution from t, as b is a subset of t.
-        Default is False.
-    target : set of ints, optional
+        If ``True``, double counting from descendant particles in the
+        hard event will be switched off. *eg.* for event ``t > b W+``,
+        descendants of ``b`` will show no contribution from ``t``, as
+        ``b`` is a subset of ``t``. Default is ``False``.
+    target : set[int], optional
         Highlights specific partons in the hard event to decompose
-        properties with respect to.
-        If left as None, will simply use all partons in hard event,
-        except for incoming partons.
+        properties with respect to. If unset, will use all partons in
+        hard event, except for incoming partons.
 
     Returns
     -------
-    trace_array : Dict of arrays
-        Dictionary of arrays. Keys are parton names, arrays represent
-        the contributions of hard partons traced down to the properties
-        of the selected subset of particles specified by mask.
+    trace_array : dict[str, ndarray]
+        Keys are parton names, arrays represent the contributions of
+        hard partons traced down to the properties of the selected
+        subset of particles specified by mask.
     """
     if isinstance(prop, base.ArrayBase):
         prop = prop.data
@@ -273,9 +277,11 @@ def cluster_pmu(
 
     :group: calculate
 
+    .. versionadded:: 0.1.4
+
     Parameters
     ----------
-    pmu: gcl.MomentumArray
+    pmu: MomentumArray
         The momenta of each particle in the point cloud.
     radius : float
         The radius of the clusters to be produced.
@@ -294,7 +300,7 @@ def cluster_pmu(
 
     Returns
     -------
-    clusters : gcl.MaskGroup
+    clusters : MaskGroup
         MaskGroup object, containing boolean masks over the input data
         for each jet clustering.
 
@@ -302,10 +308,8 @@ def cluster_pmu(
     -----
     This is a wrapper around FastJet's implementation.
 
-    Standard settings:
-        kt algorithm: p_val = 1
-        Cambridge/Aachen algorithm: p_val = 0
-        anti-kt algorithm: p_val = -1
+    ``p_val`` set to ``-1`` gives anti-kT, ``0`` gives Cambridge-Aachen,
+    and ``1`` gives kT clusterings.
     """
     pmu_pyjet = pmu.data[["e", "x", "y", "z"]]
     pmu_pyjet.dtype.names = "E", "px", "py", "pz"
@@ -341,7 +345,7 @@ def _root_diff_two_squares(
     squared difference. This means that root negative squared
     differences are permitted, but produce negative, rather than
     imaginary, values.
-    If `x1` or `x2` is scalar_like (ie. unambiguously cast-able to a
+    If `x1` or `x2` is scalar_like (*ie.* unambiguously cast-able to a
     scalar type), it is broadcast for use with each element of the other
     argument.
 

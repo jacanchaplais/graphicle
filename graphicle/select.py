@@ -48,8 +48,8 @@ def fastjet_clusters(
     eta_cut: ty.Optional[float] = None,
     top_k: ty.Optional[int] = None,
 ) -> ty.List[gcl.MaskArray]:
-    """Clusters particles using the FastJet implementation of the
-    generalised-kt algorithm.
+    """Clusters particles using the **FastJet** implementation of the
+    *generalised-kt algorithm*.
 
     :group: select
 
@@ -58,7 +58,7 @@ def fastjet_clusters(
 
     Parameters
     ----------
-    pmu: gcl.MomentumArray
+    pmu: MomentumArray
         The momenta of each particle in the point cloud.
     radius : float
         The radius of the clusters to be produced.
@@ -76,7 +76,7 @@ def fastjet_clusters(
         discarded.
     top_k : int, optional
         Only return a maximum ``top_k`` number of jets, sorted by
-        transverse momentum. ie. if ``top_k`` is 3, only 3 jets with
+        transverse momentum. *ie.* if ``top_k`` is 3, only 3 jets with
         highest pt will be given. If ``top_k`` exceeds the number of
         jets reconstructed, all of the jets will be included.
 
@@ -90,8 +90,8 @@ def fastjet_clusters(
     -----
     This is a wrapper around FastJet's implementation.
 
-    ``p_val`` set to ``-1`` gives anti-kT, ``0`` gives Cambridge-Aachen,
-    and ``1`` gives kT clusterings.
+    ``p_val`` set to ``-1`` gives **anti-kT**, ``0`` gives
+    **Cambridge-Aachen**, and ``1`` gives **kT** clusterings.
     """
     pmu_pyjet = pmu.data[["e", "x", "y", "z"]]
     pmu_pyjet.dtype.names = "E", "px", "py", "pz"
@@ -199,15 +199,12 @@ def find_vertex(
 
 
 def vertex_descendants(adj: gcl.AdjacencyList, vertex: int) -> gcl.MaskArray:
-    """Return a mask over a graphicle object, identifying which
-    particles descend from a given interaction vertex.
+    """Returns a ``MaskArray`` to select particles which descend from a
+    given interaction vertex.
 
     :group: select
 
     .. versionadded:: 0.1.0
-
-    .. versionchanged:: 0.1.11
-       Performance enhancements.
 
     Parameters
     ----------
@@ -465,8 +462,8 @@ def hard_descendants(
     target: ty.Optional[ty.Iterable[int]] = None,
     sign_sensitive: bool = False,
 ) -> gcl.MaskGroup:
-    """Returns a MaskGroup over the particles in the graph, where True
-    indicates a particle descends from a specific hard parton.
+    """Returns a ``MaskGroup`` instance to select particle descendants
+    of ``target`` hard partons (by PDG code).
 
     :group: select
 
@@ -478,17 +475,18 @@ def hard_descendants(
     Parameters
     ----------
     graph : Graphicle
-        Particle graph containing at least PdgArray and StatusArray.
+        Particle graph containing at least ``PdgArray`` and
+        ``StatusArray``.
     target : Iterable[int], optional
         PDG codes referring to the hard particles for which descendants
         are obtained. If ``None``, will obtain masks for all
         intermediate and outgoing hard partons. Default is ``None``.
     sign_sensitive : bool
         Indicates whether sign of PDG code should be used when selecting
-        hard partons, ie. if set to False both particle and
-        anti-particle partons will be masked, whereas if True only the
-        partons explicitly matching the target sign will be considered.
-        Default is False.
+        hard partons, *ie.* if set to ``False`` both particle and
+        anti-particle partons will be masked, whereas if ``True`` only
+        the partons explicitly matching the target sign will be
+        considered. Default is ``False``.
     """
     hard_vtxs = list()
     # get the vertices of the hard partons
@@ -719,7 +717,7 @@ def leaf_masks(mask_tree: gcl.MaskGroup) -> gcl.MaskGroup:
 
 
 def any_overlap(masks: gcl.MaskGroup) -> bool:
-    """Given a MaskGroup object, checks if any of the masks overlap
+    """Given a ``MaskGroup`` object, checks if any of the masks overlap
     with each other.
 
     :group: select
@@ -734,8 +732,8 @@ def any_overlap(masks: gcl.MaskGroup) -> bool:
     Returns
     -------
     any_overlap : bool
-        True if at least two MaskArrays in MaskGroup have at least one
-        True element in the same location.
+        ``True`` if at least two ``MaskArrays`` in ``masks`` have at
+        least one ``True`` element in the same location.
     """
     combos = it.combinations(masks.dict.values(), 2)
     pair_checks = map(np.bitwise_and, *zip(*combos))

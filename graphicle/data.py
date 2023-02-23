@@ -117,6 +117,8 @@ class MomentumElement(ty.NamedTuple):
     """Named tuple container for the momentum of a single particle.
 
     :group: datastructure
+
+    .. versionadded:: 0.2.0
     """
 
     x: float
@@ -130,6 +132,8 @@ class ColorElement(ty.NamedTuple):
     particle.
 
     :group: datastructure
+
+    .. versionadded:: 0.2.0
     """
 
     color: int
@@ -141,6 +145,8 @@ class VertexPair(ty.NamedTuple):
     particle.
 
     :group: datastructure
+
+    .. versionadded:: 0.2.0
     """
 
     src: int
@@ -171,8 +177,8 @@ def _array_ufunc(
     ufunc : callable
         Numpy ufunc being called on ``instance``.
     method : str
-        Method applied to ``ufunc``, eg. 'reduce' for ``np.add.reduce``,
-        of which ``np.sum`` is an alias.
+        Method applied to ``ufunc``, *eg.* ``'reduce'`` for
+        ``np.add.reduce``, of which ``np.sum`` is an alias.
     *inputs : tuple[Any]
         Positional arguments of the ufunc.
     **kwargs : dict[str, Any]
@@ -182,7 +188,7 @@ def _array_ufunc(
     -------
     output : arrays or scalars, or tuple thereof, or None
         Output of passed ufunc. Type depends on ``method``, ``inputs``,
-        and ``instance``. If ``method`` is 'reduce' on ``instance``
+        and ``instance``. If ``method`` is ``'reduce'`` on ``instance``
         with a flat underlying array, then ``output`` will be scalar.
         If ``ufunc`` maps an array to booleans, ``output`` will be a
         ``MaskArray``.
@@ -382,9 +388,14 @@ class MaskArray(base.MaskBase, base.ArrayBase):
 
     :group: datastructure
 
+    .. versionadded:: 0.1.0
+
+    .. versionchanged:: 0.2.0
+       Added internal numpy interfaces for greater interoperability.
+
     Parameters
     ----------
-    data : Sequence[bool]
+    data : sequence[bool]
         Boolean values consituting the mask.
 
     Attributes
@@ -505,7 +516,7 @@ class MaskArray(base.MaskBase, base.ArrayBase):
 
 
 def _mask_compat(*masks: base.MaskLike) -> bool:
-    """Check if a collection of masks are compatible, ie. they must be
+    """Check if a collection of masks are compatible, *ie.* they must be
     either numpy boolean arrays, or ``MaskBase`` instances.
     """
     for mask in masks:
@@ -521,9 +532,9 @@ def _mask_eq(mask1: base.MaskLike, mask2: base.MaskLike) -> MaskArray:
 
     Parameters
     ----------
-    mask1 : base.MaskBase | numpy.ndarray
+    mask1 : base.MaskBase or ndarray
         Boolean array to compare against.
-    mask2 : base.MaskBase | numpy.ndarray
+    mask2 : base.MaskBase or ndarray
         The other array.
     """
     if not _mask_compat(mask1, mask2):
@@ -542,9 +553,9 @@ def _mask_neq(mask1: base.MaskLike, mask2: base.MaskLike) -> MaskArray:
 
     Parameters
     ----------
-    mask1 : base.MaskBase | numpy.ndarray
+    mask1 : base.MaskBase or ndarray
         Boolean array to compare against.
-    mask2 : base.MaskBase | numpy.ndarray
+    mask2 : base.MaskBase or ndarray
         The other array.
     """
     if not _mask_compat(mask1, mask2):
@@ -588,25 +599,29 @@ class MaskGroup(base.MaskBase, cla.MutableMapping[str, base.MaskBase]):
 
     :group: datastructure
 
+    .. versionadded:: 0.1.0
+
     Parameters
     ----------
     _mask_arrays : dict of MaskArrays or array-like objects
         Dictionary of MaskArray objects to be composed.
-    agg_op : str or MaskAggOp
-        Defines the aggregation operation when accessing the `data`
-        attribute. Options are "and", "or", "none". Default is "and".
+    agg_op : {'and', 'or', 'none'}
+        Defines the aggregation operation when accessing the ``data``
+        attribute. Default is ``'and'``.
 
     Attributes
     ----------
     data : ndarray[bool_]
         Combination of all masks in group via bitwise AND reduction.
+    agg_op : MaskAggOp
+        Aggregation operation set for reduction over constituent masks.
     names : list[str]
         Provides the string values of the keys to the top-level nested
         ``MaskBase`` objects as a list. Will be deprecated in future.
         ``MaskGroup.keys()`` is preferred.
     bitwise_or : ndarray[bool_]
         Bitwise ``OR`` reduction over the nested masks.
-    bitwise_or : np.ndarray[bool_]
+    bitwise_and : np.ndarray[bool_]
         Bitwise ``AND`` reduction over the nested masks.
     dict : dict[base.MaskBase]
         Masks nested in a dictionary instead of a ``MaskGroup``.
@@ -616,7 +631,10 @@ class MaskGroup(base.MaskBase, cla.MutableMapping[str, base.MaskBase]):
     from_numpy_structured()
         Converts a structured boolean array into a ``MaskGroup``.
     flatten()
-        Removes any nesting of ``MaskGroup``s within ``MaskGroup``s.
+        Removes any nesting of ``MaskGroup`` instances within
+        ``MaskGroup`` instances.
+
+        .. versionadded:: 0.1.11
     copy()
         Copies the ``MaskGroup`` instance.
     """
@@ -835,35 +853,49 @@ class PdgArray(base.ArrayBase):
 
     :group: datastructure
 
+    .. versionadded:: 0.1.0
+
+    .. versionchanged:: 0.2.0
+       Added internal numpy interfaces for greater interoperability.
+
     Parameters
     ----------
-    data : Sequence[int]
+    data : sequence[int]
         The PDG codes for each particle in the point cloud.
 
     Attributes
     ----------
-    name : ndarray
+    name : ndarray[object]
         String representation of particle names.
-    charge : ndarray
+    charge : ndarray[float64]
         Charge for each particle in elementary units.
-    mass : ndarray
+    mass : ndarray[float64]
         Mass for each particle in GeV.
-    mass_bounds : ndarray
-        Mass upper and lower bounds for each particle in GeV.
-    quarks : ndarray
+    mass_bounds : ndarray[void]
+        Mass upper and lower bounds for each particle in GeV. Structured
+        array with fields ``('masslower', 'massupper')``.
+    quarks : ndarray[object]
         String representation of quark composition for each particle.
-    width : ndarray
+    width : ndarray[float64]
         Width for each particle in GeV.
-    width_bounds : ndarray
+    width_bounds : ndarray[void]
         Width upper and lower bounds for each particle in GeV.
-    isospin : ndarray
+        Structured array with fields ``('widthlower', 'widthupper')``.
+    isospin : ndarray[float64]
         Isospin for each particle.
-    g_parity : ndarray
+    g_parity : ndarray[float64]
         G-parity for each particle.
-    space_parity : ndarray
+    space_parity : ndarray[float64]
         Spatial parity for each particle.
-    charge_parity : ndarray
+    charge_parity : ndarray[float64]
         Charge parity for each particle.
+
+    Methods
+    -------
+    mask()
+        Returns ``MaskArray`` to blacklist or whitelist PDGs from event.
+    copy()
+        Provides a deepcopy of the data.
     """
 
     _data: base.IntVector = _array_field("<i4")
@@ -1036,17 +1068,26 @@ class MomentumArray(base.ArrayBase):
 
     :group: datastructure
 
+    .. versionadded:: 0.1.0
+
+    .. versionchanged:: 0.2.0
+       Added internal numpy interfaces for greater interoperability.
+
+    .. versionchanged:: 0.2.3
+       Added ``x``, ``y``, ``z``, and ``energy`` attributes.
+
     Parameters
     ----------
-    data : np.ndarray[np.float64]
+    data : ndarray[float64]
         Data representing the four-momentum of each particle in the
         point cloud. Given as either a (n, 4)-dimensional numpy array,
-        or a structured array, with fields "x", "y", "z", "e".
+        or structured array, with field names ``('x', 'y', 'z', 'e')``.
 
     Attributes
     ----------
-    data : ndarray[float64]
-        Structured array containing four momenta.
+    data : ndarray[void]
+        Structured array containing ``('x', 'y', 'z', 'e')`` components
+        of four momenta.
     x : ndarray[float64]
         x component of momentum.
     y : ndarray[float64]
@@ -1063,15 +1104,23 @@ class MomentumArray(base.ArrayBase):
         Pseudorapidity component of particle momenta.
     phi : ndarray[float64]
         Azimuthal component of particle momenta.
-    theta : np.ndarray[double]
+    theta : ndarray[float64]
         Angular displacement from beam axis.
-    mass : np.ndarray[double]
+    mass : ndarray[float64]
         Mass of the particles
 
     Methods
     -------
     delta_R()
-        Calculates interparticle distances with ``other`` MomentumArray.
+        Calculates interparticle distances with ``other``
+        ``MomentumArray``.
+
+        .. versionchanged:: 0.1.5
+           Computes 2D matrix of inter-particle distances, enabling
+           comparisons between arbitrary length ``MomentumArray``
+           instances.
+    copy()
+        Provides a deepcopy of the data.
     """
 
     # data: base.AnyVector = array_field("pmu")
@@ -1243,7 +1292,7 @@ class MomentumArray(base.ArrayBase):
         Notes
         -----
         Infinite values may be encountered if comparing with particles
-        not present on the eta-phi plane, __ie.__ travelling parallel to
+        not present on the eta-phi plane, *ie.* travelling parallel to
         the beam axis.
         """
         with warnings.catch_warnings():
@@ -1264,17 +1313,28 @@ class ColorArray(base.ArrayBase):
 
     :group: datastructure
 
+    .. versionadded:: 0.1.0
+
+    .. versionchanged:: 0.2.0
+       Added internal numpy interfaces for greater interoperability.
+
     Parameters
     ----------
-    data : np.ndarray[np.int32]
+    data : ndarray[int32] or ndarray[void]
         Data representing the QCD color charge of each particle in the
         point cloud. Given as either a (n, 2)-dimensional numpy array,
-        or a structured array, with fields "color", "anticolor".
+        or a structured array, with field names
+        ``('color', 'anticolor')``.
 
     Attributes
     ----------
-    data : ndarray
-        Structured array containing color / anti-color pairs.
+    data : ndarray[void]
+        Structured array containing ``('color', 'anticolor')`` pairs.
+
+    Methods
+    -------
+    copy()
+        Provides a deepcopy of the data.
     """
 
     _data: base.VoidVector = _array_field("<i4", 2)
@@ -1352,9 +1412,14 @@ class HelicityArray(base.ArrayBase):
 
     :group: datastructure
 
+    .. versionadded:: 0.1.0
+
+    .. versionchanged:: 0.2.0
+       Added internal numpy interfaces for greater interoperability.
+
     Parameters
     ----------
-    data : Sequence[int]
+    data : sequence[int]
         Data representing the spin polarisation of each particle in the
         point cloud.
 
@@ -1362,6 +1427,11 @@ class HelicityArray(base.ArrayBase):
     ----------
     data : ndarray[int16]
         Helicity values.
+
+    Methods
+    -------
+    copy()
+        Provides a deepcopy of the data.
     """
 
     _data: base.HalfIntVector = _array_field("<i2")
@@ -1435,9 +1505,14 @@ class StatusArray(base.ArrayBase):
 
     :group: datastructure
 
+    .. versionadded:: 0.1.0
+
+    .. versionchanged:: 0.2.0
+       Added internal numpy interfaces for greater interoperability.
+
     Parameters
     ----------
-    data : Sequence[int]
+    data : sequence[int]
         Data representing the Monte-Carlo event generator's status for
         each particle in the point cloud.
 
@@ -1446,10 +1521,20 @@ class StatusArray(base.ArrayBase):
     data : ndarray[int16]
         Status codes.
 
+    Methods
+    -------
+    in_range()
+        Returns ``MaskArray`` to filter event over inclusive range of
+        status codes.
+    copy()
+        Provides a deepcopy of the data.
+
     Notes
     -----
-    These codes are specific to the Monte-Carlo event generators which
-    produced the data.
+    These codes are specific to the Monte-Carlo event generators (MCEGs)
+    which produced the data. Currently, functionality has only been
+    developed with ``pythia8``, using data from other MCEGs may yield
+    unexpected results.
     """
 
     _data: base.HalfIntVector = _array_field("<i2")
@@ -1616,6 +1701,8 @@ class ParticleSet(base.ParticleBase):
 
     :group: datastructure
 
+    .. versionadded:: 0.1.0
+
     Parameters
     ----------
     pdg : PdgArray
@@ -1645,6 +1732,13 @@ class ParticleSet(base.ParticleBase):
         Status codes from Monte-Carlo event generator.
     final : MaskArray
         Boolean array indicating final state in particle set.
+
+    Methods
+    -------
+    from_numpy()
+        Constructs ``ParticleSet`` instance from numpy arrays.
+    copy()
+        Provides a deepcopy of the data.
     """
 
     pdg: PdgArray = field(default=Factory(PdgArray))
@@ -1737,37 +1831,55 @@ class AdjacencyList(base.AdjacencyBase):
 
     :group: datastructure
 
+    .. versionadded:: 0.1.0
+
+    .. versionchanged:: 0.2.4
+       Added internal numpy interfaces for greater interoperability.
+
     Parameters
     ----------
-    _data : np.ndarray[np.int32]
+    _data : ndarray[int32] or ndarray[void]
         COO formatted edge pairs, either given as a (n-2)-dimensional
-        array, or a structured array with fields "in", "out".
-    weights : np.ndarray[np.float64]
+        array, or a structured array with field names ``('in', 'out')``.
+    weights : np.ndarray[float64]
         Weights attributed to each edge in the COO list.
 
     Attributes
     ----------
-    edges : ndarray
-        COO edge list.
-    nodes : ndarray
-        Vertex ids of each particle with at least one edge.
-    weights : ndarray
-        Scalar value embedded on each edge.
-    matrix : ndarray
-        Adjacency matrix representation.
-    leaves : MaskArray
-        Provides a mask for selecting the leaves of a DAG / tree.
-
-        .. versionadded:: 0.2.4
-    data : ndarray
+    data : ndarray[void]
         Underlying array data. Identical to ``edges`` attribute,
         included for consistency with ``base.ArrayBase`` numpy
         interfaces.
 
         .. versionadded:: 0.2.4
+    edges : ndarray[void]
+        COO edge list, with field names ``('in', 'out')``.
+    nodes : ndarray[int32]
+        Vertex ids of each particle with at least one edge.
+    weights : ndarray[float64]
+        Scalar value embedded on each edge.
+    matrix : ndarray[int32] or ndarray[float64]
+        Adjacency matrix representation.
+
+        .. versionchanged:: 0.2.4
+           Duplicate edges are added together.
+    leaves : MaskArray
+        Provides a mask for selecting the leaves of a DAG / tree.
+
+        .. versionadded:: 0.2.4
 
     Methods
     -------
+    from_matrix()
+        Construct ``AdjacencyList`` from an adjacency matrix.
+    to_sparse()
+        Exposes the data as a SciPy sparse (coo) array.
+
+        .. versionadded:: 0.1.11
+    to_dicts()
+        Exposes the data as a dictionary with keys "edges" and "nodes".
+    copy()
+        Provides a deepcopy of the data.
     """
 
     _data: base.AnyVector = _array_field("<i4", 2)
@@ -1838,10 +1950,14 @@ class AdjacencyList(base.AdjacencyBase):
 
     @property
     def data(self) -> base.VoidVector:
+        """Underlying numpy data."""
         return self._data.view(self.dtype).reshape(-1)
 
     @property
     def edges(self) -> base.VoidVector:
+        """Vertex index pairs exposed as a structured numpy array with
+        fields 'in' and 'out' respectively.
+        """
         return self.data
 
     @property
@@ -2004,6 +2120,11 @@ class Graphicle:
 
     :group: datastructure
 
+    .. versionadded:: 0.1.0
+
+    .. versionchanged:: 0.2.4
+       Removed ``hard_vertex`` attribute.
+
     Parameters
     ----------
     particles : ParticleSet
@@ -2036,10 +2157,21 @@ class Graphicle:
         Vertex ids of each particle with at least one edge.
     hard_mask : MaskGroup
         Identifies which particles participate in the hard process.
-        For Pythia, this is split into four categories: incoming,
-        intermediate, outgoing, outgoing_nonperturbative_diffraction.
-    hard_vertex : int
-        Vertex at which the hard process is initiated.
+        For Pythia, this is split into four categories:
+        ``'incoming'``, ``'intermediate'``, ``'outgoing'``, and
+        ``'outgoing_nonperturbative_diffraction'``.
+
+    Methods
+    -------
+    from_numpy()
+        Constructs ``Graphicle`` instance from numpy arrays.
+    from_event()
+        Constructs ``Graphicle`` instance from object implementing the
+        ``base.EventInterface`` protocol.
+
+        .. versionadded:: 0.1.7
+    copy()
+        Provides a deepcopy of the data.
     """
 
     particles: ParticleSet = field(default=Factory(ParticleSet))
@@ -2175,19 +2307,3 @@ class Graphicle:
     @property
     def nodes(self) -> base.IntVector:
         return self.adj.nodes
-
-    def _need_attr(self, attr_name: str, task: str) -> None:
-        if len(getattr(self, attr_name)) == 0:
-            raise AttributeError(
-                f"Graphicle object needs '{attr_name}' attribute to {task}."
-            )
-
-    @property
-    def hard_vertex(self) -> int:
-        """Id of vertex at which hard interaction occurs."""
-        for prop in ("status", "edges"):
-            self._need_attr(attr_name=prop, task="infer hard vertex")
-        hard_edges = self.edges[self.status.hard_mask]
-        vertex_array = np.intersect1d(hard_edges["in"], hard_edges["out"])
-        central = vertex_array[np.argmin(np.abs(vertex_array))]
-        return int(central)

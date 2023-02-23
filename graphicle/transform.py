@@ -4,14 +4,14 @@
 
 Utilities for manipulating the graph structure of particle data.
 """
-import numpy as np
 import networkx as _nx
+import numpy as np
 from typicle import Types
 from typicle.convert import cast_array
 
 import graphicle as gcl
-from . import base
 
+from . import base
 
 __all__ = ["particle_as_node", "centre_angle", "centre_pseudorapidity"]
 
@@ -19,17 +19,24 @@ _types = Types()
 
 
 def particle_as_node(adj_list: gcl.AdjacencyList) -> gcl.AdjacencyList:
-    """Converts an adjacency list in which the particles are represented
-    as edges, to one in which the particles are the nodes.
-    The order of the nodes in the resulting AdjacencyList retains the
-    same particle ordering of the initial edge list.
+    """Converts an ``AdjacencyList`` in which the particles are
+    represented as edges, to one in which the particles are the nodes.
+    The order of the nodes in the resulting ``AdjacencyList`` retains
+    the same particle ordering of the initial edge list.
 
     :group: transform
+
+    .. versionadded:: 0.1.0
 
     Parameters
     ----------
     adj_list : AdjacencyList
         The edge-as-particle representation.
+
+    Returns
+    -------
+    node_adj : AdjacencyList
+        The node-as-particle representation.
 
     Examples
     --------
@@ -76,9 +83,12 @@ def particle_as_node(adj_list: gcl.AdjacencyList) -> gcl.AdjacencyList:
 def centre_angle(
     angle: base.DoubleVector, pt: base.DoubleVector
 ) -> base.DoubleVector:
-    """Shifts angles so transverse momentum weighted centroid is at 0.
+    """Shifts angles so transverse momentum weighted centroid is at
+    ``0``.
 
     :group: transform
+
+    .. versionadded:: 0.1.0
 
     Parameters
     ----------
@@ -106,9 +116,11 @@ def centre_angle(
 def centre_pseudorapidity(
     eta: base.DoubleVector, pt: base.DoubleVector
 ) -> base.DoubleVector:
-    """Shifts pseudorapidities so pt weighted midpoint is at 0.
+    """Shifts pseudorapidities so pt weighted midpoint is at ``0``.
 
     :group: transform
+
+    .. versionadded:: 0.1.0
 
     Parameters
     ----------
