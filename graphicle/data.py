@@ -117,6 +117,8 @@ class MomentumElement(ty.NamedTuple):
     """Named tuple container for the momentum of a single particle.
 
     :group: datastructure
+
+    .. versionadded:: 0.2.0
     """
 
     x: float
@@ -130,6 +132,8 @@ class ColorElement(ty.NamedTuple):
     particle.
 
     :group: datastructure
+
+    .. versionadded:: 0.2.0
     """
 
     color: int
@@ -141,6 +145,8 @@ class VertexPair(ty.NamedTuple):
     particle.
 
     :group: datastructure
+
+    .. versionadded:: 0.2.0
     """
 
     src: int
@@ -384,6 +390,11 @@ class MaskArray(base.MaskBase, base.ArrayBase):
 
     :group: datastructure
 
+    .. versionadded:: 0.1.0
+
+    .. versionchanged:: 0.2.0
+       Added internal numpy interfaces for greater interoperability.
+
     Parameters
     ----------
     data : Sequence[bool]
@@ -589,6 +600,11 @@ class MaskGroup(base.MaskBase, cla.MutableMapping[str, base.MaskBase]):
     Can be nested to form complex hierarchies.
 
     :group: datastructure
+
+    .. versionadded:: 0.1.0
+
+    .. versionchanged:: 0.2.0
+       Added internal numpy interfaces for greater interoperability.
 
     Parameters
     ----------
@@ -833,6 +849,11 @@ class PdgArray(base.ArrayBase):
 
     :group: datastructure
 
+    .. versionadded:: 0.1.0
+
+    .. versionchanged:: 0.2.0
+       Added internal numpy interfaces for greater interoperability.
+
     Parameters
     ----------
     data : Sequence[int]
@@ -1033,6 +1054,11 @@ class MomentumArray(base.ArrayBase):
     """Data structure containing four-momentum of particle list.
 
     :group: datastructure
+
+    .. versionadded:: 0.1.0
+
+    .. versionchanged:: 0.2.0
+       Added internal numpy interfaces for greater interoperability.
 
     Parameters
     ----------
@@ -1262,6 +1288,11 @@ class ColorArray(base.ArrayBase):
 
     :group: datastructure
 
+    .. versionadded:: 0.1.0
+
+    .. versionchanged:: 0.2.0
+       Added internal numpy interfaces for greater interoperability.
+
     Parameters
     ----------
     data : np.ndarray[np.int32]
@@ -1350,6 +1381,11 @@ class HelicityArray(base.ArrayBase):
 
     :group: datastructure
 
+    .. versionadded:: 0.1.0
+
+    .. versionchanged:: 0.2.0
+       Added internal numpy interfaces for greater interoperability.
+
     Parameters
     ----------
     data : Sequence[int]
@@ -1432,6 +1468,11 @@ class StatusArray(base.ArrayBase):
     """Data structure containing status values for particle set.
 
     :group: datastructure
+
+    .. versionadded:: 0.1.0
+
+    .. versionchanged:: 0.2.0
+       Added internal numpy interfaces for greater interoperability.
 
     Parameters
     ----------
@@ -1614,6 +1655,8 @@ class ParticleSet(base.ParticleBase):
 
     :group: datastructure
 
+    .. versionadded:: 0.1.0
+
     Parameters
     ----------
     pdg : PdgArray
@@ -1734,6 +1777,11 @@ class AdjacencyList(base.AdjacencyBase):
     COO edge list, and provides methods to convert representation.
 
     :group: datastructure
+
+    .. versionadded:: 0.1.0
+
+    .. versionchanged:: 0.2.4
+       Added internal numpy interfaces for greater interoperability.
 
     Parameters
     ----------
@@ -2001,6 +2049,8 @@ class Graphicle:
     information between particles.
 
     :group: datastructure
+
+    .. versionadded:: 0.1.0
 
     Parameters
     ----------
