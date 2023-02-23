@@ -608,20 +608,22 @@ class MaskGroup(base.MaskBase, cla.MutableMapping[str, base.MaskBase]):
     _mask_arrays : dict of MaskArrays or array-like objects
         Dictionary of MaskArray objects to be composed.
     agg_op : {'and', 'or', 'none'}
-        Defines the aggregation operation when accessing the `data`
+        Defines the aggregation operation when accessing the ``data``
         attribute. Default is 'and'.
 
     Attributes
     ----------
     data : ndarray[bool_]
         Combination of all masks in group via bitwise AND reduction.
+    agg_op : MaskAggOp
+        Aggregation operation set for reduction over constituent masks.
     names : list[str]
         Provides the string values of the keys to the top-level nested
         ``MaskBase`` objects as a list. Will be deprecated in future.
         ``MaskGroup.keys()`` is preferred.
     bitwise_or : ndarray[bool_]
         Bitwise ``OR`` reduction over the nested masks.
-    bitwise_or : np.ndarray[bool_]
+    bitwise_and : np.ndarray[bool_]
         Bitwise ``AND`` reduction over the nested masks.
     dict : dict[base.MaskBase]
         Masks nested in a dictionary instead of a ``MaskGroup``.
@@ -1068,7 +1070,7 @@ class MomentumArray(base.ArrayBase):
        Added internal numpy interfaces for greater interoperability.
 
     .. versionchanged:: 0.2.3
-       Added `x`, `y`, `z`, and `energy` attributes.
+       Added ``x``, ``y``, ``z``, and ``energy`` attributes.
 
     Parameters
     ----------
