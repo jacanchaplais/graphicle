@@ -19,7 +19,6 @@ import numpy as np
 import numpy.lib.recfunctions as rfn
 import pyjet
 from pyjet import ClusterSequence, PseudoJet
-from typicle import Types
 
 import graphicle as gcl
 
@@ -31,8 +30,6 @@ __all__ = [
     "flow_trace",
     "cluster_pmu",
 ]
-
-_types = Types()
 
 
 def azimuth_centre(pmu: gcl.MomentumArray, pt_weight: bool = True) -> float:
@@ -60,6 +57,12 @@ def azimuth_centre(pmu: gcl.MomentumArray, pt_weight: bool = True) -> float:
     if pt_weight is True:
         pol = pol * pmu.pt
     return float(np.angle(pol.sum()))
+
+
+def pseudorapidity_centre(pmu: gcl.MomentumArray) -> float:
+    pt_norm = pmu.pt / pmu.pt.sum()
+    eta_wt_mid = (pmu.eta * pt_norm).sum()
+    return eta_wt_mid
 
 
 def combined_mass(
@@ -146,7 +149,7 @@ def _trace_vector(
 ) -> base.AnyVector:
     len_basis = len(basis)
     feat_fmt = rfn.structured_to_unstructured if is_structured else lambda x: x
-    color = np.zeros((len_basis, feat_dim), dtype=_types.double)
+    color = np.zeros((len_basis, feat_dim), dtype="<f8")
     if vertex in basis:
         color[basis.index(vertex)] = 1.0
         if exclusive is True:

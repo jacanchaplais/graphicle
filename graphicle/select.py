@@ -31,6 +31,7 @@ __all__ = [
     "hadron_vertices",
     "fastjet_clusters",
     "leaf_masks",
+    "centroid_prune",
 ]
 
 
@@ -297,7 +298,28 @@ def _partition_vertex(
 
     Parameters
     ----------
-    mask : gcl.MaskArray
+    mask : MaskArray
+        Hard parton descendants.
+    pcls_in : MaskArray or ndarray[bool_]
+        The particles entering the hadronisation vertex.
+    vtx_desc : MaskArray
+        Particles descending from the hadronisation vertex.
+    final : MaskArray
+        Final state particles.
+    pmu : MomentumArray
+        Four momenta.
+    dist_strat : callable
+        Callable which takes two ``MomentumArray`` instances, and
+        returns a double array with number of rows and columns equal to
+        the lengths of the input momenta, respectively. Output should
+        represent pairwise distance between particles incident on the
+        hadronisation vertex, and the final state descendants.
+
+    Returns
+    -------
+    filtered_mask : MaskArray
+        Input ``MaskArray``, filtered to remove background incident on
+        the same hadronisation vertex.
     """
     mask = mask.copy()
     parton_pmu = pmu[pcls_in]
@@ -355,7 +377,12 @@ def partition_descendants(
                 if vtx_id not in graph.edges["out"][mask.data]:
                     continue
                 mask.data = _partition_vertex(
-                    mask, pcls_in, vtx_desc, graph.final, graph.pmu, dist_strat
+                    mask,
+                    pcls_in,
+                    vtx_desc,
+                    graph.final,
+                    graph.pmu,
+                    dist_strat,
                 ).data
     return hier
 
@@ -712,3 +739,57 @@ def any_overlap(masks: gcl.MaskGroup) -> bool:
     pair_checks = map(np.bitwise_and, *zip(*combos))
     overlaps: bool = np.bitwise_or.reduce(tuple(pair_checks), axis=None)
     return overlaps
+
+
+def centroid_prune(
+    pmu: gcl.MomentumArray,
+    radius: float,
+    mask: ty.Optional[gcl.MaskArray] = None,
+    centre: ty.Optional[ty.Tuple[float, float]] = None,
+) -> gcl.MaskArray:
+    """For a given ``MomentumArray``, calculate the distance every
+    particle is from a centroid location, and return a ``MaskArray`` for
+    all of the particles which are within a given ``radius``.
+    If ``centre`` is not provided, the transverse momentum weighted
+    centroid will be used.
+
+    :group: select
+
+    .. versionadded:: 0.2.4
+
+    Parameters
+    ----------
+    pmu : MomentumArray
+        Four-momenta for a set of particles.
+    radius : float
+        Euclidean distance in the azimuth-pseudorapidity plane from the
+        centroid, beyond which particles will be filtered out.
+    mask : MaskArray, optional
+        If provided, will apply the mask to the passed ``pmu``, and
+        output ``MaskArray`` will have the same length.
+    centre : tuple[float, float]
+        Pseudorapidity and azimuth coordinates for a user-defined
+        centroid.
+
+    Returns
+    -------
+    prune_mask : MaskArray
+        Mask which retains only the particles within ``radius`` of the
+        centroid.
+    """
+    if mask is not None:
+        pmu = pmu[mask]
+        event_mask = np.zeros_like(mask, "<?")
+    if centre is None:
+        eta_mid = (pmu.eta * pmu.pt).sum() / pmu.pt.sum()
+        phi_sum_ = (pmu._xy_pol * pmu.pt).sum()
+        phi_mid_ = phi_sum_ / np.abs(phi_sum_)
+    else:
+        eta_mid, phi_mid = centre
+        phi_mid_ = np.exp(complex(0, phi_mid))
+    dist = np.hypot(pmu.eta - eta_mid, np.angle(pmu._xy_pol * phi_mid_.conj()))
+    is_within = dist < radius
+    if mask is None:
+        return gcl.MaskArray(is_within)
+    event_mask[mask] = is_within
+    return gcl.MaskArray(event_mask)
