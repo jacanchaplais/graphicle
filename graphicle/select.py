@@ -50,6 +50,9 @@ def fastjet_clusters(
     """Clusters particles using the FastJet implementation of the
     generalised-kt algorithm.
 
+    .. versionadded:: 0.2.3
+       Migrated from ``graphicle.calculate.cluster_pmu()``.
+
     :group: select
 
     Parameters
@@ -88,9 +91,6 @@ def fastjet_clusters(
 
     ``p_val`` set to ``-1`` gives anti-kT, ``0`` gives Cambridge-Aachen,
     and ``1`` gives kT clusterings.
-
-    .. versionadded:: 0.2.3
-       Migrated from ``graphicle.calculate.cluster_pmu()``.
     """
     pmu_pyjet = pmu.data[["e", "x", "y", "z"]]
     pmu_pyjet.dtype.names = "E", "px", "py", "pz"
@@ -125,6 +125,8 @@ def find_vertex(
     """Locate vertices with the inward and outward particles of the
     passed pdg codes.
 
+    .. versionadded:: 0.1.0
+
     :group: select
 
     Parameters
@@ -141,8 +143,6 @@ def find_vertex(
     vertices : array of ints
         List the vertex ids which match the passed incoming and outgoing
         pdg codes.
-
-    .. versionadded:: 0.1.0
     """
     # preparing the search sets
     search = dict()
@@ -201,6 +201,11 @@ def vertex_descendants(adj: gcl.AdjacencyList, vertex: int) -> gcl.MaskArray:
     """Return a mask over a graphicle object, identifying which
     particles descend from a given interaction vertex.
 
+    .. versionadded:: 0.1.0
+
+    .. versionchanged:: 0.1.11
+       Speed improvements by replacing NetworkX with SciPy.
+
     :group: select
 
     Parameters
@@ -215,11 +220,6 @@ def vertex_descendants(adj: gcl.AdjacencyList, vertex: int) -> gcl.MaskArray:
     mask : MaskArray
         Boolean mask over the graphicle objects associated with the
         passed AdjacencyList.
-
-    .. versionadded:: 0.1.0
-
-    .. versionchanged:: 0.1.11
-       Speed improvements by replacing NetworkX with SciPy.
     """
     sparse = adj._sparse_signed
     vertex = sparse.row[vertex == adj.edges["in"]][0]
@@ -235,6 +235,8 @@ def hadron_vertices(
 ) -> ty.Tuple[int, ...]:
     """Locates the hadronisation vertices in the generation DAG.
 
+    .. versionadded:: 0.1.11
+
     :group: select
 
     Parameters
@@ -249,8 +251,6 @@ def hadron_vertices(
     vertex_ids : tuple[int]
         Indices of the hadronisation vertices in the generation DAG,
         returned in no particular order.
-
-    .. versionadded:: 0.1.11
     """
     vtx_arr = np.unique(adj.edges[status.in_range(80, 90)]["in"])
     return tuple(map(int, vtx_arr))
@@ -321,6 +321,8 @@ def partition_descendants(
     """Partitions the final state descendants with mixed hard partonic
     heritage, by aligning them with their nearest ancestor.
 
+    .. versionadded:: 0.1.11
+
     :group: select
 
     Parameters
@@ -343,8 +345,6 @@ def partition_descendants(
     hier_parted : MaskGroup
         Same nested tree structure as input, but with the final
         state hadrons partitioned to their nearest hard parton ancestor.
-
-    .. versionadded:: 0.1.11
     """
     dist_strat = fn.partial(gcl.matrix.parton_hadron_distance, pt_exp=pt_exp)
     hadron_vtxs = _hadron_vtx_parton_iter(
@@ -441,6 +441,12 @@ def hard_descendants(
     """Returns a MaskGroup over the particles in the graph, where True
     indicates a particle descends from a specific hard parton.
 
+    .. versionadded:: 0.1.0
+
+    .. versionchanged:: 0.1.11
+       Target parameter now optional. Using default implies all hard
+       partons.
+
     :group: select
 
     Parameters
@@ -457,12 +463,6 @@ def hard_descendants(
         anti-particle partons will be masked, whereas if True only the
         partons explicitly matching the target sign will be considered.
         Default is False.
-
-    .. versionadded:: 0.1.0
-
-    .. versionchanged:: 0.1.11
-       Target parameter now optional. Using default implies all hard
-       partons.
     """
     hard_vtxs = list()
     # get the vertices of the hard partons
@@ -495,6 +495,8 @@ def hierarchy(
     the partons of the hard process and their descendants. Uses a tree
     structure, such that partons which are descendants of other hard
     partons are accessible, and nested within their parents.
+
+    .. versionadded:: 0.1.11
 
     :group: select
 
@@ -565,8 +567,6 @@ def hierarchy(
     This function will not separate the mixed heritage when two sibling
     hard partons share ancestry for a given particle. In order to
     partition the resulting structure, use ``partition_descendants()``.
-
-    .. versionadded:: 0.1.11
     """
     hard_mask = graph.hard_mask
     del hard_mask["incoming"]
@@ -671,6 +671,8 @@ def leaf_masks(mask_tree: gcl.MaskGroup) -> gcl.MaskGroup:
     """Find the leaves of the hard process, when organised into a
     hierarchical tree from ``hierarchy()``.
 
+    .. versionadded:: 0.1.11
+
     :group: select
 
     Parameters
@@ -683,8 +685,6 @@ def leaf_masks(mask_tree: gcl.MaskGroup) -> gcl.MaskGroup:
     -------
     leaves : MaskGroup
         Flat ``MaskGroup`` of only the leaves of ``mask_tree``.
-
-    .. versionadded:: 0.1.11
     """
     mask_group = gcl.MaskGroup(agg_op="or")  # type: ignore
     for name, branch in mask_tree.items():
@@ -695,6 +695,8 @@ def leaf_masks(mask_tree: gcl.MaskGroup) -> gcl.MaskGroup:
 def any_overlap(masks: gcl.MaskGroup) -> bool:
     """Given a MaskGroup object, checks if any of the masks overlap
     with each other.
+
+    .. versionadded:: 0.1.0
 
     :group: select
 
@@ -708,8 +710,6 @@ def any_overlap(masks: gcl.MaskGroup) -> bool:
     any_overlap : bool
         True if at least two MaskArrays in MaskGroup have at least one
         True element in the same location.
-
-    .. versionadded:: 0.1.0
     """
     combos = it.combinations(masks.dict.values(), 2)
     pair_checks = map(np.bitwise_and, *zip(*combos))
