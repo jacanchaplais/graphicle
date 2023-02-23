@@ -8,7 +8,13 @@ import graphicle as gcl
 
 from . import base
 
-__all__ = ["cut_adj", "knn_adj", "fc_adj", "delta_R_aff"]
+__all__ = [
+    "cut_adj",
+    "knn_adj",
+    "fc_adj",
+    "delta_R_aff",
+    "parton_hadron_distance",
+]
 
 _types = Types()
 
