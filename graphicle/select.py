@@ -294,7 +294,6 @@ def _partition_vertex(
     final: gcl.MaskArray,
     pmu: gcl.MomentumArray,
     dist_strat: DistFunc,
-    # radius: float,
 ) -> gcl.MaskArray:
     """Prunes input ``mask`` representing hard parton descendants based
     on if final state hadrons are closer to them or background,
@@ -330,10 +329,6 @@ def _partition_vertex(
     final_from_vtx = vtx_desc & final
     hadron_pmu = pmu[final_from_vtx]
     dist = dist_strat(parton_pmu, hadron_pmu)
-    # dist_mask = np.zeros_like(dist, "<?")
-    # parton_idxs = np.flatnonzero(mask[pcls_in])
-    # dist_mask[parton_idxs, :] = dist[parton_idxs, :] > radius
-    # dist[dist_mask] *= 1.0E+6
     alloc = np.argmin(dist, axis=0)
     final_from_hard = np.in1d(alloc, np.flatnonzero(mask[pcls_in]))
     mask.data[final_from_vtx] = final_from_hard
@@ -344,7 +339,6 @@ def partition_descendants(
     graph: gcl.Graphicle,
     hier: gcl.MaskGroup,
     pt_exp: float = -0.1,
-    # radius: float = 0.4,
 ) -> gcl.MaskGroup:
     """Partitions the final state descendants with mixed hard partonic
     heritage, by aligning them with their nearest ancestor.
@@ -391,7 +385,7 @@ def partition_descendants(
                     vtx_desc,
                     graph.final,
                     graph.pmu,
-                    dist_strat,  # radius
+                    dist_strat,
                 ).data
     return hier
 
