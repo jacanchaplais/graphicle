@@ -82,11 +82,11 @@ def combined_mass(
     pmu : MomentumArray, ndarray
         Momenta of particles comprising a jet, or an analagous combined
         object. If a numpy array is passed, it must be structured with
-        fields (x, y, z, e).
+        fields with names ``('x', 'y', 'z', 'e')``.
     weight : array, optional
         Weights for each particle when reconstructing the jet momentum.
         May be either structured or unstructured. If unstructured,
-        ensure the columns are in the order (x, y, z, e).
+        ensure the columns are in the order ``('x', 'y', 'z', 'e')``.
 
     Notes
     -----
@@ -95,7 +95,7 @@ def combined_mass(
 
     In the event of a squared mass below zero (due to numerical
     fluctuations for very low mass reconstructions), this function will
-    simply return 0.0.
+    simply return ``0.0``.
     """
     # sanitizing and combining the inputs
     if isinstance(pmu, gcl.MomentumArray):
@@ -190,28 +190,26 @@ def flow_trace(
         Boolean mask identifying which particles should have their
         ancestry traced.
     prop : ArrayBase, ndarray
-        Property to trace back, eg. 4-momentum, charge.
-        Must be the same shape as arrays stored in graph.
-        Can be structured, unstructured, or a graphicle array, though
-        unstructured arrays must be 1d.
+        Property to trace back, *eg.* 4-momentum, charge. Must be the
+        same shape as arrays stored in graph. Can be structured,
+        unstructured, or a graphicle array, though unstructured arrays
+        must be 1D.
     exclusive : bool
         If True, double counting from descendant particles in the hard
-        event will be switched off.
-        eg. for event t > b W+, descendants of b will show no
-        contribution from t, as b is a subset of t.
-        Default is False.
+        event will be switched off. *eg.* for event ``t > b W+``,
+        descendants of ``b`` will show no contribution from ``t``, as
+        ``b`` is a subset of ``t``. Default is ``False``.
     target : set of ints, optional
         Highlights specific partons in the hard event to decompose
-        properties with respect to.
-        If left as None, will simply use all partons in hard event,
-        except for incoming partons.
+        properties with respect to. If unset, will use all partons in
+        hard event, except for incoming partons.
 
     Returns
     -------
-    trace_array : Dict of arrays
-        Dictionary of arrays. Keys are parton names, arrays represent
-        the contributions of hard partons traced down to the properties
-        of the selected subset of particles specified by mask.
+    trace_array : dict[str, ndarray]
+        Keys are parton names, arrays represent the contributions of
+        hard partons traced down to the properties of the selected
+        subset of particles specified by mask.
     """
     if isinstance(prop, base.ArrayBase):
         prop = prop.data
@@ -346,7 +344,7 @@ def _root_diff_two_squares(
     squared difference. This means that root negative squared
     differences are permitted, but produce negative, rather than
     imaginary, values.
-    If `x1` or `x2` is scalar_like (ie. unambiguously cast-able to a
+    If `x1` or `x2` is scalar_like (*ie.* unambiguously cast-able to a
     scalar type), it is broadcast for use with each element of the other
     argument.
 

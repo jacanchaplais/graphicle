@@ -205,7 +205,7 @@ def delta_R_aff(pmu: gcl.MomentumArray) -> base.DoubleVector:
     Notes
     -----
     Infinite values may be encountered if particles are travelling
-    parallel to the beam axis, `ie.` with infinite pseudorapidity.
+    parallel to the beam axis, *ie.* with infinite pseudorapidity.
     """
     return pmu.delta_R(pmu)
 

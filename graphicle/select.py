@@ -75,7 +75,7 @@ def fastjet_clusters(
         discarded.
     top_k : int, optional
         Only return a maximum ``top_k`` number of jets, sorted by
-        transverse momentum. ie. if ``top_k`` is 3, only 3 jets with
+        transverse momentum. *ie.* if ``top_k`` is 3, only 3 jets with
         highest pt will be given. If ``top_k`` exceeds the number of
         jets reconstructed, all of the jets will be included.
 
@@ -458,7 +458,7 @@ def hard_descendants(
         intermediate and outgoing hard partons. Default is ``None``.
     sign_sensitive : bool
         Indicates whether sign of PDG code should be used when selecting
-        hard partons, ie. if set to False both particle and
+        hard partons, *ie.* if set to False both particle and
         anti-particle partons will be masked, whereas if True only the
         partons explicitly matching the target sign will be considered.
         Default is False.

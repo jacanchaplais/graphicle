@@ -177,8 +177,8 @@ def _array_ufunc(
     ufunc : callable
         Numpy ufunc being called on ``instance``.
     method : str
-        Method applied to ``ufunc``, eg. 'reduce' for ``np.add.reduce``,
-        of which ``np.sum`` is an alias.
+        Method applied to ``ufunc``, *eg.* ``'reduce'`` for
+        ``np.add.reduce``, of which ``np.sum`` is an alias.
     *inputs : tuple[Any]
         Positional arguments of the ufunc.
     **kwargs : dict[str, Any]
@@ -188,7 +188,7 @@ def _array_ufunc(
     -------
     output : arrays or scalars, or tuple thereof, or None
         Output of passed ufunc. Type depends on ``method``, ``inputs``,
-        and ``instance``. If ``method`` is 'reduce' on ``instance``
+        and ``instance``. If ``method`` is ``'reduce'`` on ``instance``
         with a flat underlying array, then ``output`` will be scalar.
         If ``ufunc`` maps an array to booleans, ``output`` will be a
         ``MaskArray``.
@@ -518,7 +518,7 @@ class MaskArray(base.MaskBase, base.ArrayBase):
 
 
 def _mask_compat(*masks: base.MaskLike) -> bool:
-    """Check if a collection of masks are compatible, ie. they must be
+    """Check if a collection of masks are compatible, *ie.* they must be
     either numpy boolean arrays, or ``MaskBase`` instances.
     """
     for mask in masks:
@@ -1287,7 +1287,7 @@ class MomentumArray(base.ArrayBase):
         Notes
         -----
         Infinite values may be encountered if comparing with particles
-        not present on the eta-phi plane, __ie.__ travelling parallel to
+        not present on the eta-phi plane, *ie.* travelling parallel to
         the beam axis.
         """
         with warnings.catch_warnings():
