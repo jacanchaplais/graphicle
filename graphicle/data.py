@@ -609,7 +609,7 @@ class MaskGroup(base.MaskBase, cla.MutableMapping[str, base.MaskBase]):
         Dictionary of MaskArray objects to be composed.
     agg_op : {'and', 'or', 'none'}
         Defines the aggregation operation when accessing the ``data``
-        attribute. Default is 'and'.
+        attribute. Default is ``'and'``.
 
     Attributes
     ----------
@@ -858,32 +858,34 @@ class PdgArray(base.ArrayBase):
 
     Parameters
     ----------
-    data : Sequence[int]
+    data : sequence[int]
         The PDG codes for each particle in the point cloud.
 
     Attributes
     ----------
-    name : ndarray
+    name : ndarray[object]
         String representation of particle names.
-    charge : ndarray
+    charge : ndarray[float64]
         Charge for each particle in elementary units.
-    mass : ndarray
+    mass : ndarray[float64]
         Mass for each particle in GeV.
-    mass_bounds : ndarray
-        Mass upper and lower bounds for each particle in GeV.
-    quarks : ndarray
+    mass_bounds : ndarray[void]
+        Mass upper and lower bounds for each particle in GeV. Structured
+        array with fields ``('masslower', 'massupper')``.
+    quarks : ndarray[object]
         String representation of quark composition for each particle.
-    width : ndarray
+    width : ndarray[float64]
         Width for each particle in GeV.
-    width_bounds : ndarray
+    width_bounds : ndarray[void]
         Width upper and lower bounds for each particle in GeV.
-    isospin : ndarray
+        Structured array with fields ``('widthlower', 'widthupper')``.
+    isospin : ndarray[float64]
         Isospin for each particle.
-    g_parity : ndarray
+    g_parity : ndarray[float64]
         G-parity for each particle.
-    space_parity : ndarray
+    space_parity : ndarray[float64]
         Spatial parity for each particle.
-    charge_parity : ndarray
+    charge_parity : ndarray[float64]
         Charge parity for each particle.
 
     Methods
@@ -1074,15 +1076,16 @@ class MomentumArray(base.ArrayBase):
 
     Parameters
     ----------
-    data : np.ndarray[np.float64]
+    data : ndarray[float64]
         Data representing the four-momentum of each particle in the
         point cloud. Given as either a (n, 4)-dimensional numpy array,
-        or a structured array, with fields "x", "y", "z", "e".
+        or structured array, with field names ``('x', 'y', 'z', 'e')``.
 
     Attributes
     ----------
-    data : ndarray[float64]
-        Structured array containing four momenta.
+    data : ndarray[void]
+        Structured array containing ``('x', 'y', 'z', 'e')`` components
+        of four momenta.
     x : ndarray[float64]
         x component of momentum.
     y : ndarray[float64]
@@ -1099,9 +1102,9 @@ class MomentumArray(base.ArrayBase):
         Pseudorapidity component of particle momenta.
     phi : ndarray[float64]
         Azimuthal component of particle momenta.
-    theta : np.ndarray[double]
+    theta : np.ndarray[float64]
         Angular displacement from beam axis.
-    mass : np.ndarray[double]
+    mass : np.ndarray[float64]
         Mass of the particles
 
     Methods
@@ -1315,15 +1318,15 @@ class ColorArray(base.ArrayBase):
 
     Parameters
     ----------
-    data : np.ndarray[np.int32]
+    data : ndarray[int32]
         Data representing the QCD color charge of each particle in the
         point cloud. Given as either a (n, 2)-dimensional numpy array,
         or a structured array, with fields "color", "anticolor".
 
     Attributes
     ----------
-    data : ndarray
-        Structured array containing color / anti-color pairs.
+    data : ndarray[void]
+        Structured array containing ``('color', 'anticolor')`` pairs.
 
     Methods
     -------
@@ -1413,7 +1416,7 @@ class HelicityArray(base.ArrayBase):
 
     Parameters
     ----------
-    data : Sequence[int]
+    data : sequence[int]
         Data representing the spin polarisation of each particle in the
         point cloud.
 
@@ -1506,7 +1509,7 @@ class StatusArray(base.ArrayBase):
 
     Parameters
     ----------
-    data : Sequence[int]
+    data : sequence[int]
         Data representing the Monte-Carlo event generator's status for
         each particle in the point cloud.
 
@@ -1832,27 +1835,27 @@ class AdjacencyList(base.AdjacencyBase):
 
     Parameters
     ----------
-    _data : np.ndarray[np.int32]
+    _data : ndarray[int32] or ndarray[void]
         COO formatted edge pairs, either given as a (n-2)-dimensional
-        array, or a structured array with fields "in", "out".
-    weights : np.ndarray[np.float64]
+        array, or a structured array with field names ``('in', 'out')``.
+    weights : np.ndarray[float64]
         Weights attributed to each edge in the COO list.
 
     Attributes
     ----------
-    data : ndarray
+    data : ndarray[void]
         Underlying array data. Identical to ``edges`` attribute,
         included for consistency with ``base.ArrayBase`` numpy
         interfaces.
 
         .. versionadded:: 0.2.4
-    edges : ndarray
-        COO edge list.
-    nodes : ndarray
+    edges : ndarray[void]
+        COO edge list, with field names ``('in', 'out')``.
+    nodes : ndarray[int32]
         Vertex ids of each particle with at least one edge.
-    weights : ndarray
+    weights : ndarray[float64]
         Scalar value embedded on each edge.
-    matrix : ndarray
+    matrix : ndarray[int32] or ndarray[float64]
         Adjacency matrix representation.
 
         .. versionchanged:: 0.2.4
@@ -2151,8 +2154,9 @@ class Graphicle:
         Vertex ids of each particle with at least one edge.
     hard_mask : MaskGroup
         Identifies which particles participate in the hard process.
-        For Pythia, this is split into four categories: incoming,
-        intermediate, outgoing, outgoing_nonperturbative_diffraction.
+        For Pythia, this is split into four categories:
+        ``'incoming'``, ``'intermediate'``, ``'outgoing'``, and
+        ``'outgoing_nonperturbative_diffraction'``.
 
     Methods
     -------

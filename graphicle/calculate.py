@@ -278,7 +278,7 @@ def cluster_pmu(
 
     Parameters
     ----------
-    pmu: gcl.MomentumArray
+    pmu: MomentumArray
         The momenta of each particle in the point cloud.
     radius : float
         The radius of the clusters to be produced.
@@ -297,7 +297,7 @@ def cluster_pmu(
 
     Returns
     -------
-    clusters : gcl.MaskGroup
+    clusters : MaskGroup
         MaskGroup object, containing boolean masks over the input data
         for each jet clustering.
 
@@ -305,10 +305,8 @@ def cluster_pmu(
     -----
     This is a wrapper around FastJet's implementation.
 
-    Standard settings:
-        kt algorithm: p_val = 1
-        Cambridge/Aachen algorithm: p_val = 0
-        anti-kt algorithm: p_val = -1
+    ``p_val`` set to ``-1`` gives anti-kT, ``0`` gives Cambridge-Aachen,
+    and ``1`` gives kT clusterings.
     """
     pmu_pyjet = pmu.data[["e", "x", "y", "z"]]
     pmu_pyjet.dtype.names = "E", "px", "py", "pz"

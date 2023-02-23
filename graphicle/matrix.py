@@ -30,7 +30,7 @@ def cut_adj(
     towards the neighbours within a cut range, determined from the input
     affinity matrix.
 
-    The cut represents the limiting value of the affinity matrix for
+    The ``cut`` represents the limiting value of the affinity matrix for
     elements to form edges in the adjacency matrix.
 
     :group: matrix
@@ -39,7 +39,7 @@ def cut_adj(
 
     Parameters
     ----------
-    matrix : ndarray
+    matrix : ndarray[float64]
         Particle affinities.
     cut : float
         Value beyond which affinities are not sufficient to form edges.
@@ -55,7 +55,7 @@ def cut_adj(
 
     Returns
     -------
-    adj : array
+    adj : ndarray[bool_] or ndarray[float64]
         Adjacency matrix representing particle connectivity.
 
     Notes
@@ -97,7 +97,7 @@ def knn_adj(
 ) -> base.DoubleVector:
     """Produce a directed adjacency matrix with outward edges towards
     the ``k`` nearest neighbours, determined from the input affinity
-    matrix.
+    ``matrix``.
 
     :group: matrix
 
@@ -105,7 +105,7 @@ def knn_adj(
 
     Parameters
     ----------
-    matrix : ndarray
+    matrix : ndarray[float64]
         2D matrix of Particle affinities.
     k : int
         Number of nearest neighbours in result.
@@ -122,7 +122,7 @@ def knn_adj(
 
     Returns
     -------
-    adj : array
+    adj : ndarray[bool_] or ndarray[float64]
         Adjacency matrix representing particle connectivity.
 
     Notes
@@ -176,6 +176,12 @@ def fc_adj(
         ``False``.
     dtype : dtype-like
         The dtype of the output array. Default is ``np.bool_``.
+
+    Returns
+    -------
+    adj : ndarray[bool_] or ndarray[float64]
+        Fully connected Adjacency matrix representing particle
+        connectivity.
     """
     adj = np.ones((num_nodes, num_nodes), dtype=dtype)
     if self_loop is False:
@@ -193,12 +199,12 @@ def delta_R_aff(pmu: gcl.MomentumArray) -> base.DoubleVector:
 
     Parameters
     ----------
-    pmu : gcl.MomentumArray
+    pmu : MomentumArray
         Four-momenta of particle set.
 
     Returns
     -------
-    delta_R_matrix : np.ndarray[float64]
+    delta_R_matrix : ndarray[float64]
         Square symmetric matrix representing the Euclidean distance
         between every pair of particles in the eta-phi plane.
 
@@ -232,7 +238,7 @@ def parton_hadron_distance(
 
     Returns
     -------
-    dists : ndarray[double]
+    dists : ndarray[float64]
         Distance matrix between ``parton_pmu`` and ``hadron_pmu``,
         whose number of rows and columns equal to the input sizes,
         respectively.
