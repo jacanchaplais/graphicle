@@ -370,9 +370,7 @@ def _array_field(dtype: npt.DTypeLike, num_cols: int = 1):
 
 def _truthy(data: ty.Union[base.ArrayBase, base.AdjacencyBase]) -> bool:
     """Defines the truthy value of the graphicle data structures."""
-    if len(data) == 0:
-        return False
-    return True
+    return not (len(data) == 0)
 
 
 ##################################
@@ -758,8 +756,12 @@ class MaskGroup(base.MaskBase, cla.MutableMapping[str, base.MaskBase]):
     def __ne__(self, other: base.MaskLike) -> "MaskArray":
         return _mask_neq(self, other)
 
-    def copy(self):
-        return deepcopy(self)
+    def copy(self) -> "MaskGroup":
+        mask_copies = map(op.methodcaller("copy"), self._mask_arrays.values())
+        return self.__class__(
+            cl.OrderedDict(zip(self._mask_arrays.keys(), mask_copies)),
+            agg_op=self._agg_op,  # type: ignore
+        )
 
     @property
     def names(self) -> ty.List[str]:
