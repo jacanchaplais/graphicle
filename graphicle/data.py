@@ -1107,9 +1107,8 @@ class MomentumArray(base.ArrayBase):
     Methods
     -------
     delta_R()
-        Calculates interparticle distances with ``other`` MomentumArray.
-
-        .. versionadded:: 0.1.0
+        Calculates interparticle distances with ``other``
+        ``MomentumArray``.
 
         .. versionchanged:: 0.1.5
            Computes 2D matrix of inter-particle distances, enabling
