@@ -1755,6 +1755,19 @@ class AdjacencyList(base.AdjacencyBase):
         Scalar value embedded on each edge.
     matrix : ndarray
         Adjacency matrix representation.
+    leaves : MaskArray
+        Provides a mask for selecting the leaves of a DAG / tree.
+
+        .. versionadded:: 0.2.4
+    data : ndarray
+        Underlying array data. Identical to ``edges`` attribute,
+        included for consistency with ``base.ArrayBase`` numpy
+        interfaces.
+
+        .. versionadded:: 0.2.4
+
+    Methods
+    -------
     """
 
     _data: base.AnyVector = _array_field("<i4", 2)
@@ -1800,7 +1813,77 @@ class AdjacencyList(base.AdjacencyBase):
         return self.__class__(self._data[key])
 
     def copy(self) -> "AdjacencyList":
-        return deepcopy(self)
+        return self.__class__(self._data)
+
+    @fn.cached_property
+    def _edge_relabel(self) -> base.IntVector:
+        _, inv = np.unique(self._data, return_inverse=True)
+        return inv.reshape(-1, 2)
+
+    @fn.cached_property
+    def _sparse_signed(self) -> coo_array:
+        return self.to_sparse()
+
+    @fn.cached_property
+    def _sparse_unsigned(self) -> coo_array:
+        sparse_arr = self._sparse_signed.copy()
+        sparse_arr.data[...] = True
+        return sparse_arr
+
+    @property
+    def _sparse_weighted(self) -> coo_array:
+        sparse_arr = self._sparse_signed.copy()
+        sparse_arr.data = self.weights
+        return sparse_arr
+
+    @property
+    def data(self) -> base.VoidVector:
+        return self._data.view(self.dtype).reshape(-1)
+
+    @property
+    def edges(self) -> base.VoidVector:
+        return self.data
+
+    @property
+    def nodes(self) -> base.IntVector:
+        """Nodes are extracted from the edge list, and put in
+        ascending order of magnitude, regardless of sign.
+        Positive sign conventionally means final state particle.
+        """
+        unsort_nodes = np.unique(self._data)
+        sort_idxs = np.argsort(np.abs(unsort_nodes))
+        return unsort_nodes[sort_idxs]  # type: ignore
+
+    @property
+    def leaves(self) -> MaskArray:
+        """A mask to select the leaves of the graph."""
+        out_degree = self._sparse_unsigned.sum(axis=1)
+        zero_idxs = np.flatnonzero(out_degree == 0)
+        leaf_mask = np.in1d(self._sparse_unsigned.col, zero_idxs)
+        return MaskArray(leaf_mask)
+
+    @property
+    def matrix(self) -> ty.Union[base.DoubleVector, base.IntVector]:
+        """Exposes the adjacency as a dense matrix.
+
+        Notes
+        -----
+        For instances which have set ``weights`` attribute, the nonzero
+        output will be equal to the weights. Otherwise nonzero elements
+        will be an integer. For a single edge between two vertices, this
+        will be ``1``.
+
+        For both the weighted and unweighted case, if several edges
+        connect vertex pairs, their entries will be summed to produce
+        the dense matrix. This may cause loss of information.
+        """
+        if self.weights.size > 0:
+            adj = self._sparse_weighted
+        else:
+            adj = self._sparse_unsigned.copy()
+            adj.data = adj.data.astype("<i4")
+        adj.sum_duplicates()
+        return adj.todense(order="C")
 
     @classmethod
     def from_matrix(
@@ -1834,48 +1917,6 @@ class AdjacencyList(base.AdjacencyBase):
         if weighted is True:
             kwargs["weights"] = sps_adj.data
         return cls(**kwargs)
-
-    @property
-    def matrix(self) -> ty.Union[base.DoubleVector, base.IntVector]:
-        size = len(self.nodes)
-        if len(self.weights) > 0:
-            weights = self.weights
-            dtype = self.weights.dtype
-        else:
-            weights = np.array(1)
-            dtype = "<i4"
-        adj = np.zeros((size, size), dtype=dtype)
-        abs_edges = self._edge_relabel
-        adj[abs_edges[:, 0], abs_edges[:, 1]] = weights
-        return adj
-
-    @fn.cached_property
-    def _edge_relabel(self) -> base.IntVector:
-        _, inv = np.unique(self._data, return_inverse=True)
-        return inv.reshape(-1, 2)
-
-    @property
-    def data(self) -> base.VoidVector:
-        return self._data.view(self.dtype).reshape(-1)
-
-    @property
-    def edges(self) -> base.VoidVector:
-        return self.data
-
-    @property
-    def nodes(self) -> base.IntVector:
-        """Nodes are extracted from the edge list, and put in
-        ascending order of magnitude, regardless of sign.
-        Positive sign conventionally means final state particle.
-        """
-        # extract nodes from edge list
-        unsort_nodes = np.unique(self._data)
-        sort_idxs = np.argsort(np.abs(unsort_nodes))
-        return unsort_nodes[sort_idxs]  # type: ignore
-
-    @fn.cached_property
-    def _sparse(self) -> coo_array:
-        return self.to_sparse()
 
     def to_sparse(self, data: ty.Optional[base.AnyVector] = None) -> coo_array:
         """Converts the graph structure to a ``scipy.sparse.coo_array``
