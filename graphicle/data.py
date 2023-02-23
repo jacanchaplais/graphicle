@@ -603,9 +603,6 @@ class MaskGroup(base.MaskBase, cla.MutableMapping[str, base.MaskBase]):
 
     .. versionadded:: 0.1.0
 
-    .. versionchanged:: 0.2.0
-       Added internal numpy interfaces for greater interoperability.
-
     Parameters
     ----------
     _mask_arrays : dict of MaskArrays or array-like objects
