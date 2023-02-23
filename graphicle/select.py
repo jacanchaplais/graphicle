@@ -30,6 +30,7 @@ __all__ = [
     "partition_descendants",
     "hadron_vertices",
     "fastjet_clusters",
+    "leaf_masks",
 ]
 
 
@@ -50,6 +51,9 @@ def fastjet_clusters(
     generalised-kt algorithm.
 
     :group: select
+
+    .. versionadded:: 0.2.3
+       Migrated from ``graphicle.calculate.cluster_pmu()``.
 
     Parameters
     ----------
@@ -87,9 +91,6 @@ def fastjet_clusters(
 
     ``p_val`` set to ``-1`` gives anti-kT, ``0`` gives Cambridge-Aachen,
     and ``1`` gives kT clusterings.
-
-    .. versionadded:: 0.2.3
-    Migrated from ``graphicle.calculate.cluster_pmu()``.
     """
     pmu_pyjet = pmu.data[["e", "x", "y", "z"]]
     pmu_pyjet.dtype.names = "E", "px", "py", "pz"
@@ -125,6 +126,8 @@ def find_vertex(
     passed pdg codes.
 
     :group: select
+
+    .. versionadded:: 0.1.0
 
     Parameters
     ----------
@@ -200,6 +203,11 @@ def vertex_descendants(adj: gcl.AdjacencyList, vertex: int) -> gcl.MaskArray:
 
     :group: select
 
+    .. versionadded:: 0.1.0
+
+    .. versionchanged:: 0.1.11
+       Performance enhancements.
+
     Parameters
     ----------
     adj : AdjacencyList
@@ -213,10 +221,11 @@ def vertex_descendants(adj: gcl.AdjacencyList, vertex: int) -> gcl.MaskArray:
         Boolean mask over the graphicle objects associated with the
         passed AdjacencyList.
     """
-    bft = breadth_first_tree(adj._sparse, abs(vertex))
-    desc_nodes = (2 * bft.data.astype("<i4") - 1) * bft.indices
-    mask = np.isin(adj.edges["in"], desc_nodes)
-    mask[adj.edges["in"] == vertex] = True
+    sparse = adj._sparse_signed
+    vertex = sparse.row[vertex == adj.edges["in"]][0]
+    bft = breadth_first_tree(sparse, vertex)
+    mask = np.isin(sparse.row, bft.indices)
+    mask[sparse.row == vertex] = True  # include parent vertex
     return gcl.MaskArray(mask)
 
 
@@ -227,6 +236,8 @@ def hadron_vertices(
     """Locates the hadronisation vertices in the generation DAG.
 
     :group: select
+
+    .. versionadded:: 0.1.11
 
     Parameters
     ----------
@@ -311,6 +322,8 @@ def partition_descendants(
     heritage, by aligning them with their nearest ancestor.
 
     :group: select
+
+    .. versionadded:: 0.1.11
 
     Parameters
     ----------
@@ -430,6 +443,11 @@ def hard_descendants(
 
     :group: select
 
+    .. versionadded:: 0.1.0
+
+    .. versionchanged:: 0.1.11
+       Target parameter now optional.
+
     Parameters
     ----------
     graph : Graphicle
@@ -478,6 +496,8 @@ def hierarchy(
     partons are accessible, and nested within their parents.
 
     :group: select
+
+    .. versionadded:: 0.1.11
 
     Parameters
     ----------
@@ -652,6 +672,8 @@ def leaf_masks(mask_tree: gcl.MaskGroup) -> gcl.MaskGroup:
 
     :group: select
 
+    .. versionadded:: 0.1.11
+
     Parameters
     ----------
     mask_tree : MaskGroup
@@ -674,6 +696,8 @@ def any_overlap(masks: gcl.MaskGroup) -> bool:
     with each other.
 
     :group: select
+
+    .. versionadded:: 0.1.0
 
     Parameters
     ----------
