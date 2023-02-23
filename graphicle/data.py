@@ -1794,6 +1794,7 @@ class AdjacencyList(base.AdjacencyBase):
         Underlying array data. Identical to ``edges`` attribute,
         included for consistency with ``base.ArrayBase`` numpy
         interfaces.
+
         .. versionadded:: 0.2.4
     edges : ndarray
         COO edge list.
@@ -1803,10 +1804,12 @@ class AdjacencyList(base.AdjacencyBase):
         Scalar value embedded on each edge.
     matrix : ndarray
         Adjacency matrix representation.
+
         .. versionchanged:: 0.2.4
            Duplicate edges are added together.
     leaves : MaskArray
         Provides a mask for selecting the leaves of a DAG / tree.
+
         .. versionadded:: 0.2.4
 
     Methods
@@ -1815,6 +1818,7 @@ class AdjacencyList(base.AdjacencyBase):
         Construct ``AdjacencyList`` from an adjacency matrix.
     to_sparse()
         Exposes the data as a SciPy sparse (coo) array.
+
         .. versionadded:: 0.1.11
     to_dicts()
         Exposes the data as a dictionary with keys "edges" and "nodes".
