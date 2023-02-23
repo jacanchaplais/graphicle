@@ -736,6 +736,10 @@ def centroid_prune(
     If ``centre`` is not provided, the transverse momentum weighted
     centroid will be used.
 
+    :group: select
+
+    .. versionadded:: 0.2.4
+
     Parameters
     ----------
     pmu : MomentumArray
@@ -743,6 +747,9 @@ def centroid_prune(
     radius : float
         Euclidean distance in the azimuth-pseudorapidity plane from the
         centroid, beyond which particles will be filtered out.
+    mask : MaskArray, optional
+        If provided, will apply the mask to the passed ``pmu``, and
+        output ``MaskArray`` will have the same length.
     centre : tuple[float, float]
         Pseudorapidity and azimuth coordinates for a user-defined
         centroid.
