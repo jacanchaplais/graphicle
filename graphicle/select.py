@@ -31,6 +31,7 @@ __all__ = [
     "hadron_vertices",
     "fastjet_clusters",
     "leaf_masks",
+    "centroid_prune",
 ]
 
 
