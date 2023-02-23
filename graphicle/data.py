@@ -2115,6 +2115,9 @@ class Graphicle:
 
     .. versionadded:: 0.1.0
 
+    .. versionchanged:: 0.2.4
+       Removed ``hard_vertex`` attribute.
+
     Parameters
     ----------
     particles : ParticleSet
@@ -2296,19 +2299,3 @@ class Graphicle:
     @property
     def nodes(self) -> base.IntVector:
         return self.adj.nodes
-
-    def _need_attr(self, attr_name: str, task: str) -> None:
-        if len(getattr(self, attr_name)) == 0:
-            raise AttributeError(
-                f"Graphicle object needs '{attr_name}' attribute to {task}."
-            )
-
-    @property
-    def hard_vertex(self) -> int:
-        """Id of vertex at which hard interaction occurs."""
-        for prop in ("status", "edges"):
-            self._need_attr(attr_name=prop, task="infer hard vertex")
-        hard_edges = self.edges[self.status.hard_mask]
-        vertex_array = np.intersect1d(hard_edges["in"], hard_edges["out"])
-        central = vertex_array[np.argmin(np.abs(vertex_array))]
-        return int(central)
