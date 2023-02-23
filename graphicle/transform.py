@@ -4,14 +4,14 @@
 
 Utilities for manipulating the graph structure of particle data.
 """
-import numpy as np
 import networkx as _nx
+import numpy as np
 from typicle import Types
 from typicle.convert import cast_array
 
 import graphicle as gcl
-from . import base
 
+from . import base
 
 __all__ = ["particle_as_node", "centre_angle", "centre_pseudorapidity"]
 
@@ -25,6 +25,8 @@ def particle_as_node(adj_list: gcl.AdjacencyList) -> gcl.AdjacencyList:
     same particle ordering of the initial edge list.
 
     :group: transform
+
+    .. versionadded:: 0.1.0
 
     Parameters
     ----------
@@ -80,6 +82,8 @@ def centre_angle(
 
     :group: transform
 
+    .. versionadded:: 0.1.0
+
     Parameters
     ----------
     angle : array
@@ -109,6 +113,8 @@ def centre_pseudorapidity(
     """Shifts pseudorapidities so pt weighted midpoint is at 0.
 
     :group: transform
+
+    .. versionadded:: 0.1.0
 
     Parameters
     ----------

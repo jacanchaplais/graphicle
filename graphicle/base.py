@@ -51,6 +51,8 @@ class EventInterface(ty.Protocol):
 
     :group: base
 
+    .. versionadded:: 0.1.7
+
     Attributes
     ----------
     pdg : ndarray[int32]

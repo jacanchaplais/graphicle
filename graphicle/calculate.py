@@ -40,6 +40,8 @@ def azimuth_centre(pmu: gcl.MomentumArray, pt_weight: bool = True) -> float:
 
     :group: calculate
 
+    .. versionadded:: 0.1.7
+
     Parameters
     ----------
     pmu : MomentumArray
@@ -72,6 +74,8 @@ def combined_mass(
     itself in Minkowski space.
 
     :group: calculate
+
+    .. versionadded:: 0.1.0
 
     Parameters
     ----------
@@ -175,6 +179,8 @@ def flow_trace(
 
     :group: calculate
 
+    .. versionadded:: 0.1.0
+
     Parameters
     ----------
     graph : Graphicle
@@ -269,6 +275,8 @@ def cluster_pmu(
     """Clusters particles using the generalised-kt algorithm.
 
     :group: calculate
+
+    .. versionadded:: 0.1.4
 
     Parameters
     ----------

@@ -29,6 +29,8 @@ def cut_adj(
 
     :group: matrix
 
+    .. versionadded:: 0.1.0
+
     Parameters
     ----------
     matrix : array
@@ -93,6 +95,8 @@ def knn_adj(
 
     :group: matrix
 
+    .. versionadded:: 0.1.0
+
     Parameters
     ----------
     matrix : 2d numpy array
@@ -154,6 +158,8 @@ def fc_adj(
 
     :group: matrix
 
+    .. versionadded:: 0.1.0
+
     Parameters
     ----------
     num_nodes : int
@@ -175,6 +181,8 @@ def delta_R_aff(pmu: gcl.MomentumArray) -> base.DoubleVector:
     internally within the given MomentumArray.
 
     :group: matrix
+
+    .. versionadded:: 0.1.0
 
     Parameters
     ----------
@@ -203,6 +211,10 @@ def parton_hadron_distance(
     """Calculates pairwise transverse-momentum (pt) weighted distances
     between two sets of 4-momenta. The pt weighting is raised to the
     power given by ``pt_exp``.
+
+    :group: matrix
+
+    .. versionadded:: 0.1.11
 
     Parameters
     ----------
