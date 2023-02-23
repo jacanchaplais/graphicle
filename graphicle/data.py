@@ -397,7 +397,7 @@ class MaskArray(base.MaskBase, base.ArrayBase):
 
     Parameters
     ----------
-    data : Sequence[bool]
+    data : sequence[bool]
         Boolean values consituting the mask.
 
     Attributes
@@ -534,9 +534,9 @@ def _mask_eq(mask1: base.MaskLike, mask2: base.MaskLike) -> MaskArray:
 
     Parameters
     ----------
-    mask1 : base.MaskBase | numpy.ndarray
+    mask1 : base.MaskBase or ndarray
         Boolean array to compare against.
-    mask2 : base.MaskBase | numpy.ndarray
+    mask2 : base.MaskBase or ndarray
         The other array.
     """
     if not _mask_compat(mask1, mask2):
@@ -555,9 +555,9 @@ def _mask_neq(mask1: base.MaskLike, mask2: base.MaskLike) -> MaskArray:
 
     Parameters
     ----------
-    mask1 : base.MaskBase | numpy.ndarray
+    mask1 : base.MaskBase or ndarray
         Boolean array to compare against.
-    mask2 : base.MaskBase | numpy.ndarray
+    mask2 : base.MaskBase or ndarray
         The other array.
     """
     if not _mask_compat(mask1, mask2):
@@ -607,9 +607,9 @@ class MaskGroup(base.MaskBase, cla.MutableMapping[str, base.MaskBase]):
     ----------
     _mask_arrays : dict of MaskArrays or array-like objects
         Dictionary of MaskArray objects to be composed.
-    agg_op : str or MaskAggOp
+    agg_op : {'and', 'or', 'none'}
         Defines the aggregation operation when accessing the `data`
-        attribute. Options are "and", "or", "none". Default is "and".
+        attribute. Default is 'and'.
 
     Attributes
     ----------
