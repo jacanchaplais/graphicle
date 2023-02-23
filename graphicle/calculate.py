@@ -70,7 +70,7 @@ def combined_mass(
     weight: base.DoubleVector | None = None,
 ) -> float:
     """Returns the combined mass of the particles represented in the
-    provided MomentumArray.
+    provided ``MomentumArray``.
 
     This is done by summing the four momenta, optionally weighting the
     components, and then taking the inner product of the result with
@@ -82,19 +82,19 @@ def combined_mass(
 
     Parameters
     ----------
-    pmu : MomentumArray, ndarray
+    pmu : MomentumArray or ndarray[void]
         Momenta of particles comprising a jet, or an analagous combined
         object. If a numpy array is passed, it must be structured with
         fields with names ``('x', 'y', 'z', 'e')``.
-    weight : array, optional
+    weight : ndarray[float64], optional
         Weights for each particle when reconstructing the jet momentum.
         May be either structured or unstructured. If unstructured,
         ensure the columns are in the order ``('x', 'y', 'z', 'e')``.
 
     Notes
     -----
-    This does not mask the MomentumArray for you. All filters and cuts
-    must be applied before passing to this function.
+    This does not mask the ``MomentumArray`` for you. All filters and
+    cuts must be applied before passing to this function.
 
     In the event of a squared mass below zero (due to numerical
     fluctuations for very low mass reconstructions), this function will
@@ -189,20 +189,20 @@ def flow_trace(
     graph : Graphicle
         Full particle event, containing hard partons, showering and
         hadronisation.
-    mask : MaskArray, MaskGroup, ndarray
+    mask : MaskArray or MaskGroup or ndarray[bool_]
         Boolean mask identifying which particles should have their
         ancestry traced.
-    prop : ArrayBase, ndarray
-        Property to trace back, *eg.* 4-momentum, charge. Must be the
-        same shape as arrays stored in graph. Can be structured,
+    prop : ArrayBase or ndarray[any]
+        Property to trace back, *eg.* 4-momentum, charge, *etc*. Must be
+        the same shape as arrays stored in graph. Can be structured,
         unstructured, or a graphicle array, though unstructured arrays
         must be 1D.
     exclusive : bool
-        If True, double counting from descendant particles in the hard
-        event will be switched off. *eg.* for event ``t > b W+``,
+        If ``True``, double counting from descendant particles in the
+        hard event will be switched off. *eg.* for event ``t > b W+``,
         descendants of ``b`` will show no contribution from ``t``, as
         ``b`` is a subset of ``t``. Default is ``False``.
-    target : set of ints, optional
+    target : set[int], optional
         Highlights specific partons in the hard event to decompose
         properties with respect to. If unset, will use all partons in
         hard event, except for incoming partons.

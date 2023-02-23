@@ -1104,9 +1104,9 @@ class MomentumArray(base.ArrayBase):
         Pseudorapidity component of particle momenta.
     phi : ndarray[float64]
         Azimuthal component of particle momenta.
-    theta : np.ndarray[float64]
+    theta : ndarray[float64]
         Angular displacement from beam axis.
-    mass : np.ndarray[float64]
+    mass : ndarray[float64]
         Mass of the particles
 
     Methods
@@ -1320,10 +1320,11 @@ class ColorArray(base.ArrayBase):
 
     Parameters
     ----------
-    data : ndarray[int32]
+    data : ndarray[int32] or ndarray[void]
         Data representing the QCD color charge of each particle in the
         point cloud. Given as either a (n, 2)-dimensional numpy array,
-        or a structured array, with fields "color", "anticolor".
+        or a structured array, with field names
+        ``('color', 'anticolor')``.
 
     Attributes
     ----------
