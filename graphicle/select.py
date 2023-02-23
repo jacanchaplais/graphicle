@@ -446,8 +446,7 @@ def hard_descendants(
     .. versionadded:: 0.1.0
 
     .. versionchanged:: 0.1.11
-       Target parameter now optional. Using default implies all hard
-       partons.
+       Target parameter now optional.
 
     Parameters
     ----------
