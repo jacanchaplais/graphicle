@@ -631,7 +631,10 @@ class MaskGroup(base.MaskBase, cla.MutableMapping[str, base.MaskBase]):
     from_numpy_structured()
         Converts a structured boolean array into a ``MaskGroup``.
     flatten()
-        Removes any nesting of ``MaskGroup``s within ``MaskGroup``s.
+        Removes any nesting of ``MaskGroup`` instances within
+        ``MaskGroup`` instances.
+
+        .. versionadded:: 0.1.11
     copy()
         Copies the ``MaskGroup`` instance.
     """
@@ -880,6 +883,13 @@ class PdgArray(base.ArrayBase):
         Spatial parity for each particle.
     charge_parity : ndarray
         Charge parity for each particle.
+
+    Methods
+    -------
+    mask()
+        Returns ``MaskArray`` to blacklist or whitelist PDGs from event.
+    copy()
+        Provides a deepcopy of the data.
     """
 
     _data: base.IntVector = _array_field("<i4")
@@ -1057,6 +1067,9 @@ class MomentumArray(base.ArrayBase):
     .. versionchanged:: 0.2.0
        Added internal numpy interfaces for greater interoperability.
 
+    .. versionchanged:: 0.2.3
+       Added `x`, `y`, `z`, and `energy` attributes.
+
     Parameters
     ----------
     data : np.ndarray[np.float64]
@@ -1093,6 +1106,15 @@ class MomentumArray(base.ArrayBase):
     -------
     delta_R()
         Calculates interparticle distances with ``other`` MomentumArray.
+
+        .. versionadded:: 0.1.0
+
+        .. versionchanged:: 0.1.5
+           Computes 2D matrix of inter-particle distances, enabling
+           comparisons between arbitrary length ``MomentumArray``
+           instances.
+    copy()
+        Provides a deepcopy of the data.
     """
 
     # data: base.AnyVector = array_field("pmu")
@@ -1301,6 +1323,11 @@ class ColorArray(base.ArrayBase):
     ----------
     data : ndarray
         Structured array containing color / anti-color pairs.
+
+    Methods
+    -------
+    copy()
+        Provides a deepcopy of the data.
     """
 
     _data: base.VoidVector = _array_field("<i4", 2)
@@ -1393,6 +1420,11 @@ class HelicityArray(base.ArrayBase):
     ----------
     data : ndarray[int16]
         Helicity values.
+
+    Methods
+    -------
+    copy()
+        Provides a deepcopy of the data.
     """
 
     _data: base.HalfIntVector = _array_field("<i2")
@@ -1482,10 +1514,20 @@ class StatusArray(base.ArrayBase):
     data : ndarray[int16]
         Status codes.
 
+    Methods
+    -------
+    in_range()
+        Returns ``MaskArray`` to filter event over inclusive range of
+        status codes.
+    copy()
+        Provides a deepcopy of the data.
+
     Notes
     -----
-    These codes are specific to the Monte-Carlo event generators which
-    produced the data.
+    These codes are specific to the Monte-Carlo event generators (MCEGs)
+    which produced the data. Currently, functionality has only been
+    developed with ``pythia8``, using data from other MCEGs may yield
+    unexpected results.
     """
 
     _data: base.HalfIntVector = _array_field("<i2")
@@ -1683,6 +1725,13 @@ class ParticleSet(base.ParticleBase):
         Status codes from Monte-Carlo event generator.
     final : MaskArray
         Boolean array indicating final state in particle set.
+
+    Methods
+    -------
+    from_numpy()
+        Constructs ``ParticleSet`` instance from numpy arrays.
+    copy()
+        Provides a deepcopy of the data.
     """
 
     pdg: PdgArray = field(default=Factory(PdgArray))
@@ -2100,8 +2149,18 @@ class Graphicle:
         Identifies which particles participate in the hard process.
         For Pythia, this is split into four categories: incoming,
         intermediate, outgoing, outgoing_nonperturbative_diffraction.
-    hard_vertex : int
-        Vertex at which the hard process is initiated.
+
+    Methods
+    -------
+    from_numpy()
+        Constructs ``Graphicle`` instance from numpy arrays.
+    from_event()
+        Constructs ``Graphicle`` instance from object implementing the
+        ``base.EventInterface`` protocol.
+
+        .. versionadded:: 0.1.7
+    copy()
+        Provides a deepcopy of the data.
     """
 
     particles: ParticleSet = field(default=Factory(ParticleSet))
