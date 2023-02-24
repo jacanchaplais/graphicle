@@ -371,8 +371,8 @@ def partition_descendants(
     for vtx_id, pcls_in in hadron_vtxs:
         vtx_desc = vertex_descendants(graph.adj, vtx_id)
         for name, branch in hier.items():
-            for _, mask in _leaf_mask_iter(branch, name):
-                if vtx_id not in graph.edges["out"][mask.data]:
+            for _, mask in _leaf_mask_iter(name, branch):
+                if vtx_id not in graph.edges["out"][mask]:
                     continue
                 mask.data = _partition_vertex(
                     mask,
