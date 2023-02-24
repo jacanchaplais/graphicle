@@ -88,8 +88,6 @@ def fastjet_clusters(
 
     Notes
     -----
-    This is a wrapper around FastJet's implementation.
-
     ``p_val`` set to ``-1`` gives **anti-kT**, ``0`` gives
     **Cambridge-Aachen**, and ``1`` gives **kT** clusterings.
     """
@@ -387,10 +385,24 @@ def partition_descendants(
     return hier
 
 
-def _hard_matrix(hard_desc: gcl.MaskGroup) -> base.BoolVector:
-    """Returns a square adjacency matrix for the hard process. Rows
-    represent each hard parton, and the values indicate whether another
-    given hard parton is a descendant of it.
+def _hard_ancestor_matrix(hard_desc: gcl.MaskGroup) -> base.BoolVector:
+    """Returns a directed adjacency matrix for the hard process.
+
+    Parameters
+    ----------
+    hard_desc : MaskGroup
+        Collection of masks indicating descendants from hard partons,
+        over the hard process only. Obtain with ``hard_descendants()``
+        and then applying ``StatusArray.hard_mask`` (with ``'incoming'``
+        removed).
+
+    Returns
+    -------
+    hard_matrix : ndarray[bool_]
+        Square directed adjacency matrix, linking partons in the hard
+        process to their descendants. Rows represent each hard parton,
+        and columns indicate which hard partons descend from it
+        (including descendants-of-descendants).
     """
     num_hard = len(hard_desc)
     mat = np.zeros((num_hard, num_hard), dtype="<?")
