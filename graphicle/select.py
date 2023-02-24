@@ -752,9 +752,7 @@ def _make_tree(
     """
     branch = gcl.MaskGroup(agg_op="or")  # type: ignore
     if isinstance(flat, dict):
-        for key, nest in flat.items():
-            if key not in roots:
-                continue
+        for key, nest in filter(lambda item: item[0] in roots, flat.items()):
             branch[key] = _make_tree(nest, roots, hard, desc, adj)
             branch[key]["latent"] = (  # type: ignore
                 branch[key].data != desc[key].data
