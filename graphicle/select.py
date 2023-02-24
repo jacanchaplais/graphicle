@@ -542,6 +542,7 @@ def hard_descendants(
     graph: gcl.Graphicle,
     target: ty.Optional[ty.Iterable[int]] = None,
     sign_sensitive: bool = False,
+    strict: bool = True,
 ) -> gcl.MaskGroup:
     """Returns a ``MaskGroup`` instance to select particle descendants
     of ``target`` hard partons (by PDG code).
@@ -551,7 +552,10 @@ def hard_descendants(
     .. versionadded:: 0.1.0
 
     .. versionchanged:: 0.1.11
-       Target parameter now optional.
+       ``target`` parameter now optional.
+
+    .. versionchanged:: 0.2.5
+       ``strict`` parameter added.
 
     Parameters
     ----------
@@ -568,28 +572,45 @@ def hard_descendants(
         anti-particle partons will be masked, whereas if ``True`` only
         the partons explicitly matching the target sign will be
         considered. Default is ``False``.
+    strict : bool
+        If ``True`` all PDGs in ``target`` must be present in the hard
+        process. If ``False``, only a subset need be present. Default
+        is ``True``.
+
+    Returns
+    -------
+    descendant_masks : MaskGroup
+        Collection of masks over the event indicating the descendants
+        of partons from within the hard process.
+
+    Raises
+    ------
+    ValueError
+        If PDG codes required by ``target`` and ``strict`` are absent
+        from the partons in the hard process.
     """
-    hard_vtxs = list()
-    # get the vertices of the hard partons
-    for stage, mask in graph.hard_mask.items():
-        if stage == "incoming":
-            continue
-        pcls = graph[mask]
-        if target is not None:
-            hard_mask = pcls.pdg.mask(
-                list(target), blacklist=False, sign_sensitive=sign_sensitive
-            )
-            if not np.any(hard_mask):
-                continue
-            pcls = pcls[hard_mask]
-        pdg_keys = _pdgs_to_keys(pcls.pdg)
-        pcl_out_vtxs = map(int, pcls.edges["out"])
-        hard_vtxs.extend(list(zip(pdg_keys, pcl_out_vtxs)))
-    # find the descendants of those vertices
-    masks = gcl.MaskGroup(agg_op="or")
-    for pdg_key, vtx in hard_vtxs:
-        masks[pdg_key] = vertex_descendants(graph.adj, vtx)
-    return masks
+    hard_mask = graph.hard_mask
+    del hard_mask["incoming"]
+    hard_graph = graph[hard_mask]
+    if target is not None:
+        target_pdgs = set(target)
+        target_mask = hard_graph.pdg.mask(
+            target=tuple(target_pdgs),
+            blacklist=False,
+            sign_sensitive=sign_sensitive,
+        )
+        if not np.any(target_mask):
+            raise ValueError("No target PDGs found in hard process.")
+        if (strict is True) and (np.sum(target_mask) != len(target_pdgs)):
+            found_pdgs = set(map(int, hard_graph.pdg[target_mask]))
+            missing_pdgs = target_pdgs - found_pdgs
+            missing_str = ", ".join(map(str, missing_pdgs))
+            raise ValueError(f"Missing PDGs in hard process: {missing_str}.")
+        hard_graph = hard_graph[target_mask]
+    pdg_keys = _pdgs_to_keys(hard_graph.pdg)
+    pcl_out_vtxs = map(int, hard_graph.edges["out"])
+    vtx_descs = map(vertex_descendants, it.repeat(graph.adj), pcl_out_vtxs)
+    return gcl.MaskGroup(cl.OrderedDict(zip(pdg_keys, vtx_descs)), agg_op="or")
 
 
 def hierarchy(
