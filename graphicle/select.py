@@ -131,7 +131,8 @@ def find_vertex(
     Parameters
     ----------
     graph : Graphicle
-        Graphicle object, which must contain at least edge and pdg data.
+        ``Graphicle`` object, which must contain at least edge and pdg
+        data.
     pdgs_in : set of ints
         Subset of pdg codes to match against the incoming particles.
     pdgs_out : set of ints
@@ -139,9 +140,14 @@ def find_vertex(
 
     Returns
     -------
-    vertices : array of ints
+    vertices : ndarray[int32]
         List the vertex ids which match the passed incoming and outgoing
         pdg codes.
+
+    Raises
+    ------
+    ValueError
+        Raised if ``pdgs_in`` and ``pdgs_out`` are both left blank.
     """
     # preparing the search sets
     search = dict()
