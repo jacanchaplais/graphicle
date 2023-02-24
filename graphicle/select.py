@@ -411,39 +411,108 @@ def _hard_ancestor_matrix(hard_desc: gcl.MaskGroup) -> base.BoolVector:
     return mat
 
 
-def _composite_matrix(hard_matrix: base.BoolVector) -> base.BoolVector:
-    """Similar to ``_hard_matrix()``, but columns represent direct
-    children, not grand-children further nested composites.
+def _hard_parent_matrix(hard_matrix: base.BoolVector) -> base.BoolVector:
+    """Returns an adjacency matrix over the hard process of parents to
+    their direct children. Filters out grandchildren *etc*.
+
+    Parameters
+    ----------
+    hard_matrix : ndarray[bool_]
+        Directed adjacency matrix representing the links from ancestors
+        to descendants (including descendants-of-descendants *etc*.)
+        Obtain with ``_hard_ancestor_matrix()``.
+
+    Returns
+    -------
+    hard_parent_matrix : ndarray[bool_]
+        Directed adjacency matrix representing links from parents to
+        direct (first generation) children. Same as ``hard_matrix``, but
+        with grandchildren *etc.* removed.
+
+    Notes
+    -----
+    This function has side-effects on the input. In fact, the return
+    value is the same object in memory as ``hard_matrix``, so could
+    technically be discarded entirely. If this behaviour is problematic,
+    pass ``hard_matrix.copy()`` instead.
     """
-    pcls_with_hard_children = filter(np.any, hard_matrix)
-    asc_parents = sorted(pcls_with_hard_children, key=np.sum)
-    for row_i in reversed(asc_parents):
-        for row_j in asc_parents:
-            if row_i is row_j:
-                continue
-            row_i[row_j] = False
+    pcls_with_hard_parent_dict = filter(np.any, hard_matrix)
+    asc_parents = sorted(pcls_with_hard_parent_dict, key=np.sum)
+    row_pairs = it.product(reversed(asc_parents), asc_parents)
+    for row_i, row_j in filter(lambda pair: op.is_not(*pair), row_pairs):
+        row_i[row_j] = False
     return hard_matrix
 
 
-def _hard_children(
+def _hard_parent_dict(
     comp_mat: base.BoolVector,
     names: ty.Tuple[str, ...],
 ) -> ty.Dict[str, ty.Tuple[str, ...]]:
+    """Creates a mapping between the names of parent partons in the hard
+    process to the names of their children.
+
+    Parameters
+    ----------
+    comp_mat : ndarray[bool_]
+        Directed adjacency matrix for the hard process, with edges from
+        parent hard partons to their immediate children. Each row
+        represents a parent parton, where columns represent the children
+        they are linked to. Obtain this with ``_hard_parent_matrix()``.
+    names : tuple[str, ...]
+        Names of the hard partons, appearing in the same order as the
+        corresponding rows / columns of adjacency matrix representing
+        the hard process (and therefore same order as ``comp_mat``).
+
+    Returns
+    -------
+    parent_dict : dict[str, tuple[str, ...]]
+        Mapping from parents to children in the hard process. Keys are
+        parent names, and values are tuples of children names.
+    """
     parents = filter(lambda parton: np.any(parton[1]), zip(names, comp_mat))
-    comp_dict = dict()
-    for name, parton in parents:
-        comp_dict[name] = tuple(it.compress(names, parton))
-    return comp_dict
+    parents = it.tee(parents, 2)
+    parent_names = map(op.itemgetter(0), parents[0])
+    children_masks = map(op.itemgetter(1), parents[1])
+    children_names = map(it.compress, it.repeat(names), children_masks)
+    children_names = map(tuple, children_names)
+    return dict(zip(parent_names, children_names))
 
 
 def _flat_hierarchy(
     hard_desc: gcl.MaskGroup,
 ) -> ty.Dict[str, ty.Tuple[str, ...]]:
-    """Produces a flat representation of the hard process hierarchy."""
+    """Produces a mapping between partons to their direct children in
+    the hard process. This mapping is flat, *ie.* there is no nesting
+    of dictionaries in dictionaries. Children of one parton may be
+    parents of another, and so may be both included in a child tuple
+    and as a parent key. There is no distinction between grandparents
+    and parents, *etc*.
+
+    Parameters
+    ----------
+    hard_desc : MaskGroup
+        Collection of masks indicating descendants from hard partons,
+        over the hard process only. Obtain with ``hard_descendants()``
+        and then applying ``StatusArray.hard_mask`` (with ``'incoming'``
+        removed).
+
+    Returns
+    -------
+    parent_dict : dict[str, tuple[str, ...]]
+        Mapping from parents to children in the hard process. Keys are
+        parent names, and values are tuples of children names.
+
+    Notes
+    -----
+    In rare cases, when several particles with the same PDG code are
+    present in the hard process, the particle names will be appended
+    with a colon followed by a numerical index, *eg.* ``'b~:0'``. See
+    ``_pdgs_to_keys()`` for more information.
+    """
     names = tuple(hard_desc.keys())
-    hard_matrix = _hard_matrix(hard_desc)
-    comp_matrix = _composite_matrix(hard_matrix)
-    return _hard_children(comp_matrix, names)
+    ancestor_matrix = _hard_ancestor_matrix(hard_desc)
+    parent_matrix = _hard_parent_matrix(ancestor_matrix)
+    return _hard_parent_dict(parent_matrix, names)
 
 
 def _pdgs_to_keys(pdg: gcl.PdgArray) -> ty.Tuple[str, ...]:
