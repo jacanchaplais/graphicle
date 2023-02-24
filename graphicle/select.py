@@ -777,8 +777,8 @@ def _make_tree(
 
 
 def _leaf_mask_iter(
-    branch: ty.Union[gcl.MaskGroup, gcl.MaskArray],
     branch_name: str,
+    branch: ty.Union[gcl.MaskGroup, gcl.MaskArray],
     exclude_latent: bool = True,
 ) -> ty.Generator[ty.Tuple[str, gcl.MaskArray], None, None]:
     """Recursive function, traversing a branch of the nested mask tree
@@ -791,7 +791,7 @@ def _leaf_mask_iter(
             if exclude_latent and name == "latent":
                 continue
             # TODO: look into contravariant type for this
-            yield from _leaf_mask_iter(mask, name)  # type: ignore
+            yield from _leaf_mask_iter(name, mask, exclude_latent)  # type: ignore
 
 
 def leaf_masks(mask_tree: gcl.MaskGroup) -> gcl.MaskGroup:
@@ -815,7 +815,7 @@ def leaf_masks(mask_tree: gcl.MaskGroup) -> gcl.MaskGroup:
     """
     mask_group = gcl.MaskGroup(agg_op="or")  # type: ignore
     for name, branch in mask_tree.items():
-        mask_group.update(dict(_leaf_mask_iter(branch, name)))  # type: ignore
+        mask_group.update(dict(_leaf_mask_iter(name, branch)))  # type: ignore
     return mask_group
 
 
