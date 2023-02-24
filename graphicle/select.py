@@ -714,11 +714,14 @@ def hierarchy(
         for key, idx in zip(hard_final_keys, hard_final_idxs):
             desc[key].data[idx] = True
     masks = _make_tree(hard, roots, hard, desc, graph.adj)
-    for root_name, root in masks.items():
-        for name, mask in _leaf_mask_iter(root, root_name, False):
-            if name != "latent":
-                continue
-            mask[mask & graph.hard_mask] = False
+    leaf_iters = it.starmap(
+        fn.partial(_leaf_mask_iter, exclude_latent=False), masks.items()
+    )
+    leaf_iter = it.chain.from_iterable(leaf_iters)
+    leaf_iter = filter(lambda kv: kv[0] == "latent", leaf_iter)
+    leaf_masks = map(op.itemgetter(1), leaf_iter)
+    for leaf_mask in leaf_masks:
+        leaf_mask[leaf_mask & graph.hard_mask] = False
     return masks
 
 
