@@ -48,6 +48,7 @@ import warnings
 from copy import deepcopy
 from enum import Enum
 
+import deprecation
 import numpy as np
 import numpy.typing as npt
 from attr import Factory, cmp_using, define, field, setters
@@ -821,22 +822,51 @@ class MaskGroup(base.MaskBase, cla.MutableMapping[str, base.MaskBase]):
             )
 
     @property
+    @deprecation.deprecated(
+        deprecated_in="0.2.6",
+        removed_in="0.3.0",
+        details="Use ``MaskGroup.to_dict()`` instead.",
+    )
     def dict(self) -> ty.Dict[str, base.BoolVector]:
+        """Masks nested in a dictionary instead of a ``MaskGroup``."""
         return {key: val.data for key, val in self._mask_arrays.items()}
 
-    def flatten(self) -> "MaskGroup":
+    def to_dict(self) -> ty.Dict[str, base.BoolVector]:
+        """Masks nested in a dictionary instead of a ``MaskGroup``."""
+        return {key: val.data for key, val in self._mask_arrays.items()}
+
+    def flatten(
+        self, how: ty.Literal["rise", "agg"] = "rise"
+    ) -> "MaskGroup[MaskArray]":
         """Removes nesting such that the ``MaskGroup`` contains only
-        ``MaskArray``s, and no other ``MaskGroup``s.
+        ``MaskArray`` instances, and no other ``MaskGroup``.
+
+        .. versionadded:: 0.1.11
+
+        .. versionchanged:: 0.2.6
+           Added ``'how'`` parameter.
+
+        Parameters
+        ----------
+        how : {'rise', 'agg'}
+            Method used to convert into flat ``MaskGroup``. ``'rise'``
+            recurses through nested levels, raising all contained
+            ``MaskArray`` instances to the top level. ``'agg'`` loops
+            over the top level of ``MaskBase`` objects, leaving
+            top-level ``MaskArray`` objects as-is, but calling the
+            aggregation operation over any ``MaskGroup``. Default is
+            ``'rise'``.
 
         Returns
         -------
         flat_masks : MaskGroup
-            ``MaskGroup`` in which all sub-``MaskGroup``s are aggregated
-            and placed at the top level of the outer ``MaskGroup``,
-            along with the ``MaskArray``s from the innermost levels.
+            Flat ``MaskGroup`` with only ``MaskArray`` instances nested
+            at the top level.
         """
 
-        def leaves(mask_group: "MaskGroup"):
+        def leaves(
+            mask_group: "MaskGroup",
+        ) -> ty.Iterator[ty.Tuple[str, base.MaskLike]]:
             for key, val in mask_group.items():
                 if key == "latent":
                     continue
@@ -846,12 +876,16 @@ class MaskGroup(base.MaskBase, cla.MutableMapping[str, base.MaskBase]):
                 else:
                     yield key, val
 
-        return self.__class__(dict(leaves(self)), "or")  # type: ignore
+        if how == "rise":
+            return self.__class__(cl.OrderedDict(leaves(self)), "or")  # type: ignore
+        return self.__class__(
+            cl.OrderedDict(
+                zip(self.keys(), map(op.attrgetter("data"), self.values()))
+            ),
+            "or",
+        )
 
 
-############################
-# PDG STORAGE AND QUERYING #
-############################
 @define(eq=False)
 class PdgArray(base.ArrayBase):
     """Returns data structure containing PDG integer codes for particle
