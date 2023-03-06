@@ -1,4 +1,3 @@
-from . import base, calculate, matrix, select, transform
 from .data import (
     AdjacencyList,
     ColorArray,
@@ -14,6 +13,8 @@ from .data import (
     StatusArray,
     VertexPair,
 )
+
+from . import base, calculate, matrix, select, transform  # isort: skip
 
 __all__ = [
     "MaskArray",
