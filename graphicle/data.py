@@ -622,6 +622,9 @@ class MaskGroup(base.MaskBase, cla.MutableMapping[str, MaskGeneric]):
 
     @property
     def agg_op(self) -> MaskAggOp:
+        """Aggregation operation set for reduction over constituent
+        masks.
+        """
         return MaskAggOp(self._agg_op.lower())
 
     @agg_op.setter
