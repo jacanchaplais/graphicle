@@ -591,53 +591,31 @@ class MaskAggOp(Enum):
 
 
 AggStringLiterals = ty.Literal["or", "and", "none"]
+MaskGeneric = ty.TypeVar(
+    "MaskGeneric", MaskArray, "MaskGroup", ty.Union[MaskArray, "MaskGroup"]
+)
 
 
 @define
-class MaskGroup(base.MaskBase, cla.MutableMapping[str, base.MaskBase]):
+class MaskGroup(base.MaskBase, cla.MutableMapping[str, MaskGeneric]):
     """Data structure to compose groups of masks over particle arrays.
     Can be nested to form complex hierarchies.
 
     :group: datastructure
 
     .. versionadded:: 0.1.0
+    .. versionchanged:: 0.2.6
+       Changed ``bitwise_or`` and ``bitwise_and`` properties into
+       methods.
+       Added generic type hinting for elements within ``MaskGroup``.
 
     Parameters
     ----------
-    _mask_arrays : dict of MaskArrays or array-like objects
+    mask_arrays : dict[str, MaskLike]
         Dictionary of MaskArray objects to be composed.
     agg_op : {'and', 'or', 'none'}
         Defines the aggregation operation when accessing the ``data``
         attribute. Default is ``'and'``.
-
-    Attributes
-    ----------
-    data : ndarray[bool_]
-        Combination of all masks in group via bitwise AND reduction.
-    agg_op : MaskAggOp
-        Aggregation operation set for reduction over constituent masks.
-    names : list[str]
-        Provides the string values of the keys to the top-level nested
-        ``MaskBase`` objects as a list. Will be deprecated in future.
-        ``MaskGroup.keys()`` is preferred.
-    bitwise_or : ndarray[bool_]
-        Bitwise ``OR`` reduction over the nested masks.
-    bitwise_and : np.ndarray[bool_]
-        Bitwise ``AND`` reduction over the nested masks.
-    dict : dict[base.MaskBase]
-        Masks nested in a dictionary instead of a ``MaskGroup``.
-
-    Methods
-    -------
-    from_numpy_structured()
-        Converts a structured boolean array into a ``MaskGroup``.
-    flatten()
-        Removes any nesting of ``MaskGroup`` instances within
-        ``MaskGroup`` instances.
-
-        .. versionadded:: 0.1.11
-    copy()
-        Copies the ``MaskGroup`` instance.
     """
 
     _mask_arrays: _MASK_DICT = field(
@@ -693,7 +671,9 @@ class MaskGroup(base.MaskBase, cla.MutableMapping[str, base.MaskBase]):
     def __iter__(self) -> ty.Iterator[str]:
         return iter(self._mask_arrays)
 
-    def __getitem__(self, key) -> ty.Union[MaskArray, "MaskGroup"]:
+    def __getitem__(
+        self, key
+    ) -> ty.Union[MaskArray, "MaskGroup[MaskGeneric]"]:
         """Subscripting for ``MaskGroup`` object.
 
         Parameters
@@ -719,11 +699,11 @@ class MaskGroup(base.MaskBase, cla.MutableMapping[str, base.MaskBase]):
         else:
             return self._mask_arrays[key]
 
-    def __setitem__(self, key, mask) -> None:
+    def __setitem__(self, key: str, mask: base.MaskLike) -> None:
         """Add a new MaskArray to the group, with given key."""
         if not isinstance(key, str):
             raise KeyError("Key must be string.")
-        if not isinstance(mask, base.MaskBase):
+        if not isinstance(mask, (MaskArray, type(self))):
             mask = MaskArray(mask)
         self._mask_arrays.update({key: mask})
 
@@ -775,7 +755,7 @@ class MaskGroup(base.MaskBase, cla.MutableMapping[str, base.MaskBase]):
     def __ne__(self, other: base.MaskLike) -> "MaskArray":
         return _mask_neq(self, other)
 
-    def copy(self) -> "MaskGroup":
+    def copy(self) -> "MaskGroup[MaskGeneric]":
         mask_copies = map(op.methodcaller("copy"), self._mask_arrays.values())
         return self.__class__(
             cl.OrderedDict(zip(self._mask_arrays.keys(), mask_copies)),
