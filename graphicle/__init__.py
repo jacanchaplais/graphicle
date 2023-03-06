@@ -1,16 +1,19 @@
+from . import base, calculate, matrix, select, transform
 from .data import (
+    AdjacencyList,
+    ColorArray,
+    ColorElement,
+    Graphicle,
+    HelicityArray,
     MaskArray,
     MaskGroup,
-    PdgArray,
     MomentumArray,
-    ColorArray,
-    HelicityArray,
-    StatusArray,
+    MomentumElement,
     ParticleSet,
-    AdjacencyList,
-    Graphicle,
+    PdgArray,
+    StatusArray,
+    VertexPair,
 )
-from . import matrix, transform, select, calculate, base
 
 __all__ = [
     "MaskArray",
@@ -23,6 +26,9 @@ __all__ = [
     "ParticleSet",
     "AdjacencyList",
     "Graphicle",
+    "MomentumElement",
+    "VertexPair",
+    "ColorElement",
     "matrix",
     "transform",
     "select",
