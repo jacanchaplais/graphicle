@@ -231,7 +231,7 @@ def flow_trace(
     # identify the hard ancestors to which we trace
     hard_mask = graph.hard_mask.copy()
     del hard_mask["incoming"]
-    hard_graph = graph[hard_mask.bitwise_or]
+    hard_graph = graph[hard_mask.bitwise_or()]
     if target:  # restrict hard partons to user specified pdgs
         target_mask = hard_graph.pdg.mask(
             list(target), blacklist=False, sign_sensitive=True

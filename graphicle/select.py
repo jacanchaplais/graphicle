@@ -371,7 +371,7 @@ def partition_descendants(
     """
     dist_strat = fn.partial(gcl.matrix.parton_hadron_distance, pt_exp=pt_exp)
     hadron_vtxs = _hadron_vtx_parton_iter(
-        graph.adj, graph.status, hier.bitwise_or
+        graph.adj, graph.status, hier.bitwise_or()
     )
     hier = hier.copy()
     for vtx_id, pcls_in in hadron_vtxs:

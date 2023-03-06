@@ -788,9 +788,9 @@ class MaskGroup(base.MaskBase, cla.MutableMapping[str, MaskGeneric]):
     def data(self) -> base.BoolVector:
         """Same as MaskGroup.bitwise_and."""
         if self.agg_op is MaskAggOp.AND:
-            return self.bitwise_and
+            return self.bitwise_and()
         elif self.agg_op is MaskAggOp.OR:
-            return self.bitwise_or
+            return self.bitwise_or()
         elif self.agg_op is MaskAggOp.NONE:
             raise ValueError(
                 "No bitwise aggregation operation set for this MaskGroup."
