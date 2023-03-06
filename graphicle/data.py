@@ -1084,49 +1084,15 @@ class MomentumArray(base.ArrayBase):
 
     Parameters
     ----------
-    data : ndarray[float64]
+    data : ndarray[float64] or sequence of length-4 tuples of floats
         Data representing the four-momentum of each particle in the
         point cloud. Given as either a (n, 4)-dimensional numpy array,
         or structured array, with field names ``('x', 'y', 'z', 'e')``.
 
     Attributes
     ----------
-    data : ndarray[void]
-        Structured array containing ``('x', 'y', 'z', 'e')`` components
-        of four momenta.
-    x : ndarray[float64]
-        x component of momentum.
-    y : ndarray[float64]
-        y component of momentum.
-    z : ndarray[float64]
-        z component of momentum.
-    energy : ndarray[float64]
-        Energy component of momentum.
-    pt : ndarray[float64]
-        Transverse component of particle momenta.
-    rapidity : ndarray[float64]
-        Rapidity component of the particle momenta.
-    eta : ndarray[float64]
-        Pseudorapidity component of particle momenta.
-    phi : ndarray[float64]
-        Azimuthal component of particle momenta.
-    theta : ndarray[float64]
-        Angular displacement from beam axis.
-    mass : ndarray[float64]
-        Mass of the particles
-
-    Methods
-    -------
-    delta_R()
-        Calculates interparticle distances with ``other``
-        ``MomentumArray``.
-
-        .. versionchanged:: 0.1.5
-           Computes 2D matrix of inter-particle distances, enabling
-           comparisons between arbitrary length ``MomentumArray``
-           instances.
-    copy()
-        Provides a deepcopy of the data.
+    dtype : dtype
+        ``numpy`` data type that data is exposed with.
     """
 
     # data: base.AnyVector = array_field("pmu")
@@ -1150,6 +1116,9 @@ class MomentumArray(base.ArrayBase):
 
     @property
     def data(self) -> base.VoidVector:
+        """Structured array containing ``('x', 'y', 'z', 'e')``
+        components of four momenta, :math:`p_\\mu`.
+        """
         return self._data.view(self.dtype).reshape(-1)
 
     @data.setter
@@ -1214,32 +1183,32 @@ class MomentumArray(base.ArrayBase):
 
     @property
     def x(self) -> base.DoubleVector:
-        """Momentum component along x-axis."""
+        """x component of momentum, :math:`p_x`."""
         return self.data["x"].reshape(-1)
 
     @property
     def y(self) -> base.DoubleVector:
-        """Momentum component along y-axis."""
+        """y component of momentum, :math:`p_y`."""
         return self.data["y"].reshape(-1)
 
     @property
     def z(self) -> base.DoubleVector:
-        """Momentum component along longitudinal / z-axis."""
+        """z component of momentum, :math:`p_z`."""
         return self.data["z"].reshape(-1)
 
     @property
     def energy(self) -> base.DoubleVector:
-        """Energy component of momentum."""
+        """Energy component of momentum, :math:`E`."""
         return self.data["e"].reshape(-1)
 
     @property
     def pt(self) -> base.DoubleVector:
-        """Momentum component transverse to the beam-axis."""
+        """Transverse component of particle momenta, :math:`p_T`."""
         return self._zt_pol.imag.reshape(-1)
 
     @fn.cached_property
     def eta(self) -> base.DoubleVector:
-        """Pseudorapidity of particles.
+        """Pseudorapidity component of particle momenta, :math:`\\eta`.
 
         Notes
         -----
@@ -1252,7 +1221,7 @@ class MomentumArray(base.ArrayBase):
 
     @fn.cached_property
     def rapidity(self) -> base.DoubleVector:
-        """Rapidity of particles."""
+        """Rapidity component of the particle momenta, :math:`y`."""
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
             rap = 0.5 * np.log((self.energy + self.z) / (self.energy - self.z))
@@ -1260,46 +1229,52 @@ class MomentumArray(base.ArrayBase):
 
     @fn.cached_property
     def phi(self) -> base.DoubleVector:
-        """Azimuthal angular displacement of particles about beam-axis."""
+        """Azimuth component of particle momenta, :math:`\\phi`."""
         return np.angle(self._xy_pol).reshape(-1)
 
     @fn.cached_property
     def theta(self) -> base.DoubleVector:
-        """Angular displacement of particles from positive beam-axis."""
+        """Spherical angle from the beam axis, :math:`\\theta`."""
         return np.angle(self._zt_pol).reshape(-1)
 
     @fn.cached_property
     def mass(self) -> base.DoubleVector:
-        """Mass of particles."""
+        """Mass of the particles, :math:`m`."""
         return calculate._root_diff_two_squares(
             self.energy, self._spatial_mag
         ).reshape(-1)
 
     def delta_R(self, other: "MomentumArray") -> base.DoubleVector:
-        """Calculates the Euclidean inter-particle distances in the
-        eta-phi plane between this set of particles and a provided
-        'other' set. Produces a mxn matrix, where m is number of
-        particles in this MomentumArray, and n is the number of
-        particles in other.
+        """Calculates the Euclidean inter-particle distances,
+        :math:`\\Delta R_{ij}`, in the :math:`\\eta-\\phi` plane between
+        this set of particles and a provided ``other`` set. Produces a
+        ``mxn`` matrix, where ``m`` is number of particles in this
+        MomentumArray, and ``n`` is the number of particles in other.
+
+        .. versionchanged:: 0.1.5
+           Computes 2D matrix of inter-particle distances, enabling
+           comparisons between arbitrary length ``MomentumArray``
+           instances.
 
         Parameters
         ----------
         other : MomentumArray
-            Four-momenta of the particle set to compute delta_R against.
+            Four-momenta of the particle set to compute
+            :math:`\\Delta R_{ij}` against.
 
         Returns
         -------
-        delta_R_matrix : np.ndarray[double]
+        ndarray[float64]
             Matrix representing the Euclidean distance between the two
-            sets of particles in the eta-phi plane. Rows represent
-            particles in this particle set, and columns particles in
-            the other set.
+            sets of particles in the :math:`\\eta-\\phi` plane. Rows
+            represent particles in this particle set, and columns
+            particles in the other set.
 
         Notes
         -----
         Infinite values may be encountered if comparing with particles
-        not present on the eta-phi plane, *ie.* travelling parallel to
-        the beam axis.
+        not present on the :math:`\\eta-\\phi` plane, *ie.* travelling
+        parallel to the beam axis.
         """
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
@@ -1328,19 +1303,9 @@ class ColorArray(base.ArrayBase):
     ----------
     data : ndarray[int32] or ndarray[void]
         Data representing the QCD color charge of each particle in the
-        point cloud. Given as either a (n, 2)-dimensional numpy array,
-        or a structured array, with field names
+        point cloud. Given as either a (n, 2)-dimensional ``numpy``
+        array, or a structured array, with field names
         ``('color', 'anticolor')``.
-
-    Attributes
-    ----------
-    data : ndarray[void]
-        Structured array containing ``('color', 'anticolor')`` pairs.
-
-    Methods
-    -------
-    copy()
-        Provides a deepcopy of the data.
     """
 
     _data: base.VoidVector = _array_field("<i4", 2)
@@ -1377,6 +1342,9 @@ class ColorArray(base.ArrayBase):
 
     @property
     def data(self) -> base.VoidVector:
+        """Structured array containing ``('color', 'anticolor')``
+        values for particle set.
+        """
         return self._data.view(self.dtype).reshape(-1)
 
     @data.setter
@@ -1428,16 +1396,6 @@ class HelicityArray(base.ArrayBase):
     data : sequence[int]
         Data representing the spin polarisation of each particle in the
         point cloud.
-
-    Attributes
-    ----------
-    data : ndarray[int16]
-        Helicity values.
-
-    Methods
-    -------
-    copy()
-        Provides a deepcopy of the data.
     """
 
     _data: base.HalfIntVector = _array_field("<i2")
@@ -1522,19 +1480,6 @@ class StatusArray(base.ArrayBase):
         Data representing the Monte-Carlo event generator's status for
         each particle in the point cloud.
 
-    Attributes
-    ----------
-    data : ndarray[int16]
-        Status codes.
-
-    Methods
-    -------
-    in_range()
-        Returns ``MaskArray`` to filter event over inclusive range of
-        status codes.
-    copy()
-        Provides a deepcopy of the data.
-
     Notes
     -----
     These codes are specific to the Monte-Carlo event generators (MCEGs)
@@ -1594,6 +1539,7 @@ class StatusArray(base.ArrayBase):
 
     @property
     def data(self) -> base.HalfIntVector:
+        """Array containing the status codes for the particle record."""
         return self._data
 
     @data.setter
@@ -1641,6 +1587,9 @@ class StatusArray(base.ArrayBase):
 
     @property
     def hard_mask(self) -> MaskGroup:
+        """Mask over the particle record, identifying the particles
+        participating in the hard process.
+        """
         data = np.abs(self.data)
         masks = MaskGroup(
             {
@@ -1729,7 +1678,7 @@ class ParticleSet(base.ParticleBase):
     pdg : PdgArray
         PDG codes.
     pmu : MomentumArray
-        Four momenta.
+        Four momenta, :math:`p_\\mu`.
     color : ColorArray
         Color / anti-color pairs.
     helicity : HelicityArray
@@ -1738,13 +1687,6 @@ class ParticleSet(base.ParticleBase):
         Status codes from Monte-Carlo event generator.
     final : MaskArray
         Boolean array indicating final state in particle set.
-
-    Methods
-    -------
-    from_numpy()
-        Constructs ``ParticleSet`` instance from numpy arrays.
-    copy()
-        Provides a deepcopy of the data.
     """
 
     pdg: PdgArray = field(default=Factory(PdgArray))
@@ -1769,6 +1711,7 @@ class ParticleSet(base.ParticleBase):
         return _composite_len(self)
 
     def copy(self) -> "ParticleSet":
+        """Produces a deepcopy of the data."""
         return _composite_copy(self)
 
     @classmethod
@@ -1787,12 +1730,14 @@ class ParticleSet(base.ParticleBase):
         ----------
         pdg : ndarray[int32], optional
             PDG codes.
-        pmu : ndarray[float64], optional
-            Four momenta, formatted in columns of (x, y, z, e), or as
-            a structured array with those fields.
-        color : ndarray[int32], optional
+        pmu : ndarray[float64] or ndarray[void], optional
+            Four momenta, :math:`p_\\mu`, formatted as a structured
+            array with fields ``('x', 'y', 'z', 'e')`` or an
+            unstructured array with columns in that order.
+        color : ndarray[int32] or ndarray[void], optional
             Color / anti-color pairs, formatted in columns of
-            (col, acol), or as a structured array with those fields.
+            ``('color', 'anticolor')``, or as a structured array with
+            those fields.
         helicity : ndarray[int16], optional
             Helicity values.
         status : ndarray[int32], optional
@@ -1802,7 +1747,7 @@ class ParticleSet(base.ParticleBase):
 
         Returns
         -------
-        particle_set : ParticleSet
+        ParticleSet
             A composite object, wrapping the data provided in Graphicle
             objects, and providing a unified interface to them.
         """
@@ -1844,7 +1789,7 @@ class AdjacencyList(base.AdjacencyBase):
 
     Parameters
     ----------
-    _data : ndarray[int32] or ndarray[void]
+    data : ndarray[int32] or ndarray[void]
         COO formatted edge pairs, either given as a (n-2)-dimensional
         array, or a structured array with field names ``('in', 'out')``.
     weights : np.ndarray[float64]
@@ -1852,40 +1797,8 @@ class AdjacencyList(base.AdjacencyBase):
 
     Attributes
     ----------
-    data : ndarray[void]
-        Underlying array data. Identical to ``edges`` attribute,
-        included for consistency with ``base.ArrayBase`` numpy
-        interfaces.
-
-        .. versionadded:: 0.2.4
-    edges : ndarray[void]
-        COO edge list, with field names ``('in', 'out')``.
-    nodes : ndarray[int32]
-        Vertex ids of each particle with at least one edge.
     weights : ndarray[float64]
         Scalar value embedded on each edge.
-    matrix : ndarray[int32] or ndarray[float64]
-        Adjacency matrix representation.
-
-        .. versionchanged:: 0.2.4
-           Duplicate edges are added together.
-    leaves : MaskArray
-        Provides a mask for selecting the leaves of a DAG / tree.
-
-        .. versionadded:: 0.2.4
-
-    Methods
-    -------
-    from_matrix()
-        Construct ``AdjacencyList`` from an adjacency matrix.
-    to_sparse()
-        Exposes the data as a SciPy sparse (coo) array.
-
-        .. versionadded:: 0.1.11
-    to_dicts()
-        Exposes the data as a dictionary with keys "edges" and "nodes".
-    copy()
-        Provides a deepcopy of the data.
     """
 
     _data: base.AnyVector = _array_field("<i4", 2)
@@ -1956,19 +1869,26 @@ class AdjacencyList(base.AdjacencyBase):
 
     @property
     def data(self) -> base.VoidVector:
-        """Underlying numpy data."""
+        """Underlying array data. Identical to ``edges`` attribute,
+        included for consistency with ``base.ArrayBase`` ``numpy``
+        interfaces.
+
+        .. versionadded:: 0.2.4
+        """
         return self._data.view(self.dtype).reshape(-1)
 
     @property
     def edges(self) -> base.VoidVector:
-        """Vertex index pairs exposed as a structured numpy array with
-        fields 'in' and 'out' respectively.
-        """
+        """COO edge list, with field names ``('in', 'out')``."""
         return self.data
 
     @property
     def nodes(self) -> base.IntVector:
-        """Nodes are extracted from the edge list, and put in
+        """Vertex ids of each particle with at least one edge.
+
+        Notes
+        -----
+        Nodes are extracted from the edge list, and put in
         ascending order of magnitude, regardless of sign.
         Positive sign conventionally means final state particle.
         """
@@ -1986,7 +1906,10 @@ class AdjacencyList(base.AdjacencyBase):
 
     @property
     def matrix(self) -> ty.Union[base.DoubleVector, base.IntVector]:
-        """Exposes the adjacency as a dense matrix.
+        """Exposes the adjacency as a dense matrix, :math:`A_{ij}`.
+
+        .. versionchanged:: 0.2.4
+           Duplicate edges are added together.
 
         Notes
         -----
@@ -2021,16 +1944,21 @@ class AdjacencyList(base.AdjacencyBase):
 
         Parameters
         ----------
-        adj_matrix : array_like
-            2 dimensional numpy array representing the adjacency or
-            affinity matrix of a graph.
+        adj_matrix : ndarray[int32] or ndarray[bool] or ndarray[float64]
+            2D array, providing a dense square matrix representation of
+            the particle set's adjacency.
         weighted : bool
             Whether or not to propogate the numerical values in the
-            elements of the adjacency matrix as the edge weights
-            (default: False).
+            elements of the adjacency matrix as the edge weights.
+            Default is ``False``.
         self_loop : bool
-            If True will add edges from nodes to themselves, with weight
-            0 (if applicable). (default: True)
+            If ``True`` will include self-loops for each node. *ie.* an
+            edge connecting a node to itself.
+
+        Returns
+        -------
+        AdjacencyList
+            Instance created from a dense adjacency matrix.
         """
         sps_adj = coo_array(adj_matrix)
         if self_loop is True:
@@ -2044,6 +1972,8 @@ class AdjacencyList(base.AdjacencyBase):
         """Converts the graph structure to a ``scipy.sparse.coo_array``
         instance.
 
+        .. versionadded:: 0.1.11
+
         Parameters
         ----------
         data : ndarray, optional
@@ -2053,9 +1983,9 @@ class AdjacencyList(base.AdjacencyBase):
 
         Returns
         -------
-        arr : scipy.sparse.coo_array
-            COO-formatted sparse array, where rows are "in" and cols
-            are "out" indices for ``AdjacencyList.edges``.
+        coo_array
+            COO-formatted sparse array, where rows are ``"in"`` and cols
+            are ``"out"`` indices for ``AdjacencyList.edges``.
         """
         abs_edges = self._edge_relabel
         size = np.max(abs_edges) + 1
@@ -2074,9 +2004,25 @@ class AdjacencyList(base.AdjacencyBase):
         node_data: ty.Optional[
             ty.Dict[str, ty.Union[base.ArrayBase, base.AnyVector]]
         ] = None,
-    ) -> _AdjDict:
+    ) -> AdjDict:
         """Returns data in dictionary format, which is more easily
-        parsed by external libraries, such as NetworkX.
+        parsed by external libraries, such as ``NetworkX``.
+
+        Parameters
+        ----------
+        edge_data : dict[str, ArrayBase | ndarray[any]], optional
+            Values to encode on each edge.
+        node_data : dict[str, ArrayBase | ndarray[any]], optional
+            Values to encode on each node.
+
+        Returns
+        -------
+        AdjDict
+            Dictionary with ``"edges"`` and ``"nodes"`` keys, which
+            refer to a tuple of tuples, representing the edges or nodes
+            of the graph. Associated data is encoded in the final
+            element of each of the innermost tuples, which is a
+            dictionary providing labels and values for the data.
         """
         if edge_data is None:
             edge_data = dict()
@@ -2145,39 +2091,6 @@ class Graphicle:
         Data describing the particles in the set.
     adj : AdjacencyList
         Connectivity between the particles, to form a graph.
-    pdg : PdgArray
-        PDG codes.
-    pmu : MomentumArray
-        Four momenta.
-    color : ColorArray
-        Color / anti-color pairs.
-    helicity : HelicityArray
-        Helicity values.
-    status : StatusArray
-        Status codes from Monte-Carlo event generator.
-    final : MaskArray
-        Boolean array indicating final state in particle set.
-    edges : ndarray
-        COO edge list.
-    nodes : ndarray
-        Vertex ids of each particle with at least one edge.
-    hard_mask : MaskGroup
-        Identifies which particles participate in the hard process.
-        For Pythia, this is split into four categories:
-        ``'incoming'``, ``'intermediate'``, ``'outgoing'``, and
-        ``'outgoing_nonperturbative_diffraction'``.
-
-    Methods
-    -------
-    from_numpy()
-        Constructs ``Graphicle`` instance from numpy arrays.
-    from_event()
-        Constructs ``Graphicle`` instance from object implementing the
-        ``base.EventInterface`` protocol.
-
-        .. versionadded:: 0.1.7
-    copy()
-        Provides a deepcopy of the data.
     """
 
     particles: ParticleSet = field(default=Factory(ParticleSet))
@@ -2198,8 +2111,9 @@ class Graphicle:
     @classmethod
     def from_event(cls, event: base.EventInterface) -> "Graphicle":
         """Instantiates a Graphicle object from a generic event object,
-        whose attribute structure is compatible with
-        ``base.EventInterface``.
+        whose attribute structure is compatible with ``EventInterface``.
+
+        .. versionadded:: 0.1.7
 
         Parameters
         ----------
@@ -2208,6 +2122,12 @@ class Graphicle:
             consistent names and values to those defined in the
             interface. ``heparchy`` and ``showerpipe`` event objects
             can be passed for easy instantiation.
+
+        Returns
+        -------
+        Graphicle
+            Event record instantiated from a generic object implementing
+            the ``EventInterface`` protocol.
         """
         params = dict()
         for attr in base.EventInterface.__dict__:
@@ -2237,28 +2157,36 @@ class Graphicle:
 
         Parameters
         ----------
-        pdg : ndarray, optional
+        pdg : ndarray[int32], optional
             PDG codes.
-        pmu : ndarray, optional
-            Four momenta, formatted in columns of (x, y, z, e), or as
-            a structured array with those fields.
-        color : ndarray, optional
+        pmu : ndarray[float64] or ndarray[void], optional
+            Four momenta, :math:`p_\\mu`, formatted as a structured
+            array with fields ``('x', 'y', 'z', 'e')`` or an
+            unstructured array with columns in that order.
+        color : ndarray[int32] or ndarray[void], optional
             Color / anti-color pairs, formatted in columns of
-            (col, acol), or as a structured array with those fields.
-        helicity : ndarray, optional
+            ``('color', 'anticolor')``, or as a structured array with
+            those fields.
+        helicity : ndarray[int16], optional
             Helicity values.
-        status : ndarray, optional
+        status : ndarray[int16], optional
             Status codes from Monte-Carlo event generator.
-        final : ndarray, optional
+        final : ndarray[bool_], optional
             Boolean array indicating which particles are final state.
-        edges : ndarray, optional
-            COO formatted pairs of vertex ids, of shape (N, 2), where
-            N is the number of particles in the graph.
-            Alternatively, supply a structured array with fields
-            (in, out).
-        weights : ndarray, optional
+        edges : ndarray[int32] or ndarray[void], optional
+            COO formatted pairs of vertex ids, of shape ``(N, 2)``,
+            where ``N`` is the number of particles in the graph.
+            Alternatively, supply a structured array with field names
+            ``('in', 'out')``.
+        weights : ndarray[Number], optional
             Weights to be associated with each edge in the COO edge
             list, provided in the same order.
+
+        Returns
+        -------
+        Graphicle
+            Event record instantiated from a collection of optionally
+            provided ``numpy`` arrays.
         """
 
         particles = ParticleSet.from_numpy(
@@ -2280,36 +2208,49 @@ class Graphicle:
 
     @property
     def pdg(self) -> PdgArray:
+        """PDG codes."""
         return self.particles.pdg
 
     @property
     def pmu(self) -> MomentumArray:
+        """Four momenta, :math:`p_\\mu`."""
         return self.particles.pmu
 
     @property
     def color(self) -> ColorArray:
+        """Color / anti-color pairs."""
         return self.particles.color
 
     @property
     def helicity(self) -> HelicityArray:
+        """Helicity values."""
         return self.particles.helicity
 
     @property
     def status(self) -> StatusArray:
+        """Status codes from Monte-Carlo event generator."""
         return self.particles.status
 
     @property
     def hard_mask(self) -> MaskGroup:
+        """Identifies which particles participate in the hard process.
+        For Pythia, this is split into four categories:
+        ``'incoming'``, ``'intermediate'``, ``'outgoing'``, and
+        ``'outgoing_nonperturbative_diffraction'``.
+        """
         return self.particles.status.hard_mask
 
     @property
-    def final(self) -> base.MaskBase:
+    def final(self) -> MaskArray:
+        """Boolean array indicating final state in particle set."""
         return self.particles.final
 
     @property
     def edges(self) -> base.VoidVector:
+        """COO edge list, with field names ``('in', 'out')``."""
         return self.adj.edges
 
     @property
     def nodes(self) -> base.IntVector:
+        """Vertex ids of each particle with at least one edge."""
         return self.adj.nodes
