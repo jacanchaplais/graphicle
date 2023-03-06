@@ -782,16 +782,22 @@ class MaskGroup(base.MaskBase, cla.MutableMapping[str, base.MaskBase]):
         )
 
     @property
+    @deprecation.deprecated(
+        deprecated_in="0.2.6",
+        removed_in="0.3.0",
+        details="Use ``MaskGroup.keys()`` instead.",
+    )
     def names(self) -> ty.List[str]:
+        """Provides the string values of the keys to the top-level
+        nested ``MaskBase`` objects as a list.
+        """
         return list(self._mask_arrays.keys())
 
-    @property
     def bitwise_or(self) -> base.BoolVector:
         return np.bitwise_or.reduce(  # type: ignore
             [child.data for child in self._mask_arrays.values()]
         )
 
-    @property
     def bitwise_and(self) -> base.BoolVector:
         return np.bitwise_and.reduce(  # type: ignore
             [child.data for child in self._mask_arrays.values()]
