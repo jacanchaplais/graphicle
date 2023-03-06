@@ -6,18 +6,15 @@
 Welcome to graphicle's documentation!
 ====================================
 
-.. mdinclude:: ../../README.md
+``graphicle`` is a package to represent and manipulate particle physics
+data, with first class support for network-based analysis. Tutorials are
+on the way, but for now, the API reference contains documentation of the
+provided routines and their use cases. A small demo of the features are
+included on this page, too.
 
 .. toctree::
-   :caption: API Reference
-   :hidden:
+   :maxdepth: 2
 
-   api.rst
+   API Reference <api>
 
-
-Index
-=====
-
-* :ref:`genindex`
-* :ref:`modindex`
-* :ref:`search`
+.. mdinclude:: ../../README.md
