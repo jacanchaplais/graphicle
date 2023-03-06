@@ -59,32 +59,32 @@ def fastjet_clusters(
     Parameters
     ----------
     pmu: MomentumArray
-        The momenta of each particle in the point cloud.
+        Four-momenta, :math:`p_\\mu`, of particles in the point cloud.
     radius : float
-        The radius of the clusters to be produced.
+        The radius, :math:`R`, of the clusters to be produced.
     p_val : float
-        The exponent parameter determining the transverse momentum (pt)
-        dependence of iterative pseudojet merges. Positive values
-        cluster low pt particles first, positive values cluster high pt
-        particles first, and a value of zero corresponds to no pt
-        dependence.
+        The exponent parameter determining the transverse momentum,
+        :math:`p_T`, dependence of iterative pseudojet merges. Positive
+        values cluster low :math:`p_T` particles first, positive values
+        cluster high :math:`p_T` particles first, and a value of zero
+        corresponds to no :math:`p_T` dependence.
     pt_cut : float, optional
-        Jet transverse momentum threshold, below which jets will be
-        discarded.
+        Jet transverse momentum threshold. Jets with :math:`p_T` below
+        this are discarded.
     eta_cut : float, optional
-        Jet pseudorapidity threshold, above which jets will be
-        discarded.
+        Jet pseudorapidity, :math:`eta`, threshold. Jets with
+        :math:`|eta|` above this are discarded.
     top_k : int, optional
         Only return a maximum ``top_k`` number of jets, sorted by
         transverse momentum. *ie.* if ``top_k`` is 3, only 3 jets with
-        highest pt will be given. If ``top_k`` exceeds the number of
-        jets reconstructed, all of the jets will be included.
+        highest :math:`p_T` will be given. If ``top_k`` exceeds the
+        number of jets reconstructed, all of the jets will be included.
 
     Returns
     -------
     clusters : list[MaskArray]
         List containing masks over the input data for each jet
-        clustering, in order of descending transverse momentum.
+        clustering, in order of descending :math:`p_T`.
 
     Notes
     -----
@@ -371,7 +371,7 @@ def partition_descendants(
     """
     dist_strat = fn.partial(gcl.matrix.parton_hadron_distance, pt_exp=pt_exp)
     hadron_vtxs = _hadron_vtx_parton_iter(
-        graph.adj, graph.status, hier.bitwise_or
+        graph.adj, graph.status, hier.bitwise_or()
     )
     hier = hier.copy()
     for vtx_id, pcls_in in hadron_vtxs:
@@ -869,9 +869,10 @@ def centroid_prune(
     Parameters
     ----------
     pmu : MomentumArray
-        Four-momenta for a set of particles.
+        Four-momenta, :math:`p_\\mu`, of particles in the set.
     radius : float
-        Euclidean distance in the azimuth-pseudorapidity plane from the
+        Euclidean distance, or Radius :math:`R`, in the
+        pseudorapidity-azimuth, :math:`\\eta-\\phi`, plane from the
         centroid, beyond which particles will be filtered out.
     mask : MaskArray, optional
         If provided, will apply the mask to the passed ``pmu``, and
