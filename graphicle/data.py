@@ -79,9 +79,6 @@ __all__ = [
 ]
 
 
-###########################################
-# SET UP ARRAY ATTRIBUTES FOR DATACLASSES #
-###########################################
 _types = Types()
 _LOOKUP_TABLE = PdgRecords()
 
@@ -380,9 +377,6 @@ def _truthy(data: ty.Union[base.ArrayBase, base.AdjacencyBase]) -> bool:
     return not (len(data) == 0)
 
 
-##################################
-# COMPOSITE MASK DATA STRUCTURES #
-##################################
 @define
 class MaskArray(base.MaskBase, base.ArrayBase):
     """Boolean mask over Graphicle data structures.
@@ -1079,9 +1073,6 @@ class PdgArray(base.ArrayBase):
         return self.__get_prop("c")
 
 
-########################################
-# MOMENTUM STORAGE AND TRANSFORMATIONS #
-########################################
 @define(eq=False)
 class MomentumArray(base.ArrayBase):
     """Data structure containing four-momentum of particle list.
@@ -1298,9 +1289,6 @@ class MomentumArray(base.ArrayBase):
         return np.hypot(deta, dphi)
 
 
-#################
-# COLOR STORAGE #
-#################
 @define(eq=False)
 class ColorArray(base.ArrayBase):
     """Returns data structure of color / anti-color pairs for particle
@@ -1390,9 +1378,6 @@ class ColorArray(base.ArrayBase):
         return _array_ne(self, other)
 
 
-####################
-# HELICITY STORAGE #
-####################
 @define(eq=False)
 class HelicityArray(base.ArrayBase):
     """Data structure containing helicity / polarisation values for
@@ -1474,9 +1459,6 @@ class HelicityArray(base.ArrayBase):
         return _array_ne(self, other)
 
 
-####################################
-# STATUS CODE STORAGE AND QUERYING #
-####################################
 @define(eq=False)
 class StatusArray(base.ArrayBase):
     """Data structure containing status values for particle set.
@@ -1617,9 +1599,6 @@ class StatusArray(base.ArrayBase):
         return masks
 
 
-#########################################
-# COMPOSITE OF PARTICLE DATA STRUCTURES #
-#########################################
 DsetPair = ty.Tuple[ty.Iterator[str], ty.Iterator[base.ArrayBase]]
 CompositeType = ty.Union["ParticleSet", "Graphicle"]
 CompositeGeneric = ty.TypeVar("CompositeGeneric", "ParticleSet", "Graphicle")
@@ -1781,12 +1760,9 @@ class ParticleSet(base.ParticleBase):
         )
 
 
-#############################################
-# CONNECTIVITY INFORMATION AS COO EDGE LIST #
-#############################################
-class _AdjDict(ty.TypedDict):
-    edges: ty.Tuple[int, int, ty.Dict[str, ty.Any]]
-    nodes: ty.Tuple[int, ty.Dict[str, ty.Any]]
+class AdjDict(ty.TypedDict):
+    edges: ty.Tuple[ty.Tuple[int, int, ty.Dict[str, ty.Any]], ...]
+    nodes: ty.Tuple[ty.Tuple[int, ty.Dict[str, ty.Any]], ...]
 
 
 @define
@@ -2076,9 +2052,6 @@ class AdjacencyList(base.AdjacencyBase):
         )
 
 
-#####################################################
-# COMPOSITE OF GRAPH CONNECTIVITY AND PARTICLE DATA #
-#####################################################
 @define
 class Graphicle:
     """Composite object, combining particle set data with relational
