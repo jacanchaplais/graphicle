@@ -114,7 +114,7 @@ _EDGE_ORDER = ("in", "out")
 
 
 class MomentumElement(ty.NamedTuple):
-    """Named tuple container for the momentum of a single particle.
+    """Named tuple container for the four-momentum of a single particle.
 
     :group: datastructure
 
