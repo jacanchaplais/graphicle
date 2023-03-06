@@ -746,10 +746,10 @@ class MaskGroup(base.MaskBase, cla.MutableMapping[str, MaskGeneric]):
     def __invert__(self) -> MaskArray:
         return MaskArray(~self.data)
 
-    def __eq__(self, other: base.MaskLike) -> "MaskArray":
+    def __eq__(self, other: base.MaskLike) -> MaskArray:
         return _mask_eq(self, other)
 
-    def __ne__(self, other: base.MaskLike) -> "MaskArray":
+    def __ne__(self, other: base.MaskLike) -> MaskArray:
         return _mask_neq(self, other)
 
     def copy(self) -> "MaskGroup[MaskGeneric]":
@@ -771,23 +771,27 @@ class MaskGroup(base.MaskBase, cla.MutableMapping[str, MaskGeneric]):
         """
         return list(self._mask_arrays.keys())
 
-    def bitwise_or(self) -> base.BoolVector:
-        return np.bitwise_or.reduce(  # type: ignore
-            [child.data for child in self._mask_arrays.values()]
+    def bitwise_or(self) -> MaskArray:
+        return MaskArray(
+            np.bitwise_or.reduce(  # type: ignore
+                [child.data for child in self._mask_arrays.values()]
+            )
         )
 
-    def bitwise_and(self) -> base.BoolVector:
-        return np.bitwise_and.reduce(  # type: ignore
-            [child.data for child in self._mask_arrays.values()]
+    def bitwise_and(self) -> MaskArray:
+        return MaskArray(
+            np.bitwise_and.reduce(  # type: ignore
+                [child.data for child in self._mask_arrays.values()]
+            )
         )
 
     @property
     def data(self) -> base.BoolVector:
         """Same as MaskGroup.bitwise_and."""
         if self.agg_op is MaskAggOp.AND:
-            return self.bitwise_and()
+            return self.bitwise_and().data
         elif self.agg_op is MaskAggOp.OR:
-            return self.bitwise_or()
+            return self.bitwise_or().data
         elif self.agg_op is MaskAggOp.NONE:
             raise ValueError(
                 "No bitwise aggregation operation set for this MaskGroup."
