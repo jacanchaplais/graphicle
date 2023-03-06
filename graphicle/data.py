@@ -975,7 +975,7 @@ class PdgArray(base.ArrayBase):
         self._data = values  # type: ignore
 
     def copy(self) -> "PdgArray":
-        return self.__class__(self._data)
+        return self.__class__(self._data.copy())
 
     def mask(
         self,
@@ -1167,7 +1167,7 @@ class MomentumArray(base.ArrayBase):
         return _array_ne(self, other)
 
     def copy(self) -> "MomentumArray":
-        return self.__class__(self._data)
+        return self.__class__(self._data.copy())
 
     @property
     def _xy_pol(self) -> base.ComplexVector:
@@ -1357,7 +1357,8 @@ class ColorArray(base.ArrayBase):
         self._data = values  # type: ignore
 
     def copy(self) -> "ColorArray":
-        return self.__class__(self._data)
+        """Produces a deepcopy of the data."""
+        return self.__class__(self._data.copy())
 
     def __getitem__(self, key) -> "ColorArray":
         if isinstance(key, base.MaskBase):
@@ -1437,8 +1438,8 @@ class HelicityArray(base.ArrayBase):
         self._data = values  # type: ignore
 
     def copy(self) -> "HelicityArray":
-        """Returns a new HelicityArray instance with same data."""
-        return self.__class__(self._data)
+        """Produces a deepcopy of the data."""
+        return self.__class__(self._data.copy())
 
     def __getitem__(self, key) -> "HelicityArray":
         if isinstance(key, base.MaskBase):
@@ -1546,8 +1547,8 @@ class StatusArray(base.ArrayBase):
         self._data = values  # type: ignore
 
     def copy(self) -> "StatusArray":
-        """Returns a new StatusArray instance with same data."""
-        return self.__class__(self._data)
+        """Returns a deepcopy of the data."""
+        return self.__class__(self._data.copy())
 
     def in_range(
         self,
@@ -1837,7 +1838,7 @@ class AdjacencyList(base.AdjacencyBase):
         return self.__class__(self._data[key])
 
     def copy(self) -> "AdjacencyList":
-        return self.__class__(self._data)
+        return self.__class__(self._data.copy())
 
     @fn.cached_property
     def _edge_relabel(self) -> base.IntVector:
