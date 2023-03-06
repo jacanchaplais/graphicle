@@ -1561,19 +1561,19 @@ class StatusArray(base.ArrayBase):
         Parameters
         ----------
         min_status : int
-            Minimum value for status codes. Default is 0.
+            Minimum value for status codes. Default is ``0``.
         max_status : int, optional
             Maximum value for status codes. Passing ``None`` results in
             unbounded upper range. Default is ``None``.
         sign_sensitive : bool
             Whether or not to take signs into account during the
-            comparison. Default is False.
+            comparison. Default is ``False``.
 
         Returns
         -------
-        mask_out : MaskArray
+        MaskArray
             Boolean mask over the particle dataset which selects
-            data where min_status <= status <= max_status.
+            data where ``min_status <= status <= max_status``.
         """
         array = self.data
         if sign_sensitive is False:
