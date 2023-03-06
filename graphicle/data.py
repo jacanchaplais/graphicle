@@ -1891,8 +1891,22 @@ class AdjacencyList(base.AdjacencyBase):
         return unsort_nodes[sort_idxs]  # type: ignore
 
     @property
+    def roots(self) -> MaskArray:
+        """Provides a mask for selecting the roots of a DAG / tree.
+
+        .. versionadded:: 0.2.6
+        """
+        in_degree = self._sparse_unsigned.sum(axis=0)
+        zero_idxs = np.flatnonzero(in_degree == 0)
+        root_mask = np.in1d(self._sparse_unsigned.row, zero_idxs)
+        return MaskArray(root_mask)
+
+    @property
     def leaves(self) -> MaskArray:
-        """A mask to select the leaves of the graph."""
+        """Provides a mask for selecting the leaves of a DAG / tree.
+
+        .. versionadded:: 0.2.4
+        """
         out_degree = self._sparse_unsigned.sum(axis=1)
         zero_idxs = np.flatnonzero(out_degree == 0)
         leaf_mask = np.in1d(self._sparse_unsigned.col, zero_idxs)
@@ -1990,6 +2004,13 @@ class AdjacencyList(base.AdjacencyBase):
             shape=(size, size),
         )
 
+    @deprecation.deprecated(
+        deprecated_in="0.2.6",
+        removed_in="0.3.0",
+        details="Inconsistent behaviour, too niche to maintain. Use "
+        "other interfaces, such as ``AdjacencyList.to_sparse() "
+        "or ``AdjacencyList.matrix``, instead.",
+    )
     def to_dicts(
         self,
         edge_data: ty.Optional[
