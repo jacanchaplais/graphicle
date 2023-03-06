@@ -72,8 +72,8 @@ def fastjet_clusters(
         Jet transverse momentum threshold. Jets with :math:`p_T` below
         this are discarded.
     eta_cut : float, optional
-        Jet pseudorapidity, :math:`eta`, threshold. Jets with
-        :math:`|eta|` above this are discarded.
+        Jet pseudorapidity, :math:`\\eta`, threshold. Jets with
+        :math:`|\\eta|` above this are discarded.
     top_k : int, optional
         Only return a maximum ``top_k`` number of jets, sorted by
         transverse momentum. *ie.* if ``top_k`` is 3, only 3 jets with
