@@ -211,9 +211,8 @@ def vertex_descendants(adj: gcl.AdjacencyList, vertex: int) -> gcl.MaskArray:
     .. versionadded:: 0.1.0
 
     .. versionchanged:: 0.2.7
-       In the edge case of no descendants, now returns a mask particles
-       with the vertex id as the edge destination. Previously this
-       raised an unhandled ``IndexError``.
+       In the edge case of no descendants, now returns a mask with just
+       the parent, rather than raising an unhandled ``IndexError``.
 
     Parameters
     ----------
