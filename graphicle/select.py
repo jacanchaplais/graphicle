@@ -204,7 +204,7 @@ def find_vertex(
 
 def vertex_descendants(adj: gcl.AdjacencyList, vertex: int) -> gcl.MaskArray:
     """Returns a ``MaskArray`` to select particles which descend from a
-    given interaction vertex.
+    given interaction vertex. This mask includes the parent vertex.
 
     :group: select
 
