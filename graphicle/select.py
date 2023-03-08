@@ -210,6 +210,11 @@ def vertex_descendants(adj: gcl.AdjacencyList, vertex: int) -> gcl.MaskArray:
 
     .. versionadded:: 0.1.0
 
+    .. versionchanged:: 0.2.7
+       In the edge case of no descendants, now returns a mask particles
+       with the vertex id as the edge destination. Previously this
+       raised an unhandled ``IndexError``.
+
     Parameters
     ----------
     adj : AdjacencyList
@@ -223,8 +228,11 @@ def vertex_descendants(adj: gcl.AdjacencyList, vertex: int) -> gcl.MaskArray:
         Boolean mask over the graphicle objects associated with the
         passed AdjacencyList.
     """
+    vertex_mask = adj.edges["in"] == vertex
+    if not np.any(vertex_mask):
+        return gcl.MaskArray(adj.edges["out"] == vertex)
     sparse = adj._sparse_signed
-    vertex = sparse.row[vertex == adj.edges["in"]][0]
+    vertex = sparse.row[vertex_mask][0]
     bft = breadth_first_tree(sparse, vertex)
     mask = np.isin(sparse.row, bft.indices)
     mask[sparse.row == vertex] = True  # include parent vertex
@@ -414,6 +422,7 @@ def _hard_ancestor_matrix(hard_desc: gcl.MaskGroup) -> base.BoolVector:
     mat = np.zeros((num_hard, num_hard), dtype="<?")
     for i, mask in enumerate(hard_desc.values()):
         mat[i, :] = mask.data
+    np.fill_diagonal(mat, False)  # no self-parenting
     return mat
 
 
