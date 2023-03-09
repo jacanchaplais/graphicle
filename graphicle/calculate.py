@@ -5,12 +5,10 @@
 Algorithms for performing common HEP calculations using graphicle data
 structures.
 """
-from __future__ import annotations
-
 import math
+import typing as ty
 import warnings
 from functools import lru_cache, partial
-from typing import Callable, Iterable
 
 import deprecation
 import networkx as nx
@@ -20,9 +18,10 @@ import numpy.lib.recfunctions as rfn
 import pyjet
 from pyjet import ClusterSequence, PseudoJet
 
-import graphicle as gcl
-
 from . import base
+
+if ty.TYPE_CHECKING is True:
+    from graphicle.data import *
 
 __all__ = [
     "azimuth_centre",
@@ -32,7 +31,7 @@ __all__ = [
 ]
 
 
-def azimuth_centre(pmu: gcl.MomentumArray, pt_weight: bool = True) -> float:
+def azimuth_centre(pmu: "MomentumArray", pt_weight: bool = True) -> float:
     """Calculates the central point in azimuth for a set of particles.
 
     :group: calculate
@@ -59,15 +58,15 @@ def azimuth_centre(pmu: gcl.MomentumArray, pt_weight: bool = True) -> float:
     return float(np.angle(pol.sum()))
 
 
-def pseudorapidity_centre(pmu: gcl.MomentumArray) -> float:
+def pseudorapidity_centre(pmu: "MomentumArray") -> float:
     pt_norm = pmu.pt / pmu.pt.sum()
     eta_wt_mid = (pmu.eta * pt_norm).sum()
     return eta_wt_mid
 
 
 def combined_mass(
-    pmu: gcl.MomentumArray | base.VoidVector,
-    weight: base.DoubleVector | None = None,
+    pmu: ty.Union["MomentumArray", base.VoidVector],
+    weight: ty.Optional[base.DoubleVector] = None,
 ) -> float:
     """Returns the combined mass of the particles represented in the
     provided ``MomentumArray``.
@@ -101,7 +100,7 @@ def combined_mass(
     simply return ``0.0``.
     """
     # sanitizing and combining the inputs
-    if isinstance(pmu, gcl.MomentumArray):
+    if isinstance(pmu, base.ArrayBase):
         pmu = pmu.data
     data = rfn.structured_to_unstructured(pmu)
     if weight is not None:
@@ -122,7 +121,7 @@ def combined_mass(
     return mass
 
 
-def _diffuse(colors: list[base.AnyVector], feats: list[base.AnyVector]):
+def _diffuse(colors: ty.List[base.AnyVector], feats: ty.List[base.AnyVector]):
     color_shape = colors[0].shape
     av_color = np.zeros((color_shape[0], color_shape[1]), dtype="<f8")
     color_stack = np.dstack(colors)  # len_basis x feat_dim x num_in
@@ -142,7 +141,7 @@ def _diffuse(colors: list[base.AnyVector], feats: list[base.AnyVector]):
 def _trace_vector(
     nx_graph: nx.DiGraph,
     vertex: int,
-    basis: tuple[int, ...],
+    basis: ty.Tuple[int, ...],
     feat_dim: int,
     is_structured: bool,
     exclusive: bool = False,
@@ -171,12 +170,12 @@ def _trace_vector(
 
 
 def flow_trace(
-    graph: gcl.Graphicle,
-    mask: base.MaskBase | base.BoolVector,
-    prop: base.ArrayBase | base.AnyVector,
+    graph: "Graphicle",
+    mask: ty.Union[base.MaskBase, base.BoolVector],
+    prop: ty.Union[base.ArrayBase, base.AnyVector],
     exclusive: bool = False,
-    target: set[int] | None = None,
-) -> dict[str, base.DoubleVector]:
+    target: ty.Optional[ty.Set[int]] = None,
+) -> ty.Dict[str, base.DoubleVector]:
     """Performs flow tracing from specified particles in an event, back
     to the hard partons.
 
@@ -250,7 +249,7 @@ def flow_trace(
     )
     _trace_vector.cache_clear()
     traces = dict()
-    array_fmt: Callable[[base.AnyVector], base.AnyVector] = (
+    array_fmt: ty.Callable[[base.AnyVector], base.AnyVector] = (
         partial(rfn.unstructured_to_structured, dtype=dtype)  # type: ignore
         if is_structured
         else lambda x: x.squeeze()
@@ -267,12 +266,12 @@ def flow_trace(
     details="Use ``graphicle.select.fastjet_clusters()`` instead.",
 )
 def cluster_pmu(
-    pmu: gcl.MomentumArray,
+    pmu: "MomentumArray",
     radius: float,
     p_val: float,
-    pt_cut: float | None = None,
-    eta_cut: float | None = None,
-) -> gcl.MaskGroup:
+    pt_cut: ty.Optional[float] = None,
+    eta_cut: ty.Optional[float] = None,
+) -> "MaskGroup":
     """Clusters particles using the generalised-kt algorithm.
 
     :group: calculate
@@ -311,6 +310,8 @@ def cluster_pmu(
     ``p_val`` set to ``-1`` gives anti-kT, ``0`` gives Cambridge-Aachen,
     and ``1`` gives kT clusterings.
     """
+    from graphicle.data import MaskGroup
+
     pmu_pyjet = pmu.data[["e", "x", "y", "z"]]
     pmu_pyjet.dtype.names = "E", "px", "py", "pz"
     pmu_pyjet_idx = rfn.append_fields(
@@ -319,12 +320,12 @@ def cluster_pmu(
     sequence: ClusterSequence = pyjet.cluster(
         pmu_pyjet_idx, R=radius, p=p_val, ep=True
     )
-    jets: Iterable[PseudoJet] = sequence.inclusive_jets()
+    jets: ty.Iterable[PseudoJet] = sequence.inclusive_jets()
     if pt_cut is not None:
         jets = filter(lambda jet: jet.pt > pt_cut, jets)
     if eta_cut is not None:
         jets = filter(lambda jet: abs(jet.eta) < eta_cut, jets)
-    cluster_mask = gcl.MaskGroup()
+    cluster_mask = MaskGroup()
     cluster_mask.agg_op = "or"
     for i, jet in enumerate(jets):
         mask = np.zeros_like(pmu_pyjet, dtype="<?")
