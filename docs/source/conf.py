@@ -6,6 +6,8 @@
 
 # -- Path setup --------------------------------------------------------------
 
+import inspect
+
 # If extensions (or modules to document with autodoc) are in another directory,
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
@@ -14,13 +16,12 @@
 # import sys
 # sys.path.insert(0, os.path.abspath("."))
 from importlib.metadata import version as get_version
-from typing import Optional, Dict, Any
 from pathlib import Path
-import inspect
+from typing import Any, Dict, Optional
 
-import graphicle as proj_pkg
 from pygit2 import Repository
 
+import graphicle as proj_pkg
 
 # -- Project information -----------------------------------------------------
 
@@ -73,6 +74,8 @@ autodoc_typehints_format = "short"
 intersphinx_mapping = {
     "python": ("https://docs.python.org/3/", None),
     "sphinx": ("https://www.sphinx-doc.org/en/master/", None),
+    "numpy [stable]": ("https://numpy.org/doc/stable/", None),
+    "scipy [latest]": ("https://docs.scipy.org/doc/scipy/", None),
 }
 intersphinx_disabled_domains = ["std"]
 
