@@ -911,3 +911,67 @@ def centroid_prune(
         return gcl.MaskArray(is_within)
     event_mask[mask] = is_within
     return gcl.MaskArray(event_mask)
+
+
+def color_singlets(
+    leaves: gcl.MaskGroup[gcl.MaskArray],
+    status: gcl.StatusArray,
+    color: gcl.ColorArray,
+    invert: bool = False,
+) -> ty.List[ty.Tuple[str, ...]]:
+    """Identifies groups of outgoing partons from the hard process which
+    form color singlets.
+
+    .. versionadded:: 0.2.8
+
+    Parameters
+    ----------
+    leaves : MaskGroup[MaskArray]
+        Innermost nested ``MaskArray`` instances, obtained from calling
+        ``hierarchy()`` followed by ``leaf_masks()`` on a ``Graphicle``
+        object.
+    status : StatusArray
+        The status codes for the event.
+    color : ColorArray
+        The color / anticolor pair values for the event.
+    invert : bool
+        If ``True``, will invert the operation to find all colored
+        particles in the hard process which are not grouped with other
+        partons in the hard-process to form a color-singlet. Default is
+        ``False``.
+
+    Returns
+    -------
+    list[tuple[str, ...]]
+        Tuples of keys, grouping the color-connected partons in the hard
+        process.
+
+    Notes
+    -----
+    This function checks for color singlets formed from two color
+    triplets (quarks), or two color triplets plus a color octet (gluon).
+    It does not check for color singlets formed from three colour
+    triplets. This functionality *may* be added in future.
+    """
+    hard_mask = status.hard_mask["outgoing"]
+    masks = map(op.and_, it.repeat(hard_mask), leaves.values())
+    colors_ = map(it.compress, it.repeat(color), masks)
+    colors = tuple(it.chain.from_iterable(colors_))
+    colored_mask = tuple(map(op.ne, it.repeat((0, 0)), colors))
+    colored_only = it.compress(colors, colored_mask)
+    keys = tuple(it.compress(leaves.keys(), colored_mask))
+    named_colors = tuple(zip(keys, colored_only))
+    combos = it.chain(
+        it.combinations(named_colors, 2), it.combinations(named_colors, 3)
+    )
+    singlets = []
+    for names, color_elems in it.starmap(zip, combos):
+        color_set = set(map(op.attrgetter("color"), color_elems))
+        anticolor_set = set(map(op.attrgetter("anticolor"), color_elems))
+        if color_set.symmetric_difference(anticolor_set) == set():
+            singlets.append(names)
+    if invert is True:
+        members = set(it.chain.from_iterable(singlets))
+        outcasts = set(keys).symmetric_difference(members)
+        return list(zip(outcasts))
+    return singlets
