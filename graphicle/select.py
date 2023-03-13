@@ -32,6 +32,7 @@ __all__ = [
     "fastjet_clusters",
     "leaf_masks",
     "centroid_prune",
+    "color_singlets",
 ]
 
 
