@@ -923,6 +923,8 @@ def color_singlets(
     """Identifies groups of outgoing partons from the hard process which
     form color singlets.
 
+    :group: select
+
     .. versionadded:: 0.2.8
 
     Parameters
