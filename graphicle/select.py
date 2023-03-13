@@ -971,7 +971,7 @@ def color_singlets(
     for names, color_elems in it.starmap(zip, combos):
         color_set = set(map(op.attrgetter("color"), color_elems))
         anticolor_set = set(map(op.attrgetter("anticolor"), color_elems))
-        if color_set.symmetric_difference(anticolor_set) == set():
+        if color_set == anticolor_set:
             singlets.append(names)
     if invert is True:
         members = set(it.chain.from_iterable(singlets))
