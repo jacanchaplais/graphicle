@@ -15,6 +15,7 @@ import numpy.lib.recfunctions as rfn
 import pandas as pd
 import pyjet
 from pyjet import ClusterSequence, PseudoJet
+from scipy.sparse import coo_array
 from scipy.sparse.csgraph import breadth_first_tree
 
 import graphicle as gcl
@@ -39,6 +40,8 @@ __all__ = [
 DistFunc = ty.Callable[
     [gcl.MomentumArray, gcl.MomentumArray], base.DoubleVector
 ]
+MaskType = ty.Union[gcl.MaskArray, gcl.MaskGroup]
+MaskGeneric = ty.TypeVar("MaskGeneric", gcl.MaskGroup, gcl.MaskArray, MaskType)
 
 
 def fastjet_clusters(
@@ -83,7 +86,7 @@ def fastjet_clusters(
 
     Returns
     -------
-    clusters : list[MaskArray]
+    list[MaskArray]
         List containing masks over the input data for each jet
         clustering, in order of descending :math:`p_T`.
 
@@ -141,7 +144,7 @@ def find_vertex(
 
     Returns
     -------
-    vertices : ndarray[int32]
+    ndarray[int32]
         List the vertex ids which match the passed incoming and outgoing
         pdg codes.
 
@@ -204,16 +207,22 @@ def find_vertex(
 
 
 def vertex_descendants(adj: gcl.AdjacencyList, vertex: int) -> gcl.MaskArray:
-    """Returns a ``MaskArray`` to select particles which descend from a
-    given interaction vertex. This mask includes the parent vertex.
+    """Returns a ``MaskArray`` to select edges which descend from a
+    given interaction vertex.
 
     :group: select
 
     .. versionadded:: 0.1.0
 
     .. versionchanged:: 0.2.7
-       In the edge case of no descendants, now returns a mask with just
-       the parent, rather than raising an unhandled ``IndexError``.
+       In the edge case of no descendants, now returns a mask with
+       identifying edges whose source is the vertex, rather than raising
+       an unhandled ``IndexError``.
+
+    .. versionchanged:: 0.2.8
+       No longer includes parent in output. For this behaviour, use
+       ``edge_descendants()``. Additionally, routine has been patched
+       to support multigraphs.
 
     Parameters
     ----------
@@ -224,19 +233,50 @@ def vertex_descendants(adj: gcl.AdjacencyList, vertex: int) -> gcl.MaskArray:
 
     Returns
     -------
-    mask : MaskArray
+    MaskArray
         Boolean mask over the graphicle objects associated with the
         passed AdjacencyList.
     """
-    vertex_mask = adj.edges["in"] == vertex
-    if not np.any(vertex_mask):
-        return gcl.MaskArray(adj.edges["out"] == vertex)
-    sparse = adj._sparse_signed
-    vertex = sparse.row[vertex_mask][0]
-    bft = breadth_first_tree(sparse, vertex)
-    mask = np.isin(sparse.row, bft.indices)
-    mask[sparse.row == vertex] = True  # include parent vertex
-    return gcl.MaskArray(mask)
+    vertex_src_mask = adj.edges["in"] == vertex
+    vertex_dst_mask = adj.edges["out"] == vertex
+    if not np.any(vertex_dst_mask):
+        return gcl.MaskArray(vertex_src_mask)
+    sparse_coo = adj._sparse_signed
+    vertex = sparse_coo.col[vertex_src_mask][0]
+    bft = coo_array(breadth_first_tree(adj._sparse_csr, vertex))
+    coo_full = adj._edge_relabel.view(adj.dtype)
+    coo_desc = np.hstack(
+        (bft.row.reshape(-1, 1), bft.col.reshape(-1, 1))
+    ).view(adj.dtype)
+    return gcl.MaskArray(np.isin(coo_full, coo_desc))
+
+
+def edge_descendants(
+    adj: gcl.AdjacencyList, edge: gcl.VertexPair
+) -> gcl.MaskArray:
+    """Returns a ``MaskArray`` to select particles which descend from a
+    given edge in the DAG. This mask includes the parent edge.
+
+    :group: select
+
+    .. versionadded:: 0.2.8
+
+    Parameters
+    ----------
+    adj : AdjacencyList
+        Topological structure of the graph.
+    edge : VertexPair or tuple[int, int]
+        The vertex id from which the descending edges are identified.
+
+    Returns
+    -------
+    MaskArray
+        Boolean mask over the graphicle objects associated with the
+        passed AdjacencyList.
+    """
+    desc = vertex_descendants(adj, edge[1])
+    desc[adj == edge] = True
+    return desc
 
 
 def hadron_vertices(
@@ -258,7 +298,7 @@ def hadron_vertices(
 
     Returns
     -------
-    vertex_ids : tuple[int]
+    tuple[int, ...]
         Indices of the hadronisation vertices in the generation DAG,
         returned in no particular order.
     """
@@ -329,7 +369,7 @@ def _partition_vertex(
 
     Returns
     -------
-    filtered_mask : MaskArray
+    MaskArray
         Input ``MaskArray``, filtered to remove background incident on
         the same hadronisation vertex.
     """
@@ -346,9 +386,9 @@ def _partition_vertex(
 
 def partition_descendants(
     graph: gcl.Graphicle,
-    hier: gcl.MaskGroup,
+    hier: gcl.MaskGroup[MaskGeneric],
     pt_exp: float = -0.1,
-) -> gcl.MaskGroup:
+) -> gcl.MaskGroup[MaskGeneric]:
     """Partitions the final state descendants with mixed hard partonic
     heritage, by aligning them with their nearest ancestor.
 
@@ -373,7 +413,7 @@ def partition_descendants(
 
     Returns
     -------
-    hier_parted : MaskGroup
+    MaskGroup
         Same nested tree structure as input, but with the final
         state hadrons partitioned to their nearest hard parton ancestor.
     """
@@ -399,7 +439,9 @@ def partition_descendants(
     return hier
 
 
-def _hard_ancestor_matrix(hard_desc: gcl.MaskGroup) -> base.BoolVector:
+def _hard_ancestor_matrix(
+    hard_desc: gcl.MaskGroup[MaskType],
+) -> base.BoolVector:
     """Returns a directed adjacency matrix for the hard process.
 
     Parameters
@@ -412,7 +454,7 @@ def _hard_ancestor_matrix(hard_desc: gcl.MaskGroup) -> base.BoolVector:
 
     Returns
     -------
-    hard_matrix : ndarray[bool_]
+    ndarray[bool_]
         Square directed adjacency matrix, linking partons in the hard
         process to their descendants. Rows represent each hard parton,
         and columns indicate which hard partons descend from it
@@ -439,7 +481,7 @@ def _hard_parent_matrix(hard_matrix: base.BoolVector) -> base.BoolVector:
 
     Returns
     -------
-    hard_parent_matrix : ndarray[bool_]
+    ndarray[bool_]
         Directed adjacency matrix representing links from parents to
         direct (first generation) children. Same as ``hard_matrix``, but
         with grandchildren *etc.* removed.
@@ -480,7 +522,7 @@ def _hard_parent_dict(
 
     Returns
     -------
-    parent_dict : dict[str, tuple[str, ...]]
+    dict[str, tuple[str, ...]]
         Mapping from parents to children in the hard process. Keys are
         parent names, and values are tuples of children names.
     """
@@ -494,7 +536,7 @@ def _hard_parent_dict(
 
 
 def _flat_hierarchy(
-    hard_desc: gcl.MaskGroup,
+    hard_desc: gcl.MaskGroup[gcl.MaskArray],
 ) -> ty.Dict[str, ty.Tuple[str, ...]]:
     """Produces a mapping between partons to their direct children in
     the hard process. This mapping is flat, *ie.* there is no nesting
@@ -513,7 +555,7 @@ def _flat_hierarchy(
 
     Returns
     -------
-    parent_dict : dict[str, tuple[str, ...]]
+    dict[str, tuple[str, ...]]
         Mapping from parents to children in the hard process. Keys are
         parent names, and values are tuples of children names.
 
@@ -558,7 +600,7 @@ def hard_descendants(
     target: ty.Optional[ty.Iterable[int]] = None,
     sign_sensitive: bool = False,
     strict: bool = True,
-) -> gcl.MaskGroup:
+) -> gcl.MaskGroup[gcl.MaskArray]:
     """Returns a ``MaskGroup`` instance to select particle descendants
     of ``target`` hard partons (by PDG code).
 
@@ -594,7 +636,7 @@ def hard_descendants(
 
     Returns
     -------
-    descendant_masks : MaskGroup
+    MaskGroup[MaskArray]
         Collection of masks over the event indicating the descendants
         of partons from within the hard process.
 
@@ -624,14 +666,17 @@ def hard_descendants(
         hard_graph = hard_graph[target_mask]
     pdg_keys = _pdgs_to_keys(hard_graph.pdg)
     pcl_out_vtxs = map(int, hard_graph.edges["out"])
-    vtx_descs = map(vertex_descendants, it.repeat(graph.adj), pcl_out_vtxs)
-    return gcl.MaskGroup(cl.OrderedDict(zip(pdg_keys, vtx_descs)), agg_op="or")
+    descs = map(vertex_descendants, it.repeat(graph.adj), pcl_out_vtxs)
+    group = gcl.MaskGroup(cl.OrderedDict(zip(pdg_keys, descs)), agg_op="or")
+    for key, idx in zip(pdg_keys, np.flatnonzero(hard_mask), strict=True):
+        group[key][idx] = True
+    return group
 
 
 def hierarchy(
     graph: gcl.Graphicle,
-    desc: ty.Optional[gcl.MaskGroup] = None,
-) -> gcl.MaskGroup:
+    desc: ty.Optional[gcl.MaskGroup[gcl.MaskArray]] = None,
+) -> gcl.MaskGroup[MaskType]:
     """Composite ``MaskGroup`` of ``MaskGroup`` instances, representing
     the partons of the hard process and their descendants. Uses a tree
     structure, such that partons which are descendants of other hard
@@ -646,14 +691,14 @@ def hierarchy(
     graph : Graphicle
         The event to be parsed. Must include ``status``, ``edges``,
         ``pmu``, and ``pdg`` data.
-    desc : MaskGroup, optional
+    desc : MaskGroup[MaskArray], optional
         If the masks for all partons in the hard process have already
         been computed, these may be passed here to save performing the
         computation again.
 
     Returns
     -------
-    hierarchy : MaskGroup
+    MaskGroup[MaskGroup | MaskArray]
         Nested composite of ``MaskGroup`` instances, representing the
         hierarchical structure of the hard process, and the descendants
         of the hard process partons throughout the shower. Nested
@@ -717,7 +762,7 @@ def hierarchy(
         desc = hard_descendants(graph)
     else:
         desc = desc.copy()
-    hard_desc: gcl.MaskGroup = desc[hard_mask][list(names)]  # type: ignore
+    hard_desc = desc[hard_mask][list(names)]
     hard = _flat_hierarchy(hard_desc)
     keys = set(hard.keys())
     vals = set(it.chain.from_iterable(hard.values()))
@@ -729,14 +774,6 @@ def hierarchy(
         for key, idx in zip(hard_final_keys, hard_final_idxs):
             desc[key].data[idx] = True
     masks = _make_tree(hard, roots, hard, desc, graph.adj)
-    leaf_iters = it.starmap(
-        fn.partial(_leaf_mask_iter, exclude_latent=False), masks.items()
-    )
-    leaf_iter = it.chain.from_iterable(leaf_iters)
-    leaf_iter = filter(lambda kv: kv[0] == "latent", leaf_iter)
-    leaf_masks = map(op.itemgetter(1), leaf_iter)
-    for leaf_mask in leaf_masks:
-        leaf_mask[leaf_mask & graph.hard_mask] = False
     return masks
 
 
@@ -744,9 +781,9 @@ def _make_tree(
     flat: ty.Union[ty.Dict[str, ty.Any], ty.Tuple[str, ...]],
     roots: ty.Set[str],
     hard: ty.Dict[str, ty.Tuple[str, ...]],
-    desc: gcl.MaskGroup,
+    desc: gcl.MaskGroup[gcl.MaskArray],
     adj: gcl.AdjacencyList,
-) -> gcl.MaskGroup:
+) -> gcl.MaskGroup[MaskType]:
     """Recursive function to convert a flat representation of the hard
     process tree into a nested ``MaskGroup`` of ``MaskGroup`` object.
 
@@ -793,7 +830,7 @@ def _make_tree(
 
 def _leaf_mask_iter(
     branch_name: str,
-    branch: ty.Union[gcl.MaskGroup, gcl.MaskArray],
+    branch: MaskType,
     exclude_latent: bool = True,
 ) -> ty.Generator[ty.Tuple[str, gcl.MaskArray], None, None]:
     """Recursive function, traversing a branch of the nested mask tree
@@ -809,7 +846,7 @@ def _leaf_mask_iter(
             yield from _leaf_mask_iter(name, mask, exclude_latent)  # type: ignore
 
 
-def leaf_masks(mask_tree: gcl.MaskGroup) -> gcl.MaskGroup:
+def leaf_masks(mask_tree: gcl.MaskGroup) -> gcl.MaskGroup[gcl.MaskArray]:
     """Find the leaves of the hard process, when organised into a
     hierarchical tree from ``hierarchy()``.
 
@@ -825,7 +862,7 @@ def leaf_masks(mask_tree: gcl.MaskGroup) -> gcl.MaskGroup:
 
     Returns
     -------
-    leaves : MaskGroup
+    MaskGroup
         Flat ``MaskGroup`` of only the leaves of ``mask_tree``.
     """
     mask_group = gcl.MaskGroup(agg_op="or")  # type: ignore
@@ -834,7 +871,7 @@ def leaf_masks(mask_tree: gcl.MaskGroup) -> gcl.MaskGroup:
     return mask_group
 
 
-def any_overlap(masks: gcl.MaskGroup) -> bool:
+def any_overlap(masks: gcl.MaskGroup[MaskType]) -> bool:
     """Given a ``MaskGroup`` object, checks if any of the masks overlap
     with each other.
 
@@ -849,7 +886,7 @@ def any_overlap(masks: gcl.MaskGroup) -> bool:
 
     Returns
     -------
-    any_overlap : bool
+    bool
         ``True`` if at least two ``MaskArrays`` in ``masks`` have at
         least one ``True`` element in the same location.
     """
@@ -892,7 +929,7 @@ def centroid_prune(
 
     Returns
     -------
-    prune_mask : MaskArray
+    MaskArray
         Mask which retains only the particles within ``radius`` of the
         centroid.
     """
@@ -963,7 +1000,7 @@ def color_singlets(
     colored_mask = tuple(map(op.ne, it.repeat((0, 0)), colors))
     colored_only = it.compress(colors, colored_mask)
     keys = tuple(it.compress(leaves.keys(), colored_mask))
-    named_colors = tuple(zip(keys, colored_only))
+    named_colors = tuple(zip(keys, colored_only, strict=True))  # type: ignore
     combos = it.chain(
         it.combinations(named_colors, 2), it.combinations(named_colors, 3)
     )
@@ -978,3 +1015,28 @@ def color_singlets(
         outcasts = set(keys).symmetric_difference(members)
         return list(zip(outcasts))
     return singlets
+
+
+def clusters(
+    graph: gcl.Graphicle, radius: float
+) -> gcl.MaskGroup[gcl.MaskArray]:
+    hier_ = hierarchy(graph)
+    hier = partition_descendants(graph, hier_, -0.1)
+    leaves = leaf_masks(hier)
+    color_keys = color_singlets(leaves, graph.status, graph.color, True)
+    colored_leaves = map(
+        op.getitem, it.repeat(leaves), it.chain.from_iterable(color_keys)
+    )
+    colored_leaves, colored_leaves_ = it.tee(colored_leaves, 2)
+    hard_mask = graph.hard_mask["outgoing"]
+    parton_masks = map(op.and_, it.repeat(hard_mask), colored_leaves_)
+    parton_pmus = map(op.getitem, it.repeat(graph.pmu), parton_masks)
+    parton_centroids = map(op.attrgetter("eta", "phi"), parton_pmus)
+    for leaf, centroid in zip(colored_leaves, parton_centroids):
+        leaf[...] = centroid_prune(graph.pmu, radius, leaf, centroid)  # type: ignore
+    hier.recursive_drop(inplace=True)
+    flat_hier = hier.flatten("rise")
+    flat_hier_final = map(op.itemgetter(graph.final), flat_hier.values())
+    return gcl.MaskGroup(
+        cl.OrderedDict(zip(flat_hier.keys(), flat_hier_final)), agg_op="or"
+    )
