@@ -1024,15 +1024,16 @@ def clusters(
 
     The steps defining this algorithm are summarised:
 
-    # Find descendants of all hard partons within DAG
-    # Remove final state radiation from descendants
-    # Where descendants of multiple hard partons annihilate color with
-      each other, assign exclusive parentage of subsequent color neutral
-      particles to closest hard parton in the :math:`\\eta-\\phi` plane
-    # Where background is used to annihilate color of hard parton
-      descendants, remove all final state particles beyond a distance
-      of ``radius`` from the position of the hard parton in the
-      :math:`\\eta-\\phi` plane
+    #. Find descendants of all hard partons within DAG
+    #. Remove final state radiation from descendants
+    #. Where descendants of multiple hard partons annihilate color with
+       each other, assign exclusive parentage of subsequent color
+       neutral particles to closest hard parton in the
+       :math:`\\eta-\\phi` plane
+    #. Where background is used to annihilate color of hard parton
+       descendants, remove all final state particles beyond a distance
+       of ``radius`` from the position of the hard parton in the
+       :math:`\\eta-\\phi` plane
 
     Parameters
     ----------
@@ -1055,6 +1056,7 @@ def clusters(
     Hard partons may be color connected with each other, or with the
     underlying event. *eg.* for a hierarchical clustering:
 
+    ::
         MaskGroup(agg_op=OR)
         ├── t
         │   ├── b
