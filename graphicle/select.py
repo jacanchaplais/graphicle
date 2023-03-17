@@ -33,6 +33,7 @@ __all__ = [
     "leaf_masks",
     "centroid_prune",
     "color_singlets",
+    "clusters",
 ]
 
 
