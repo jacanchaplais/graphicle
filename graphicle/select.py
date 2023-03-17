@@ -1028,7 +1028,8 @@ def clusters(
     * Remove final state radiation from descendants
     * Where descendants of multiple hard partons annihilate color with
       each other, assign exclusive parentage of subsequent color neutral
-      particles to closest hard parton in the :math:`\\eta-\\phi` plane
+      particles to closest hard parton in the pseudorapidity-azimuth
+      (:math:`\\eta-\\phi`) plane
     * Where background is used to annihilate color of hard parton
       descendants, remove all final state particles beyond a distance
       of ``radius`` from the position of the hard parton in the
@@ -1039,10 +1040,9 @@ def clusters(
     graph : Graphicle
         Full event record as a DAG.
     radius : float
-        Radius in the pseudorapidity-azimuth, :math:`\\eta-\\phi`, plane
-        defining the enclosed clustering region around hard partons
-        which are color-connected to the background. See notes for more
-        information.
+        Radius in the :math:`\\eta-\\phi` plane defining the enclosed
+        clustering region around hard partons which are color-connected
+        to the underlying event. See notes for more information.
 
     Returns
     -------
@@ -1081,7 +1081,8 @@ def clusters(
     descendants tree of the bottom quark, spread over a wide region of
     the :math:`\\eta-\\phi` plane. This is when the ``radius`` parameter
     is applied, excluding all final state descendants whose distance
-    from the hard bottom quark exceeds the value passed.
+    from the hard bottom quark exceeds the value passed, cleaning up the
+    signal.
     """
     hier_ = hierarchy(graph)
     hier = partition_descendants(graph, hier_, -0.1)
