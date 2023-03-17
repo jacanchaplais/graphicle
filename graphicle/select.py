@@ -15,7 +15,6 @@ import numpy.lib.recfunctions as rfn
 import pandas as pd
 import pyjet
 from pyjet import ClusterSequence, PseudoJet
-from scipy.sparse import coo_array
 from scipy.sparse.csgraph import breadth_first_tree
 
 import graphicle as gcl
@@ -219,11 +218,6 @@ def vertex_descendants(adj: gcl.AdjacencyList, vertex: int) -> gcl.MaskArray:
        identifying edges whose source is the vertex, rather than raising
        an unhandled ``IndexError``.
 
-    .. versionchanged:: 0.2.8
-       No longer includes parent in output. For this behaviour, use
-       ``edge_descendants()``. Additionally, routine has been patched
-       to support multigraphs.
-
     Parameters
     ----------
     adj : AdjacencyList
@@ -237,18 +231,15 @@ def vertex_descendants(adj: gcl.AdjacencyList, vertex: int) -> gcl.MaskArray:
         Boolean mask over the graphicle objects associated with the
         passed AdjacencyList.
     """
-    vertex_src_mask = adj.edges["in"] == vertex
-    vertex_dst_mask = adj.edges["out"] == vertex
-    if not np.any(vertex_dst_mask):
-        return gcl.MaskArray(vertex_src_mask)
-    sparse_coo = adj._sparse_signed
-    vertex = sparse_coo.col[vertex_src_mask][0]
-    bft = coo_array(breadth_first_tree(adj._sparse_csr, vertex))
-    coo_full = adj._edge_relabel.view(adj.dtype)
-    coo_desc = np.hstack(
-        (bft.row.reshape(-1, 1), bft.col.reshape(-1, 1))
-    ).view(adj.dtype)
-    return gcl.MaskArray(np.isin(coo_full, coo_desc))
+    vertex_mask = adj.edges["in"] == vertex
+    if not np.any(vertex_mask):
+        return gcl.MaskArray(adj.edges["out"] == vertex)
+    sparse = adj._sparse_signed
+    vertex = sparse.row[vertex_mask][0]
+    bft = breadth_first_tree(adj._sparse_csr, vertex)
+    mask = np.isin(sparse.row, bft.indices)
+    mask[sparse.row == vertex] = True  # include edges directly from parent
+    return gcl.MaskArray(mask)
 
 
 def edge_descendants(
@@ -1020,6 +1011,74 @@ def color_singlets(
 def clusters(
     graph: gcl.Graphicle, radius: float
 ) -> gcl.MaskGroup[gcl.MaskArray]:
+    """Cluster and tag the final state particles in an event represented
+    by a ``Graphicle`` object. These clusters are formed by considering
+    the topology of the directed acyclic graph (DAG) generating the
+    event, tracking descendants of hard partons, and the momenta of the
+    hard partons compared against the final state particles.
+
+    :group: select
+
+    .. versionadded:: 0.2.8
+
+    The steps defining this algorithm are summarised:
+
+    # Find descendants of all hard partons within DAG
+    # Remove final state radiation from descendants
+    # Where descendants of multiple hard partons annihilate color with
+      each other, assign exclusive parentage of subsequent color neutral
+      particles to closest hard parton in the :math:`\\eta-\\phi` plane
+    # Where background is used to annihilate color of hard parton
+      descendants, remove all final state particles beyond a distance
+      of ``radius`` from the position of the hard parton in the
+      :math:`\\eta-\\phi` plane
+
+    Parameters
+    ----------
+    graph : Graphicle
+        Full event record as a DAG.
+    radius : float
+        Radius in the pseudorapidity-azimuth, :math:`\\eta-\\phi`, plane
+        defining the enclosed clustering region around hard partons
+        which are color-connected to the background. See notes for more
+        information.
+
+    Returns
+    -------
+    MaskGroup[MaskArray]
+        Flat ``MaskGroup``, containing ``MaskArray`` instances which
+        reconstruct the hard process.
+
+    Notes
+    -----
+    Hard partons may be color connected with each other, or with the
+    underlying event. *eg.* for a hierarchical clustering:
+
+        MaskGroup(agg_op=OR)
+        ├── t
+        │   ├── b
+        │   └── W+
+        │       ├── c
+        │       └── s~
+        └── t~
+            ├── b~
+            └── W-
+                ├── s
+                └── c~
+
+    the quarks decaying from the W bosons are color-connected to each
+    other, as they form from a color-singlet. This means they will
+    almost certainly annihilate their color with each other during
+    hadronisation. However, the top quarks are color connected to the
+    underlying event, and therefore will almost certainly annihilate
+    their color with partons that do not descend from the hard process.
+    This is done via proxy of the bottom quark, which inherits its color
+    from the top. This results in background radiation in the
+    descendants tree of the bottom quark, spread over a wide region of
+    the :math:`\\eta-\\phi` plane. This is when the ``radius`` parameter
+    is applied, excluding all final state descendants whose distance
+    from the hard bottom quark exceeds the value passed.
+    """
     hier_ = hierarchy(graph)
     hier = partition_descendants(graph, hier_, -0.1)
     leaves = leaf_masks(hier)
@@ -1033,7 +1092,7 @@ def clusters(
     parton_pmus = map(op.getitem, it.repeat(graph.pmu), parton_masks)
     parton_centroids = map(op.attrgetter("eta", "phi"), parton_pmus)
     for leaf, centroid in zip(colored_leaves, parton_centroids):
-        leaf[...] = centroid_prune(graph.pmu, radius, leaf, centroid)  # type: ignore
+        leaf[...] = centroid_prune(graph.pmu, radius, leaf, centroid)
     hier.recursive_drop(inplace=True)
     flat_hier = hier.flatten("rise")
     flat_hier_final = map(op.itemgetter(graph.final), flat_hier.values())
