@@ -1048,14 +1048,15 @@ def clusters(
     -------
     MaskGroup[MaskArray]
         Flat ``MaskGroup``, containing ``MaskArray`` instances which
-        reconstruct the hard process.
+        reconstruct the hard partons from the final state particles.
 
     Notes
     -----
     Hard partons may be color connected with each other, or with the
     underlying event. *eg.* for a hierarchical clustering:
 
-    ```
+    .. code-block:: text
+
         MaskGroup(agg_op=OR)
         ├── t
         │   ├── b
@@ -1067,7 +1068,7 @@ def clusters(
             └── W-
                 ├── s
                 └── c~
-    ```
+
 
     the quarks decaying from the W bosons are color-connected to each
     other, as they form from a color-singlet. This means they will
