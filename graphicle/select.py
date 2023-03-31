@@ -671,7 +671,7 @@ def hard_descendants(
     pcl_out_vtxs = map(int, hard_graph.edges["out"])
     descs = map(vertex_descendants, it.repeat(graph.adj), pcl_out_vtxs)
     group = gcl.MaskGroup(cl.OrderedDict(zip(pdg_keys, descs)), agg_op="or")
-    for key, idx in zip(pdg_keys, np.flatnonzero(hard_mask), strict=True):
+    for key, idx in zip(pdg_keys, np.flatnonzero(hard_mask)):
         group[key][idx] = True
     return group
 
