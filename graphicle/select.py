@@ -40,6 +40,16 @@ DistFunc = ty.Callable[
 ]
 
 
+def _param_check(
+    param: ty.Any, name: str, expected: ty.Type
+) -> ty.Optional[ty.NoReturn]:
+    if not isinstance(param, expected):
+        received = type(param)
+        raise ValueError(
+            f"Expected {name} to be {expected}. Received {received}."
+        )
+
+
 def fastjet_clusters(
     pmu: gcl.MomentumArray,
     radius: float,
@@ -91,6 +101,7 @@ def fastjet_clusters(
     ``p_val`` set to ``-1`` gives **anti-kT**, ``0`` gives
     **Cambridge-Aachen**, and ``1`` gives **kT** clusterings.
     """
+    _param_check(pmu, "pmu", gcl.MomentumArray)
     pmu_pyjet = pmu.data[["e", "x", "y", "z"]]
     pmu_pyjet.dtype.names = "E", "px", "py", "pz"
     pmu_pyjet_idx = rfn.append_fields(
@@ -895,6 +906,7 @@ def centroid_prune(
         Mask which retains only the particles within ``radius`` of the
         centroid.
     """
+    _param_check(pmu, "pmu", gcl.MomentumArray)
     if mask is not None:
         pmu = pmu[mask]
         event_mask = np.zeros_like(mask, "<?")
