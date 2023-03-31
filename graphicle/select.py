@@ -44,6 +44,16 @@ MaskType = ty.Union[gcl.MaskArray, gcl.MaskGroup]
 MaskGeneric = ty.TypeVar("MaskGeneric", gcl.MaskGroup, gcl.MaskArray, MaskType)
 
 
+def _param_check(
+    param: ty.Any, name: str, expected: ty.Type
+) -> ty.Optional[ty.NoReturn]:
+    if not isinstance(param, expected):
+        received = type(param)
+        raise ValueError(
+            f"Expected {name} to be {expected}. Received {received}."
+        )
+
+
 def fastjet_clusters(
     pmu: gcl.MomentumArray,
     radius: float,
@@ -95,6 +105,7 @@ def fastjet_clusters(
     ``p_val`` set to ``-1`` gives **anti-kT**, ``0`` gives
     **Cambridge-Aachen**, and ``1`` gives **kT** clusterings.
     """
+    _param_check(pmu, "pmu", gcl.MomentumArray)
     pmu_pyjet = pmu.data[["e", "x", "y", "z"]]
     pmu_pyjet.dtype.names = "E", "px", "py", "pz"
     pmu_pyjet_idx = rfn.append_fields(
@@ -925,6 +936,7 @@ def centroid_prune(
         Mask which retains only the particles within ``radius`` of the
         centroid.
     """
+    _param_check(pmu, "pmu", gcl.MomentumArray)
     if mask is not None:
         pmu = pmu[mask]
         event_mask = np.zeros_like(mask, "<?")
@@ -1097,7 +1109,7 @@ def clusters(
     parton_pmus = map(op.getitem, it.repeat(graph.pmu), parton_masks)
     parton_centroids = map(op.attrgetter("eta", "phi"), parton_pmus)
     for leaf, centroid in zip(colored_leaves, parton_centroids):
-        leaf[...] = centroid_prune(graph.pmu, radius, leaf, centroid)
+        leaf.data[...] = centroid_prune(graph.pmu, radius, leaf, centroid).data
     hier.recursive_drop(inplace=True)
     flat_hier = hier.flatten("rise")
     flat_hier_final = map(op.itemgetter(graph.final), flat_hier.values())

@@ -442,7 +442,7 @@ class MaskArray(base.MaskBase, base.ArrayBase):
         return _array_ufunc(self, ufunc, method, *inputs, **kwargs)
 
     def __iter__(self) -> ty.Iterator[bool]:
-        yield from map(bool, self.data)
+        return map(bool, self.data)
 
     def copy(self) -> "MaskArray":
         return self.__class__(self._data.copy())
@@ -705,6 +705,8 @@ class MaskGroup(base.MaskBase, cla.MutableMapping[str, MaskGeneric]):
         self._mask_arrays.update({key: mask})
 
     def __bool__(self) -> bool:
+        if len(self) == 0:
+            return False
         if np.shape(self.data)[0] == 0:
             return False
         return True
@@ -1176,7 +1178,7 @@ class MomentumArray(base.ArrayBase):
 
     def __iter__(self) -> ty.Iterator[MomentumElement]:
         flat_vals = map(float, self._data.flatten())
-        elems = zip(*(flat_vals,) * 4, strict=True)  # type: ignore
+        elems = zip(*(flat_vals,) * 4)  # type: ignore
         yield from it.starmap(MomentumElement, elems)
 
     def __len__(self) -> int:
@@ -1379,7 +1381,7 @@ class ColorArray(base.ArrayBase):
 
     def __iter__(self) -> ty.Iterator[ColorElement]:
         flat_vals = map(int, it.chain.from_iterable(self.data))
-        elems = zip(*(flat_vals,) * 2, strict=True)  # type: ignore
+        elems = zip(*(flat_vals,) * 2)
         yield from it.starmap(ColorElement, elems)
 
     @property
@@ -1857,7 +1859,7 @@ class AdjacencyList(base.AdjacencyBase):
 
     def __iter__(self) -> ty.Iterator[VertexPair]:
         flat_vals = map(int, it.chain.from_iterable(self._data))
-        elems = zip(*(flat_vals,) * 2, strict=True)  # type: ignore
+        elems = zip(*(flat_vals,) * 2)
         yield from it.starmap(VertexPair, elems)
 
     def __len__(self) -> int:
