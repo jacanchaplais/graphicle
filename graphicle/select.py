@@ -671,7 +671,7 @@ def hard_descendants(
     pcl_out_vtxs = map(int, hard_graph.edges["out"])
     descs = map(vertex_descendants, it.repeat(graph.adj), pcl_out_vtxs)
     group = gcl.MaskGroup(cl.OrderedDict(zip(pdg_keys, descs)), agg_op="or")
-    for key, idx in zip(pdg_keys, np.flatnonzero(hard_mask), strict=True):
+    for key, idx in zip(pdg_keys, np.flatnonzero(hard_mask)):
         group[key][idx] = True
     return group
 
@@ -1004,7 +1004,7 @@ def color_singlets(
     colored_mask = tuple(map(op.ne, it.repeat((0, 0)), colors))
     colored_only = it.compress(colors, colored_mask)
     keys = tuple(it.compress(leaves.keys(), colored_mask))
-    named_colors = tuple(zip(keys, colored_only, strict=True))  # type: ignore
+    named_colors = tuple(zip(keys, colored_only))
     combos = it.chain(
         it.combinations(named_colors, 2), it.combinations(named_colors, 3)
     )

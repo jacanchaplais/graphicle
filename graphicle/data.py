@@ -591,7 +591,7 @@ MaskGeneric = ty.TypeVar(
 
 
 @define
-class MaskGroup(base.MaskBase, cla.MutableMapping[str, MaskGeneric]):
+class MaskGroup(base.MaskBase, ty.MutableMapping[str, MaskGeneric]):
     """Data structure to compose groups of masks over particle arrays.
     Can be nested to form complex hierarchies.
 
