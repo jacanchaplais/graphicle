@@ -1004,7 +1004,7 @@ def color_singlets(
     colored_mask = tuple(map(op.ne, it.repeat((0, 0)), colors))
     colored_only = it.compress(colors, colored_mask)
     keys = tuple(it.compress(leaves.keys(), colored_mask))
-    named_colors = tuple(zip(keys, colored_only, strict=True))  # type: ignore
+    named_colors = tuple(zip(keys, colored_only))
     combos = it.chain(
         it.combinations(named_colors, 2), it.combinations(named_colors, 3)
     )
