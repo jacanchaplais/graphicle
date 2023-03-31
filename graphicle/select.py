@@ -923,3 +923,166 @@ def centroid_prune(
         return gcl.MaskArray(is_within)
     event_mask[mask] = is_within
     return gcl.MaskArray(event_mask)
+
+
+def color_singlets(
+    leaves: gcl.MaskGroup[gcl.MaskArray],
+    status: gcl.StatusArray,
+    color: gcl.ColorArray,
+    invert: bool = False,
+) -> ty.List[ty.Tuple[str, ...]]:
+    """Identifies groups of outgoing partons from the hard process which
+    form color singlets.
+
+    :group: select
+
+    .. versionadded:: 0.2.8
+
+    Parameters
+    ----------
+    leaves : MaskGroup[MaskArray]
+        Innermost nested ``MaskArray`` instances, obtained from calling
+        ``hierarchy()`` followed by ``leaf_masks()`` on a ``Graphicle``
+        object.
+    status : StatusArray
+        The status codes for the event.
+    color : ColorArray
+        The color / anticolor pair values for the event.
+    invert : bool
+        If ``True``, will invert the operation to find all colored
+        particles in the hard process which are not grouped with other
+        partons in the hard-process to form a color-singlet. Default is
+        ``False``.
+
+    Returns
+    -------
+    list[tuple[str, ...]]
+        Tuples of keys, grouping the color-connected partons in the hard
+        process.
+
+    Notes
+    -----
+    This function checks for color singlets formed from two color
+    triplets (quarks), or two color triplets plus a color octet (gluon).
+    It does not check for color singlets formed from three colour
+    triplets. This functionality *may* be added in future.
+    """
+    hard_mask = status.hard_mask["outgoing"]
+    masks = map(op.and_, it.repeat(hard_mask), leaves.values())
+    colors_ = map(it.compress, it.repeat(color), masks)
+    colors = tuple(it.chain.from_iterable(colors_))
+    colored_mask = tuple(map(op.ne, it.repeat((0, 0)), colors))
+    colored_only = it.compress(colors, colored_mask)
+    keys = tuple(it.compress(leaves.keys(), colored_mask))
+    named_colors = tuple(zip(keys, colored_only, strict=True))  # type: ignore
+    combos = it.chain(
+        it.combinations(named_colors, 2), it.combinations(named_colors, 3)
+    )
+    singlets = []
+    for names, color_elems in it.starmap(zip, combos):
+        color_set = set(map(op.attrgetter("color"), color_elems))
+        anticolor_set = set(map(op.attrgetter("anticolor"), color_elems))
+        if color_set == anticolor_set:
+            singlets.append(names)
+    if invert is True:
+        members = set(it.chain.from_iterable(singlets))
+        outcasts = set(keys).symmetric_difference(members)
+        return list(zip(outcasts))
+    return singlets
+
+
+def clusters(
+    graph: gcl.Graphicle, radius: float
+) -> gcl.MaskGroup[gcl.MaskArray]:
+    """Cluster and tag the final state particles in an event represented
+    by a ``Graphicle`` object. These clusters are formed by considering
+    the topology of the directed acyclic graph (DAG) generating the
+    event, tracking descendants of hard partons, and the momenta of the
+    hard partons compared against the final state particles.
+
+    :group: select
+
+    .. versionadded:: 0.2.8
+
+    The steps defining this algorithm are summarised:
+
+    * Find descendants of all hard partons within DAG
+    * Remove final state radiation from descendants
+    * Where descendants of multiple hard partons annihilate color with
+      each other, assign exclusive parentage of subsequent color neutral
+      particles to closest hard parton in the pseudorapidity-azimuth
+      (:math:`\\eta-\\phi`) plane
+    * Where background is used to annihilate color of hard parton
+      descendants, remove all final state particles beyond a distance
+      of ``radius`` from the position of the hard parton in the
+      :math:`\\eta-\\phi` plane
+
+    Parameters
+    ----------
+    graph : Graphicle
+        Full event record as a DAG.
+    radius : float
+        Radius in the :math:`\\eta-\\phi` plane defining the enclosed
+        clustering region around hard partons which are color-connected
+        to the underlying event. See notes for more information.
+
+    Returns
+    -------
+    MaskGroup[MaskArray]
+        Flat ``MaskGroup``, containing ``MaskArray`` instances which
+        reconstruct the hard partons from the final state particles.
+
+    Notes
+    -----
+    Hard partons may be color connected with each other, or with the
+    underlying event. *eg.* for a hierarchical clustering:
+
+    .. code-block:: text
+
+        MaskGroup(agg_op=OR)
+        ├── t
+        │   ├── b
+        │   └── W+
+        │       ├── c
+        │       └── s~
+        └── t~
+            ├── b~
+            └── W-
+                ├── s
+                └── c~
+
+
+    the quarks decaying from the W bosons are color-connected to each
+    other, as they form from a color-singlet. This means they will
+    almost certainly annihilate their color with each other during
+    hadronisation. However, the top quarks are color connected to the
+    underlying event, and therefore will almost certainly annihilate
+    their color with partons that do not descend from the hard process.
+    This is done via proxy of the bottom quark, which inherits its color
+    from the top. This results in background radiation in the
+    descendants tree of the bottom quark, spread over a wide region of
+    the :math:`\\eta-\\phi` plane. This is when the ``radius`` parameter
+    is applied, excluding all final state descendants whose distance
+    from the hard bottom quark exceeds the value passed, cleaning up the
+    signal.
+    """
+    hier_ = hierarchy(graph)
+    hier = partition_descendants(graph, hier_, -0.1)
+    leaves = leaf_masks(hier)
+    color_keys = color_singlets(leaves, graph.status, graph.color, True)
+    colored_leaves = map(
+        op.getitem, it.repeat(leaves), it.chain.from_iterable(color_keys)
+    )
+    colored_leaves, colored_leaves_ = it.tee(colored_leaves, 2)
+    hard_mask = graph.hard_mask["outgoing"]
+    parton_masks = map(op.and_, it.repeat(hard_mask), colored_leaves_)
+    parton_pmus = map(op.getitem, it.repeat(graph.pmu), parton_masks)
+    parton_centroids = map(op.attrgetter("eta", "phi"), parton_pmus)
+    for leaf, centroid in zip(colored_leaves, parton_centroids):
+        leaf.data[...] = centroid_prune(graph.pmu, radius, leaf, centroid).data
+    hier.recursive_drop(inplace=True)
+    flat_hier = hier.flatten("rise")
+    flat_hier_final = map(op.itemgetter(graph.final), flat_hier.values())
+    return gcl.MaskGroup(
+        cl.OrderedDict(zip(flat_hier.keys(), flat_hier_final)), agg_op="or"
+    )

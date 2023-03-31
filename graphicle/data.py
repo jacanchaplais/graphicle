@@ -442,7 +442,7 @@ class MaskArray(base.MaskBase, base.ArrayBase):
         return _array_ufunc(self, ufunc, method, *inputs, **kwargs)
 
     def __iter__(self) -> ty.Iterator[bool]:
-        yield from map(bool, self.data)
+        return map(bool, self.data)
 
     def copy(self) -> "MaskArray":
         return self.__class__(self._data.copy())
@@ -705,6 +705,8 @@ class MaskGroup(base.MaskBase, cla.MutableMapping[str, MaskGeneric]):
         self._mask_arrays.update({key: mask})
 
     def __bool__(self) -> bool:
+        if len(self) == 0:
+            return False
         if np.shape(self.data)[0] == 0:
             return False
         return True
