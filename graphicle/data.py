@@ -1291,6 +1291,39 @@ class MomentumArray(base.ArrayBase):
             self.energy, self._spatial_mag
         ).reshape(-1)
 
+    def shift_rapidity(
+        self, shift: ty.Union[float, base.DoubleVector]
+    ) -> "MomentumArray":
+        output = self.copy()
+        cosh = np.cosh(-shift)
+        sinh = np.sinh(-shift)
+        output.energy[...] = (cosh * self.energy) - (sinh * self.z)
+        output.z[...] = (cosh * self.z) - (sinh * self.energy)
+        return output
+
+    def shift_eta(
+        self, shift: ty.Union[float, base.DoubleVector]
+    ) -> "MomentumArray":
+        cosh = np.cosh(shift)
+        sinh = np.sinh(shift)
+        rap_shift = np.log(
+            (np.hypot(self.mass, cosh * self.pt) + sinh * self.pt)
+            / np.hypot(self.mass, self.pt)
+        )
+        return self.shift_rapidity(rap_shift)
+
+    def shift_phi(
+        self, shift: ty.Union[float, base.DoubleVector]
+    ) -> "MomentumArray":
+        if isinstance(shift, float):
+            rot_op = np.exp(complex(0.0, shift))
+        else:
+            rot_op = np.exp(1.0j * shift)
+        xy_pol_shifted = rot_op * self._xy_pol
+        output = self.copy()
+        output._data[:, :2] = xy_pol_shifted.view(np.float64).reshape(-1, 2)
+        return output
+
     def delta_R(self, other: "MomentumArray") -> base.DoubleVector:
         """Calculates the Euclidean inter-particle distances,
         :math:`\\Delta R_{ij}`, in the :math:`\\eta-\\phi` plane between
