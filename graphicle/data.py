@@ -1294,6 +1294,22 @@ class MomentumArray(base.ArrayBase):
     def shift_rapidity(
         self, shift: ty.Union[float, base.DoubleVector]
     ) -> "MomentumArray":
+        """Performs a Lorentz boost to a new frame, with a rapidity
+        increased by ``shift``.
+
+        .. versionadded:: 0.2.11
+
+        Parameters
+        ----------
+        shift : float or ndarray[float64]
+            The change in rapidity. If scalar, change will be broadcast
+            over all elements. If ndarray, change will be element-wise.
+
+        Returns
+        -------
+        MomentumArray
+            Copy of this array, with the shifted rapidity value.
+        """
         output = self.copy()
         cosh = np.cosh(-shift)
         sinh = np.sinh(-shift)
@@ -1304,6 +1320,28 @@ class MomentumArray(base.ArrayBase):
     def shift_eta(
         self, shift: ty.Union[float, base.DoubleVector]
     ) -> "MomentumArray":
+        """Performs a Lorentz boost to a new frame, with a
+        pseudorapidity increased by ``shift``.
+
+        .. versionadded:: 0.2.11
+
+        Parameters
+        ----------
+        shift : float or ndarray[float64]
+            The change in pseudorapidity. If scalar, change will be
+            broadcast over all elements. If ndarray, change will be
+            element-wise.
+
+        Returns
+        -------
+        MomentumArray
+            Copy of this array, with the shifted pseudorapidity value.
+
+        Notes
+        -----
+        This currently converts ``shift`` to a rapidity, and bootstraps
+        ``shift_rapidity()``.
+        """
         cosh = np.cosh(shift)
         sinh = np.sinh(shift)
         rap_shift = np.log(
@@ -1315,6 +1353,23 @@ class MomentumArray(base.ArrayBase):
     def shift_phi(
         self, shift: ty.Union[float, base.DoubleVector]
     ) -> "MomentumArray":
+        """Performs an azimuthal rotation about the longitudinal axis,
+        by adding an angle of ``shift`` to all elements.
+
+        .. versionadded:: 0.2.11
+
+        Parameters
+        ----------
+        shift : float or ndarray[float64]
+            The change in azimuthal angle. If scalar, change will be
+            broadcast over all elements. If ndarray, change will be
+            element-wise.
+
+        Returns
+        -------
+        MomentumArray
+            Copy of this array, with the shifted azimuthal angles.
+        """
         if isinstance(shift, float):
             rot_op = np.exp(complex(0.0, shift))
         else:
