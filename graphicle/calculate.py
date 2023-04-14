@@ -5,6 +5,7 @@
 Algorithms for performing common HEP calculations using graphicle data
 structures.
 """
+import contextlib as ctx
 import math
 import typing as ty
 import warnings
@@ -357,11 +358,98 @@ def _root_diff_two_squares(
 
     Returns
     -------
-    z : ndarray | float
-        Root difference of two squares.
-        This is a scalar if both `x1` and `x2` are scalars.
+    ndarray or float
+        Root difference of two squares. This is a scalar if both `x1`
+        and `x2` are scalars.
     """
     diff = x1 - x2
     sqrt_diff = math.copysign(math.sqrt(abs(diff)), diff)
     sqrt_sum = math.sqrt(x1 + x2)
     return sqrt_diff * sqrt_sum  # type: ignore
+
+
+@nb.njit(
+    nb.float64[:, :](
+        nb.float64[:], nb.float64[:], nb.complex128[:], nb.complex128[:]
+    ),
+    fastmath=True,
+)
+def _delta_R(
+    rapidity_1: base.DoubleVector,
+    rapidity_2: base.DoubleVector,
+    xy_pol_1: base.ComplexVector,
+    xy_pol_2: base.ComplexVector,
+) -> base.DoubleVector:
+    """Numba compiled implementation of Euclidean distance function in
+    the (pseudo)rapidity-azimuth plane.
+
+    Parameters
+    ----------
+    rapidity_1, rapidity_2 : ndarray[float64]
+        (Pseudo)rapidities of the particle point clouds being compared.
+    xy_pol_1, xy_pol_2 : ndarray[complex128]
+        Momentum coordinates in the xy plane of both particle point
+        clouds being compared. These are given as complex numbers, where
+        x is real, and y is imaginary.
+
+    Returns
+    -------
+    ndarray[float64]
+        Two-dimensional array containing Euclidean distance in the
+        plane. Lengths of input point clouds are mapped to the number of
+        rows and columns, respectively.
+    """
+    drap = np.atleast_2d(rapidity_1).transpose() - rapidity_2
+    drap = np.nan_to_num(drap, copy=False, nan=0.0)
+    dphi = np.angle(np.outer(xy_pol_1, xy_pol_2.conj()))
+    return np.hypot(drap, dphi)
+
+
+@nb.njit(
+    nb.float64[:, :](nb.float64[:], nb.complex128[:]),
+    fastmath=True,
+    parallel=True,
+)
+def _delta_R_symmetric(
+    rapidity: base.DoubleVector, xy_pol: base.ComplexVector
+) -> base.DoubleVector:
+    """Secondary implementation of ``_delta_R()``, but for the special
+    case when the inter-particle distances within a single point cloud
+    are being calculated. This is more efficient than passing the same
+    arrays to ``rapidity_1`` and ``rapidity_2``, *etc*.
+
+    Parameters
+    ----------
+    rapidity : ndarray[float64]
+        (Pseudo)rapidities of the particle point cloud.
+    xy_pol : ndarray[complex128]
+        Momentum coordinates in the xy plane of the particle point
+        cloud. These are given as complex numbers, where x is real, and
+        y is imaginary.
+
+    Returns
+    -------
+    ndarray[float64]
+        Two-dimensional array representing the square symmetric matrix
+        of Euclidean distances between particles in the plane.
+    """
+    size = len(rapidity)
+    result = np.empty((size, size), dtype=np.float64)
+    for i in nb.prange(size):
+        result[i, i] = 0.0
+        for j in range(i + 1, size):
+            drap = rapidity[i] - rapidity[j]
+            drap = np.nan_to_num(drap, copy=False, nan=0.0)
+            dphi = np.angle(xy_pol[i] * xy_pol[j].conjugate())
+            result[i, j] = result[j, i] = np.hypot(drap, dphi)
+    return result
+
+
+@ctx.contextmanager
+def _thread_scope(num_threads: int):
+    prev_threads = nb.get_num_threads()
+    nb.set_num_threads(num_threads)
+    try:
+        yield None
+    finally:
+        nb.set_num_threads(prev_threads)

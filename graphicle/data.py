@@ -1379,7 +1379,9 @@ class MomentumArray(base.ArrayBase):
         output._data[:, :2] = xy_pol_shifted.view(np.float64).reshape(-1, 2)
         return output
 
-    def delta_R(self, other: "MomentumArray") -> base.DoubleVector:
+    def delta_R(
+        self, other: "MomentumArray", pseudo: bool = True, threads: int = 1
+    ) -> base.DoubleVector:
         """Calculates the Euclidean inter-particle distances,
         :math:`\\Delta R_{ij}`, in the :math:`\\eta-\\phi` plane between
         this set of particles and a provided ``other`` set. Produces a
@@ -1391,11 +1393,20 @@ class MomentumArray(base.ArrayBase):
            comparisons between arbitrary length ``MomentumArray``
            instances.
 
+        .. versionchanged:: 0.2.11
+           Added ``pseudo`` and ``threads`` parameters.
+
         Parameters
         ----------
         other : MomentumArray
             Four-momenta of the particle set to compute
             :math:`\\Delta R_{ij}` against.
+        pseudo : bool
+            If ``False``, will use the true rapidity to calculate the
+            inter-particle distances. Default is ``True``.
+        threads : int
+            Number of threads over which to parallelise the calculation.
+            Default is ``1``.
 
         Returns
         -------
@@ -1410,13 +1421,21 @@ class MomentumArray(base.ArrayBase):
         Infinite values may be encountered if comparing with particles
         not present on the :math:`\\eta-\\phi` plane, *ie.* travelling
         parallel to the beam axis.
+
+        Currently multithreading is only enabled for computing distances
+        between particles within the same point cloud, *ie.* when
+        passing the same instance to the ``other`` parameter.
         """
+        get_rapidity = op.attrgetter("eta")
+        if pseudo is False:
+            get_rapidity = op.attrgetter("rapidity")
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            deta = self.eta[:, np.newaxis] - other.eta
-            deta = np.nan_to_num(deta, nan=0.0, posinf=np.inf, neginf=-np.inf)
-        dphi = np.angle(self._xy_pol[:, np.newaxis] * other._xy_pol.conj())
-        return np.hypot(deta, dphi)
+            rap1, rap2 = get_rapidity(self), get_rapidity(other)
+        with calculate._thread_scope(threads):
+            if self is other:
+                return calculate._delta_R_symmetric(rap1, self._xy_pol)
+        return calculate._delta_R(rap1, rap2, self._xy_pol, other._xy_pol)
 
 
 @define(eq=False)
