@@ -41,6 +41,7 @@ import collections as cl
 import collections.abc as cla
 import functools as fn
 import itertools as it
+import math
 import numbers as nm
 import operator as op
 import typing as ty
@@ -1129,6 +1130,9 @@ class MomentumArray(base.ArrayBase):
     .. versionchanged:: 0.2.3
        Added ``x``, ``y``, ``z``, and ``energy`` attributes.
 
+    .. versionchanged:: 0.2.11
+       Added ``mass_t`` attribute.
+
     Parameters
     ----------
     data : ndarray[float64] or sequence of length-4 tuples of floats
@@ -1291,7 +1295,159 @@ class MomentumArray(base.ArrayBase):
             self.energy, self._spatial_mag
         ).reshape(-1)
 
-    def delta_R(self, other: "MomentumArray") -> base.DoubleVector:
+    @fn.cached_property
+    def mass_t(self) -> base.DoubleVector:
+        """Transverse component of particle mass, :math:`m_T`."""
+        return calculate._root_diff_two_squares(self.energy, self.z).reshape(
+            -1
+        )
+
+    def shift_rapidity(
+        self, shift: ty.Union[float, base.DoubleVector]
+    ) -> "MomentumArray":
+        """Performs a Lorentz boost to a new frame, with a rapidity
+        increased by ``shift``.
+
+        .. versionadded:: 0.2.11
+
+        Parameters
+        ----------
+        shift : float or ndarray[float64]
+            The change in rapidity. If scalar, change will be broadcast
+            over all elements. If ndarray, change will be element-wise.
+
+        Returns
+        -------
+        MomentumArray
+            Copy of this array, with the shifted rapidity value.
+        """
+        output = self.copy()
+        cosh = np.cosh(-shift)
+        sinh = np.sinh(-shift)
+        output.energy[...] = (cosh * self.energy) - (sinh * self.z)
+        output.z[...] = (cosh * self.z) - (sinh * self.energy)
+        return output
+
+    def shift_eta(
+        self,
+        shift: ty.Union[float, base.DoubleVector],
+        experimental: bool = False,
+        max_corrections: int = 10,
+        abs_tol: float = 1.0e-14,
+    ) -> "MomentumArray":
+        """Performs a Lorentz boost to a new frame, with a
+        pseudorapidity increased by ``shift``.
+
+        .. versionadded:: 0.2.11
+
+        Parameters
+        ----------
+        shift : float or ndarray[float64]
+            The change in pseudorapidity. If scalar, change will be
+            broadcast over all elements. If ndarray, change will be
+            element-wise.
+        experimental : bool
+            If ``True`` performs the \"experimentalist\" version of the
+            shift, *ie.* assuming all particles are massless.
+            This is not a true Lorentz boost, and so the masses of the
+            particles, and internal angles between them, will not be
+            conserved, but it may be faster to calculate, and consistent
+            with what is done in experimental analyses. The energy
+            component of the momentum will be set to ``numpy.nan``. If
+            ``False``, a true Lorentz boost is performed, iteratively
+            converging on the desired location using ``max_corrections``
+            and ``abs_tol``, and the energy component will be
+            transformed to the appropriate frame. Default is ``False``.
+        max_corrections : int
+            Maximum number of Lorentz boosts to iteratively converge
+            on the desired pseudorapidity (see notes). Default is
+            ``10``.
+        abs_tol : float
+            Maximum tolerated absolute difference between the momentum
+            in :math:`\\eta` from its desired shifted location. Default
+            is ``1.0e-14``.
+
+        Returns
+        -------
+        MomentumArray
+            Copy of this array, with the shifted pseudorapidity value.
+
+        Warns
+        -----
+        UserWarning
+            If the method is unable to converge within ``abs_tol`` after
+            ``max_corrections`` corrective iterations.
+
+        Notes
+        -----
+        With ``experimental=False``, this method bootstraps the
+        ``shift_rapidity()`` method, calling it repeatedly, and
+        recalculating the difference between the desired location in
+        :math:`\\eta` with the :math:`p_T` weighted centroid of the
+        momentum. This difference gives the correction by which to shift
+        in the next iteration. Method exits when either the
+        ``max_corrections`` iterations are exceeded, or the correction
+        falls below ``abs_tol``.
+
+        With ``experimental=True``, the pseudorapidity is simply
+        shifted, and the corresponding z-component is recalculated.
+        Energy, and attributes which rely on energy, will take a value
+        of ``np.nan``.
+        """
+        pmu = self.copy()
+        if bool(experimental) is True:
+            eta = self.eta + shift
+            pmu.z[...] = self.pt * np.sinh(eta)
+            pmu.energy[...] = np.nan
+            return pmu
+        eta_mid = calculate.pseudorapidity_centre(pmu)
+        target = eta_mid + shift
+        converged = False
+        for _ in range(max_corrections):
+            if math.isclose(eta_mid, target, rel_tol=0.0, abs_tol=abs_tol):
+                converged = True
+                break
+            correction = target - eta_mid
+            pmu = pmu.shift_rapidity(correction)
+            eta_mid = calculate.pseudorapidity_centre(pmu)
+        if converged is not True:
+            warnings.warn(
+                f"Unable to converge within a tolerance of {abs_tol}."
+            )
+        return pmu
+
+    def shift_phi(
+        self, shift: ty.Union[float, base.DoubleVector]
+    ) -> "MomentumArray":
+        """Performs an azimuthal rotation about the longitudinal axis,
+        by adding an angle of ``shift`` to all elements.
+
+        .. versionadded:: 0.2.11
+
+        Parameters
+        ----------
+        shift : float or ndarray[float64]
+            The change in azimuthal angle. If scalar, change will be
+            broadcast over all elements. If ndarray, change will be
+            element-wise.
+
+        Returns
+        -------
+        MomentumArray
+            Copy of this array, with the shifted azimuthal angles.
+        """
+        if isinstance(shift, float):
+            rot_op = np.exp(complex(0.0, shift))
+        else:
+            rot_op = np.exp(1.0j * shift)
+        xy_pol_shifted = rot_op * self._xy_pol
+        output = self.copy()
+        output._data[:, :2] = xy_pol_shifted.view(np.float64).reshape(-1, 2)
+        return output
+
+    def delta_R(
+        self, other: "MomentumArray", pseudo: bool = True, threads: int = 1
+    ) -> base.DoubleVector:
         """Calculates the Euclidean inter-particle distances,
         :math:`\\Delta R_{ij}`, in the :math:`\\eta-\\phi` plane between
         this set of particles and a provided ``other`` set. Produces a
@@ -1303,11 +1459,20 @@ class MomentumArray(base.ArrayBase):
            comparisons between arbitrary length ``MomentumArray``
            instances.
 
+        .. versionchanged:: 0.2.11
+           Added ``pseudo`` and ``threads`` parameters.
+
         Parameters
         ----------
         other : MomentumArray
             Four-momenta of the particle set to compute
             :math:`\\Delta R_{ij}` against.
+        pseudo : bool
+            If ``False``, will use the true rapidity to calculate the
+            inter-particle distances. Default is ``True``.
+        threads : int
+            Number of threads over which to parallelise the calculation.
+            Default is ``1``.
 
         Returns
         -------
@@ -1322,13 +1487,21 @@ class MomentumArray(base.ArrayBase):
         Infinite values may be encountered if comparing with particles
         not present on the :math:`\\eta-\\phi` plane, *ie.* travelling
         parallel to the beam axis.
+
+        Currently multithreading is only enabled for computing distances
+        between particles within the same point cloud, *ie.* when
+        passing the same instance to the ``other`` parameter.
         """
+        get_rapidity = op.attrgetter("eta")
+        if pseudo is False:
+            get_rapidity = op.attrgetter("rapidity")
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            deta = self.eta[:, np.newaxis] - other.eta
-            deta = np.nan_to_num(deta, nan=0.0, posinf=np.inf, neginf=-np.inf)
-        dphi = np.angle(self._xy_pol[:, np.newaxis] * other._xy_pol.conj())
-        return np.hypot(deta, dphi)
+            rap1, rap2 = get_rapidity(self), get_rapidity(other)
+        with calculate._thread_scope(threads):
+            if self is other:
+                return calculate._delta_R_symmetric(rap1, self._xy_pol)
+            return calculate._delta_R(rap1, rap2, self._xy_pol, other._xy_pol)
 
 
 @define(eq=False)

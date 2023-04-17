@@ -5,6 +5,7 @@
 Algorithms for performing common HEP calculations using graphicle data
 structures.
 """
+import contextlib as ctx
 import math
 import typing as ty
 import warnings
@@ -25,6 +26,8 @@ if ty.TYPE_CHECKING is True:
 
 __all__ = [
     "azimuth_centre",
+    "pseudorapidity_centre",
+    "rapidity_centre",
     "combined_mass",
     "flow_trace",
     "cluster_pmu",
@@ -49,19 +52,56 @@ def azimuth_centre(pmu: "MomentumArray", pt_weight: bool = True) -> float:
 
     Returns
     -------
-    azimuth : float
+    float
         The centre of the particle set in the azimuth dimension.
     """
     pol = pmu._xy_pol
     if pt_weight is True:
         pol = pol * pmu.pt
-    return float(np.angle(pol.sum()))
+    return np.angle(pol.sum()).item()
 
 
 def pseudorapidity_centre(pmu: "MomentumArray") -> float:
-    pt_norm = pmu.pt / pmu.pt.sum()
-    eta_wt_mid = (pmu.eta * pt_norm).sum()
-    return eta_wt_mid
+    """Calculates the central point in pseudorapidity for a set of
+    particles.
+
+    :group: calculate
+
+    .. versionadded:: 0.1.7
+
+    Parameters
+    ----------
+    pmu : MomentumArray
+        Four-momenta of the particles.
+
+    Returns
+    -------
+    float
+        The :math:`p_T` weighted centre of the particle set in the
+        pseudorapidity dimension.
+    """
+    return ((pmu.eta * pmu.pt).sum() / pmu.pt.sum()).item()
+
+
+def rapidity_centre(pmu: "MomentumArray") -> float:
+    """Calculates the central point in rapidity for a set of particles.
+
+    :group: calculate
+
+    .. versionadded:: 0.2.11
+
+    Parameters
+    ----------
+    pmu : MomentumArray
+        Four-momenta of the particles.
+
+    Returns
+    -------
+    float
+        The :math:`p_T` weighted centre of the particle set in the
+        rapidity dimension.
+    """
+    return (pmu.rapidity * pmu.pt).sum() / pmu.pt.sum()
 
 
 def combined_mass(
@@ -357,11 +397,104 @@ def _root_diff_two_squares(
 
     Returns
     -------
-    z : ndarray | float
-        Root difference of two squares.
-        This is a scalar if both `x1` and `x2` are scalars.
+    ndarray or float
+        Root difference of two squares. This is a scalar if both `x1`
+        and `x2` are scalars.
     """
     diff = x1 - x2
     sqrt_diff = math.copysign(math.sqrt(abs(diff)), diff)
     sqrt_sum = math.sqrt(x1 + x2)
     return sqrt_diff * sqrt_sum  # type: ignore
+
+
+@nb.njit(
+    nb.float64[:, :](
+        nb.float64[:], nb.float64[:], nb.complex128[:], nb.complex128[:]
+    ),
+    parallel=True,
+)
+def _delta_R(
+    rapidity_1: base.DoubleVector,
+    rapidity_2: base.DoubleVector,
+    xy_pol_1: base.ComplexVector,
+    xy_pol_2: base.ComplexVector,
+) -> base.DoubleVector:
+    """Numba compiled implementation of Euclidean distance function in
+    the (pseudo)rapidity-azimuth plane.
+
+    Parameters
+    ----------
+    rapidity_1, rapidity_2 : ndarray[float64]
+        (Pseudo)rapidities of the particle point clouds being compared.
+    xy_pol_1, xy_pol_2 : ndarray[complex128]
+        Momentum coordinates in the xy plane of both particle point
+        clouds being compared. These are given as complex numbers, where
+        x is real, and y is imaginary.
+
+    Returns
+    -------
+    ndarray[float64]
+        Two-dimensional array containing Euclidean distance in the
+        plane. Lengths of input point clouds are mapped to the number of
+        rows and columns, respectively.
+    """
+    size_1, size_2 = len(rapidity_1), len(rapidity_2)
+    result = np.empty((size_1, size_2), dtype=np.float64)
+    for i in nb.prange(size_1):
+        for j in range(size_2):
+            drap = rapidity_1[i] - rapidity_2[j]
+            if np.isnan(drap):
+                drap = 0.0
+            dphi = np.angle(xy_pol_1[i] * xy_pol_2[j].conjugate())
+            result[i, j] = np.hypot(drap, dphi)
+    return result
+
+
+@nb.njit(
+    nb.float64[:, :](nb.float64[:], nb.complex128[:]),
+    parallel=True,
+)
+def _delta_R_symmetric(
+    rapidity: base.DoubleVector, xy_pol: base.ComplexVector
+) -> base.DoubleVector:
+    """Secondary implementation of ``_delta_R()``, but for the special
+    case when the inter-particle distances within a single point cloud
+    are being calculated. This is more efficient than passing the same
+    arrays to ``rapidity_1`` and ``rapidity_2``, *etc*.
+
+    Parameters
+    ----------
+    rapidity : ndarray[float64]
+        (Pseudo)rapidities of the particle point cloud.
+    xy_pol : ndarray[complex128]
+        Momentum coordinates in the xy plane of the particle point
+        cloud. These are given as complex numbers, where x is real, and
+        y is imaginary.
+
+    Returns
+    -------
+    ndarray[float64]
+        Two-dimensional array representing the square symmetric matrix
+        of Euclidean distances between particles in the plane.
+    """
+    size = len(rapidity)
+    result = np.empty((size, size), dtype=np.float64)
+    for i in nb.prange(size):
+        result[i, i] = 0.0
+        for j in range(i + 1, size):
+            drap = rapidity[i] - rapidity[j]
+            if np.isnan(drap):
+                drap = 0.0
+            dphi = np.angle(xy_pol[i] * xy_pol[j].conjugate())
+            result[i, j] = result[j, i] = np.hypot(drap, dphi)
+    return result
+
+
+@ctx.contextmanager
+def _thread_scope(num_threads: int):
+    prev_threads = nb.get_num_threads()
+    nb.set_num_threads(num_threads)
+    try:
+        yield None
+    finally:
+        nb.set_num_threads(prev_threads)
