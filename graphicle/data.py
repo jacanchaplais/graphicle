@@ -1341,11 +1341,11 @@ class MomentumArray(base.ArrayBase):
             shift, *ie.* assuming all particles are massless.
             This is not a true Lorentz boost, and so the masses of the
             particles, and internal angles between them, will not be
-            conserved, but it is consistent with what is done in
-            experimental analyses. If ``False``, a true Lorentz boost is
-            performed, iteratively converging on the desired location
-            using ``max_corrections`` and ``abs_tol``. Default is
-            ``False``.
+            conserved, but it may be faster to calculate, and consistent
+            with what is done in experimental analyses. If ``False``, a
+            true Lorentz boost is performed, iteratively converging on
+            the desired location using ``max_corrections`` and
+            ``abs_tol``. Default is ``False``.
         max_corrections : int
             Maximum number of Lorentz boosts to iteratively converge
             on the desired pseudorapidity (see notes). Default is
@@ -1368,12 +1368,16 @@ class MomentumArray(base.ArrayBase):
 
         Notes
         -----
+        For analyses involving only 3-momenta after the shift, there is
+        no difference between setting ``experimental`` to ``True`` or
+        ``False``.
+
         With ``experimental=False``, this method bootstraps the
         `shift_rapidity()`` method, calling it repeatedly, and
         recalculating the difference between the desired location in
         :math:`\\eta` with the :math:`p_T` weighted centroid of the
-        momentum. This difference is a gives the correction by which to
-        shift in the next iteration. Method exits when either the
+        momentum. This difference gives the correction by which to shift
+        in the next iteration. Method exits when either the
         ``max_corrections`` iterations are exceeded, or the correction
         falls below ``abs_tol``.
 
