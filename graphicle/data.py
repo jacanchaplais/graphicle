@@ -1381,7 +1381,7 @@ class MomentumArray(base.ArrayBase):
         Notes
         -----
         With ``experimental=False``, this method bootstraps the
-        `shift_rapidity()`` method, calling it repeatedly, and
+        ``shift_rapidity()`` method, calling it repeatedly, and
         recalculating the difference between the desired location in
         :math:`\\eta` with the :math:`p_T` weighted centroid of the
         momentum. This difference gives the correction by which to shift
