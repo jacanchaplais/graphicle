@@ -478,7 +478,8 @@ def _delta_R_symmetric(
         result[i, i] = 0.0
         for j in range(i + 1, size):
             drap = rapidity[i] - rapidity[j]
-            drap = np.nan_to_num(drap, copy=False, nan=0.0)
+            if np.isnan(drap):
+                drap = 0.0
             dphi = np.angle(xy_pol[i] * xy_pol[j].conjugate())
             result[i, j] = result[j, i] = np.hypot(drap, dphi)
     return result
