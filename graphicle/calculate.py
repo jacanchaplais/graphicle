@@ -26,6 +26,8 @@ if ty.TYPE_CHECKING is True:
 
 __all__ = [
     "azimuth_centre",
+    "pseudorapidity_centre",
+    "rapidity_centre",
     "combined_mass",
     "flow_trace",
     "cluster_pmu",
@@ -50,7 +52,7 @@ def azimuth_centre(pmu: "MomentumArray", pt_weight: bool = True) -> float:
 
     Returns
     -------
-    azimuth : float
+    float
         The centre of the particle set in the azimuth dimension.
     """
     pol = pmu._xy_pol
@@ -60,10 +62,45 @@ def azimuth_centre(pmu: "MomentumArray", pt_weight: bool = True) -> float:
 
 
 def pseudorapidity_centre(pmu: "MomentumArray") -> float:
-    return (pmu.eta * pmu.pt).sum() / pmu.pt.sum()
+    """Calculates the central point in pseudorapidity for a set of
+    particles.
+
+    :group: calculate
+
+    .. versionadded:: 0.1.7
+
+    Parameters
+    ----------
+    pmu : MomentumArray
+        Four-momenta of the particles.
+
+    Returns
+    -------
+    float
+        The :math:`p_T` weighted centre of the particle set in the
+        pseudorapidity dimension.
+    """
+    return ((pmu.eta * pmu.pt).sum() / pmu.pt.sum()).item()
 
 
 def rapidity_centre(pmu: "MomentumArray") -> float:
+    """Calculates the central point in rapidity for a set of particles.
+
+    :group: calculate
+
+    .. versionadded:: 0.2.11
+
+    Parameters
+    ----------
+    pmu : MomentumArray
+        Four-momenta of the particles.
+
+    Returns
+    -------
+    float
+        The :math:`p_T` weighted centre of the particle set in the
+        rapidity dimension.
+    """
     return (pmu.rapidity * pmu.pt).sum() / pmu.pt.sum()
 
 
