@@ -1292,6 +1292,13 @@ class MomentumArray(base.ArrayBase):
             self.energy, self._spatial_mag
         ).reshape(-1)
 
+    @fn.cached_property
+    def mass_t(self) -> base.DoubleVector:
+        """Transverse component of particle mass, :math:`m_T`."""
+        return calculate._root_diff_two_squares(self.energy, self.z).reshape(
+            -1
+        )
+
     def shift_rapidity(
         self, shift: ty.Union[float, base.DoubleVector]
     ) -> "MomentumArray":
@@ -1321,6 +1328,7 @@ class MomentumArray(base.ArrayBase):
     def shift_eta(
         self,
         shift: ty.Union[float, base.DoubleVector],
+        experimental: bool = False,
         max_corrections: int = 10,
         abs_tol: float = 1.0e-14,
     ) -> "MomentumArray":
@@ -1335,6 +1343,18 @@ class MomentumArray(base.ArrayBase):
             The change in pseudorapidity. If scalar, change will be
             broadcast over all elements. If ndarray, change will be
             element-wise.
+        experimental : bool
+            If ``True`` performs the \"experimentalist\" version of the
+            shift, *ie.* assuming all particles are massless.
+            This is not a true Lorentz boost, and so the masses of the
+            particles, and internal angles between them, will not be
+            conserved, but it may be faster to calculate, and consistent
+            with what is done in experimental analyses. The energy
+            component of the momentum will be set to ``numpy.nan``. If
+            ``False``, a true Lorentz boost is performed, iteratively
+            converging on the desired location using ``max_corrections``
+            and ``abs_tol``, and the energy component will be
+            transformed to the appropriate frame. Default is ``False``.
         max_corrections : int
             Maximum number of Lorentz boosts to iteratively converge
             on the desired pseudorapidity (see notes). Default is
@@ -1357,15 +1377,26 @@ class MomentumArray(base.ArrayBase):
 
         Notes
         -----
-        This method bootstraps the `shift_rapidity()`` method, calling
-        it repeatedly, and recalculating the difference between the
-        desired location in :math:`\\eta` with the :math:`p_T` weighted
-        centroid of the momentum. This difference gives the correction
-        by which to shift in the next iteration. Method exits when
-        either the ``max_corrections`` iterations are exceeded, or the
-        correction falls below ``abs_tol``.
+        With ``experimental=False``, this method bootstraps the
+        `shift_rapidity()`` method, calling it repeatedly, and
+        recalculating the difference between the desired location in
+        :math:`\\eta` with the :math:`p_T` weighted centroid of the
+        momentum. This difference gives the correction by which to shift
+        in the next iteration. Method exits when either the
+        ``max_corrections`` iterations are exceeded, or the correction
+        falls below ``abs_tol``.
+
+        With ``experimental=True``, the pseudorapidity is simply
+        shifted, and the corresponding z-component is recalculated.
+        Energy, and attributes which rely on energy, will take a value
+        of ``np.nan``.
         """
         pmu = self.copy()
+        if bool(experimental) is True:
+            eta = self.eta + shift
+            pmu.z[...] = self.pt * np.sinh(eta)
+            pmu.energy[...] = np.nan
+            return pmu
         eta_mid = calculate.pseudorapidity_centre(pmu)
         target = eta_mid + shift
         converged = False
