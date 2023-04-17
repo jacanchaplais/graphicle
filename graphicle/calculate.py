@@ -411,7 +411,6 @@ def _root_diff_two_squares(
     nb.float64[:, :](
         nb.float64[:], nb.float64[:], nb.complex128[:], nb.complex128[:]
     ),
-    fastmath=True,
 )
 def _delta_R(
     rapidity_1: base.DoubleVector,
@@ -439,14 +438,16 @@ def _delta_R(
         rows and columns, respectively.
     """
     drap = np.atleast_2d(rapidity_1).transpose() - rapidity_2
-    drap = np.nan_to_num(drap, copy=False, nan=0.0)
+    for i in range(drap.shape[0]):
+        for j in range(drap.shape[1]):
+            if np.isnan(drap[i][j]):
+                drap[i][j] = 0.0
     dphi = np.angle(np.outer(xy_pol_1, xy_pol_2.conj()))
     return np.hypot(drap, dphi)
 
 
 @nb.njit(
     nb.float64[:, :](nb.float64[:], nb.complex128[:]),
-    fastmath=True,
     parallel=True,
 )
 def _delta_R_symmetric(
