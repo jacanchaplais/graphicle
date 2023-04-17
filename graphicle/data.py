@@ -1130,6 +1130,9 @@ class MomentumArray(base.ArrayBase):
     .. versionchanged:: 0.2.3
        Added ``x``, ``y``, ``z``, and ``energy`` attributes.
 
+    .. versionchanged:: 0.2.11
+       Added ``mass_t`` attribute.
+
     Parameters
     ----------
     data : ndarray[float64] or sequence of length-4 tuples of floats
