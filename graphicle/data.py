@@ -1501,7 +1501,7 @@ class MomentumArray(base.ArrayBase):
         with calculate._thread_scope(threads):
             if self is other:
                 return calculate._delta_R_symmetric(rap1, self._xy_pol)
-        return calculate._delta_R(rap1, rap2, self._xy_pol, other._xy_pol)
+            return calculate._delta_R(rap1, rap2, self._xy_pol, other._xy_pol)
 
 
 @define(eq=False)

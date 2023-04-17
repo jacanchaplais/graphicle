@@ -411,6 +411,7 @@ def _root_diff_two_squares(
     nb.float64[:, :](
         nb.float64[:], nb.float64[:], nb.complex128[:], nb.complex128[:]
     ),
+    parallel=True,
 )
 def _delta_R(
     rapidity_1: base.DoubleVector,
@@ -437,13 +438,16 @@ def _delta_R(
         plane. Lengths of input point clouds are mapped to the number of
         rows and columns, respectively.
     """
-    drap = np.atleast_2d(rapidity_1).transpose() - rapidity_2
-    for i in range(drap.shape[0]):
-        for j in range(drap.shape[1]):
-            if np.isnan(drap[i][j]):
-                drap[i][j] = 0.0
-    dphi = np.angle(np.outer(xy_pol_1, xy_pol_2.conj()))
-    return np.hypot(drap, dphi)
+    size_1, size_2 = len(rapidity_1), len(rapidity_2)
+    result = np.empty((size_1, size_2), dtype=np.float64)
+    for i in nb.prange(size_1):
+        for j in range(size_2):
+            drap = rapidity_1[i] - rapidity_2[j]
+            if np.isnan(drap):
+                drap = 0.0
+            dphi = np.angle(xy_pol_1[i] * xy_pol_2[j].conjugate())
+            result[i, j] = np.hypot(drap, dphi)
+    return result
 
 
 @nb.njit(
