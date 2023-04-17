@@ -56,13 +56,15 @@ def azimuth_centre(pmu: "MomentumArray", pt_weight: bool = True) -> float:
     pol = pmu._xy_pol
     if pt_weight is True:
         pol = pol * pmu.pt
-    return float(np.angle(pol.sum()))
+    return np.angle(pol.sum()).item()
 
 
 def pseudorapidity_centre(pmu: "MomentumArray") -> float:
-    pt_norm = pmu.pt / pmu.pt.sum()
-    eta_wt_mid = (pmu.eta * pt_norm).sum()
-    return eta_wt_mid
+    return (pmu.eta * pmu.pt).sum() / pmu.pt.sum()
+
+
+def rapidity_centre(pmu: "MomentumArray") -> float:
+    return (pmu.rapidity * pmu.pt).sum() / pmu.pt.sum()
 
 
 def combined_mass(

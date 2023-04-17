@@ -41,6 +41,7 @@ import collections as cl
 import collections.abc as cla
 import functools as fn
 import itertools as it
+import math
 import numbers as nm
 import operator as op
 import typing as ty
@@ -1318,7 +1319,10 @@ class MomentumArray(base.ArrayBase):
         return output
 
     def shift_eta(
-        self, shift: ty.Union[float, base.DoubleVector]
+        self,
+        shift: ty.Union[float, base.DoubleVector],
+        max_corrections: int = 10,
+        abs_tol: float = 1.0e-9,
     ) -> "MomentumArray":
         """Performs a Lorentz boost to a new frame, with a
         pseudorapidity increased by ``shift``.
@@ -1331,24 +1335,52 @@ class MomentumArray(base.ArrayBase):
             The change in pseudorapidity. If scalar, change will be
             broadcast over all elements. If ndarray, change will be
             element-wise.
+        max_corrections : int
+            Maximum number of Lorentz boosts to iteratively converge
+            on the desired pseudorapidity (see notes). Default is
+            ``10``.
+        abs_tol : float
+            Maximum tolerated absolute difference between the momentum
+            in :math:`\\eta` from its desired shifted location. Default
+            is ``1.0e-9``.
 
         Returns
         -------
         MomentumArray
             Copy of this array, with the shifted pseudorapidity value.
 
+        Warns
+        -----
+        UserWarning
+            If the method is unable to converge within ``abs_tol`` after
+            ``max_corrections`` corrective iterations.
+
         Notes
         -----
-        This currently converts ``shift`` to a rapidity, and bootstraps
-        ``shift_rapidity()``.
+        This method bootstraps the ``shift_rapidity()`` method,
+        calling it repeatedly, and recalculating the difference between
+        the desired location in :math:`\\eta` with the :math:`p_T`
+        weighted centroid of the momentum. This difference is a gives
+        the correction by which to shift in the next iteration. Method
+        exits when either the ``max_corrections`` iterations are
+        exceeded, or the correction falls below ``abs_tol``.
         """
-        cosh = np.cosh(shift)
-        sinh = np.sinh(shift)
-        rap_shift = np.log(
-            (np.hypot(self.mass, cosh * self.pt) + sinh * self.pt)
-            / np.hypot(self.mass, self.pt)
-        )
-        return self.shift_rapidity(rap_shift)
+        pmu = self.copy()
+        eta_mid = calculate.pseudorapidity_centre(pmu)
+        target = eta_mid + shift
+        converged = False
+        for _ in range(max_corrections):
+            if math.isclose(eta_mid, target, rel_tol=0.0, abs_tol=abs_tol):
+                converged = True
+                break
+            correction = target - eta_mid
+            pmu = pmu.shift_rapidity(correction)
+            eta_mid = calculate.pseudorapidity_centre(pmu)
+        if converged is not True:
+            warnings.warn(
+                f"Unable to converge within a tolerance of {abs_tol}."
+            )
+        return pmu
 
     def shift_phi(
         self, shift: ty.Union[float, base.DoubleVector]
