@@ -970,7 +970,7 @@ class PdgArray(base.ArrayBase):
         Parameters
         ----------
         names: str or iterable[str]
-            String representation(s) of particle names.
+            String representation of particle names.
 
         Returns
         -------
@@ -980,7 +980,7 @@ class PdgArray(base.ArrayBase):
         Raises
         ------
         ValueError
-            If ``names`` is not the appropriate type, or are not
+            If ``names`` are not the appropriate type, or are not
             recognised.
         """
         if not isinstance(names, str) and isinstance(names, cla.Iterable):
