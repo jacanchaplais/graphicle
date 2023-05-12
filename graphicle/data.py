@@ -960,6 +960,52 @@ class PdgArray(base.ArrayBase):
     __mega_to_giga: float = field(init=False, repr=False)
     _HANDLED_TYPES = field(init=False, repr=False)
 
+    @classmethod
+    def from_name(cls, names: ty.Union[str, ty.Iterable[str]]) -> "PdgArray":
+        """Instantiates ``PdgArray`` using string representations of
+        particle names, instead of integer valued PDG codes.
+
+        .. versionadded:: 0.2.12
+
+        Parameters
+        ----------
+        names: str or iterable[str]
+            String representation(s) of particle names.
+
+        Returns
+        -------
+        PdgArray
+            Instance constructed from names.
+
+        Raises
+        ------
+        ValueError
+            If ``names`` is not the appropriate type, or are not
+            recognised.
+        """
+        if not isinstance(names, str) and isinstance(names, cla.Iterable):
+            names = list(names)
+            if not all(map(op.is_, map(type, names), it.repeat(str))):
+                raise ValueError(
+                    "When passing an iterable as names, all elements must be "
+                    "of type str."
+                )
+        elif not isinstance(names, cla.Iterable):
+            raise ValueError(
+                "names must be either a string, or iterable of strings."
+            )
+        try:
+            pdgs = (
+                _LOOKUP_TABLE.table["name"]
+                .reset_index()
+                .set_index("name")
+                .loc[names]
+                .values.reshape(-1)
+            )
+        except KeyError as e:
+            raise ValueError("Some names were not recognised.") from e
+        return cls(pdgs)
+
     def __attrs_post_init__(self) -> None:
         self.__mega_to_giga: float = 1.0e-3
         self.dtype = self._data.dtype
@@ -1054,7 +1100,7 @@ class PdgArray(base.ArrayBase):
             np.isin(data, target, assume_unique=False, invert=blacklist)
         )
 
-    def __get_prop(self, field: str) -> base.VoidVector:
+    def __get_prop(self, field: str) -> base.AnyVector:
         props = _LOOKUP_TABLE.properties(self.data, [field])[field]
         return props  # type: ignore
 
