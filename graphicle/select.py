@@ -689,6 +689,10 @@ def hierarchy(
 
     .. versionadded:: 0.1.11
 
+    .. versionchanged:: 0.2.13
+       Patch: works for hard processes with no intermediate states,
+       *eg.* ``g g > j j``.
+
     Parameters
     ----------
     graph : Graphicle
@@ -765,6 +769,8 @@ def hierarchy(
         desc = hard_descendants(graph)
     else:
         desc = desc.copy()
+    if not np.any(hard_mask["intermediate"]):
+        return desc
     hard_desc = desc[hard_mask][list(names)]
     hard = _flat_hierarchy(hard_desc)
     keys = set(hard.keys())
