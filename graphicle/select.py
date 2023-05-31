@@ -689,6 +689,10 @@ def hierarchy(
 
     .. versionadded:: 0.1.11
 
+    .. versionchanged:: 0.2.13
+       Patch: works for hard processes with no intermediate states,
+       *eg.* ``g g > j j``.
+
     Parameters
     ----------
     graph : Graphicle
