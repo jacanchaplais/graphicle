@@ -823,7 +823,6 @@ class MaskGroup(base.MaskBase, ty.MutableMapping[str, MaskGeneric]):
         self, key: str = "latent", inplace: bool = False
     ) -> "MaskGroup":
         """Removes masks indexed by ``key`` at all levels of nesting.
-        Operation is performed inplace.
 
         .. versionadded:: 0.2.8
 
