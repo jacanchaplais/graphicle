@@ -765,6 +765,8 @@ def hierarchy(
         desc = hard_descendants(graph)
     else:
         desc = desc.copy()
+    if not np.any(hard_mask["intermediate"]):
+        return desc
     hard_desc = desc[hard_mask][list(names)]
     hard = _flat_hierarchy(hard_desc)
     keys = set(hard.keys())
