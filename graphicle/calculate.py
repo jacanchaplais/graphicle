@@ -505,10 +505,12 @@ def _thread_scope(num_threads: int):
 
 
 def aggregate_momenta(
-    pmu: "MomentumArray", clusters: ty.Iterable["MaskArray"]
+    pmu: "MomentumArray", cluster_masks: ty.Iterable["MaskArray"]
 ) -> "MomentumArray":
     """Calculates the aggregate momenta for a sequence of clusters over
     the same point cloud of particles.
+
+    :group: calculate
 
     .. versionadded:: 0.2.14
 
@@ -516,9 +518,9 @@ def aggregate_momenta(
     ----------
     pmu : MomentumArray
         Four-momenta of particles in the point cloud.
-    clusters : Iterable[MaskArray]
-        Iterable of boolean masks identifying which particles belong
-        to each of the clusterings.
+    cluster_masks : Iterable[MaskArray]
+        Iterable of boolean masks identifying which particles belong to
+        each of the clusterings.
 
     Returns
     -------
@@ -527,6 +529,6 @@ def aggregate_momenta(
         each cluster, in the same order passed via ``clusters``.
     """
     momentum_class = type(pmu)
-    pmus = map(fn.partial(op.getitem, pmu), clusters)
+    pmus = map(fn.partial(op.getitem, pmu), cluster_masks)
     pmu_sums = map(fn.partial(np.sum, axis=0), pmus)
     return momentum_class(list(it.chain.from_iterable(pmu_sums)))

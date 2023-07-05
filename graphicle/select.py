@@ -36,6 +36,7 @@ __all__ = [
     "color_singlets",
     "clusters",
     "arg_closest",
+    "monte_carlo_tag",
 ]
 
 
@@ -1133,6 +1134,8 @@ def arg_closest(
     four-momenta elements in ``focus``. Elements in ``candidate`` are
     assigned to one element in ``focus`` only.
 
+    :group: select
+
     .. versionadded:: 0.2.14
 
     Parameters
@@ -1165,3 +1168,61 @@ def arg_closest(
     """
     _, idxs = opt.linear_sum_assignment(focus.delta_R(candidate, pseudo=False))
     return idxs.tolist()
+
+
+def monte_carlo_tag(
+    particles: gcl.ParticleSet,
+    cluster_masks: ty.List[gcl.MaskArray],
+    blacklist: ty.Sequence[int],
+    sign_sensitive: bool = True,
+    intermediate: bool = False,
+) -> gcl.MaskGroup[gcl.MaskArray]:
+    """Selects and tags a subset of passed ``cluster_masks`` with
+    Monte-Carlo truth data to the closest outgoing partons of the hard
+    process.
+
+    :group: select
+
+    .. versionadded:: 0.2.14
+
+    Parameters
+    ----------
+    particles : ParticleSet
+        Monte-Carlo particle data record for the event.
+    cluster_masks : list[MaskArray]
+        List of boolean masks identifying which particles belong to each
+        of the clusterings.
+    blacklist : Sequence[int]
+        A sequence of PDG codes, identifying particles in the hard
+        process which should not be assigned a cluster.
+    sign_sensitive : bool
+        If ``False``, the sign of PDG codes in the ``blacklist`` are
+        ignored. **ie.** Particles and anti-particles are not
+        distinguished. Default is ``True``.
+    intermediate : bool
+        If ``True`` includes partons from the intermediate stage of the
+        hard process. Default is ``False``.
+
+    Returns
+    -------
+    MaskGroup[MaskArray]
+        Mapping of the particle names within the hard process to the
+        assigned closest clusters, with ``agg_op=OR``.
+    """
+    portions = ["outgoing"]
+    if intermediate:
+        portions += ["intermediate"]
+    process_pcls = particles[particles.status.hard_mask[portions]]
+    process_pdg = process_pcls.pdg
+    if not sign_sensitive:
+        process_pdg = np.abs(process_pdg)
+    hard_mask = np.isin(process_pdg, blacklist, invert=True)
+    hard_pmu = process_pcls.pmu[hard_mask]
+    hard_pdg = process_pcls.pdg[hard_mask]
+    cluster_pmu = gcl.calculate.aggregate_momenta(
+        particles.pmu[particles.final], cluster_masks
+    )
+    idxs = arg_closest(hard_pmu, cluster_pmu)
+    names = _pdgs_to_keys(hard_pdg)
+    tagged_clusters = op.itemgetter(*idxs)(cluster_masks)
+    return gcl.MaskGroup(dict(zip(names, tagged_clusters)), agg_op="or")
