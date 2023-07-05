@@ -14,6 +14,7 @@ import numpy as np
 import numpy.lib.recfunctions as rfn
 import pandas as pd
 import pyjet
+import scipy.optimize as opt
 from pyjet import ClusterSequence, PseudoJet
 from scipy.sparse.csgraph import breadth_first_tree
 
@@ -34,6 +35,7 @@ __all__ = [
     "centroid_prune",
     "color_singlets",
     "clusters",
+    "arg_closest",
 ]
 
 
@@ -1122,3 +1124,44 @@ def clusters(
     return gcl.MaskGroup(
         cl.OrderedDict(zip(flat_hier.keys(), flat_hier_final)), agg_op="or"
     )
+
+
+def arg_closest(
+    focus: gcl.MomentumArray, candidate: gcl.MomentumArray
+) -> ty.List[int]:
+    """Assigns four-momenta elements in ``candidate`` to the nearest
+    four-momenta elements in ``focus``. Elements in ``candidate`` are
+    assigned to one element in ``focus`` only.
+
+    .. versionadded:: 0.2.14
+
+    Parameters
+    ----------
+    focus : MomentumArray
+        Four-momenta of objects to receive assignments to nearest
+        ``candidate`` objects.
+    candidate : MomentumArray
+        Four-momenta of candidate objects to draw from until ``focus``
+        objects have each received an assignment.
+
+    Returns
+    -------
+    list[int]
+        Indices of elements in ``candidate`` assigned to each respective
+        element in ``focus``. This list will be the same length as
+        ``focus``.
+
+    Notes
+    -----
+    Since only one ``focus`` element can receive a given ``candidate``
+    element, this must be regarded a cost-minimisation problem. The
+    costs here are the distances in the azimuth-rapidity plane between
+    elements. To illustrate, if one ``candidate`` element is the closest
+    for two ``focus`` elements, it must be assigned to the smaller
+    distance of the two, and the remaining ``focus`` element must be
+    assigned the next-nearest ``candidate`` element. This is equivalent
+    to the Assignment Problem for a complete bipartite graph, and uses
+    SciPy's modified **Jonker-Volgenant algorithm** under the hood.
+    """
+    _, idxs = opt.linear_sum_assignment(focus.delta_R(candidate, pseudo=False))
+    return idxs.tolist()
