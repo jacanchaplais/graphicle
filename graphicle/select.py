@@ -1223,6 +1223,9 @@ def monte_carlo_tag(
         If ``intermediate`` and ``outgoing`` are simultaneously set to
         ``False``, or ``blacklist`` and ``whitelist`` are simultaneously
         not ``None``.
+    IndexError
+        If after applying ``blacklist`` or ``whitelist``, no matching
+        partons remain in the hard process.
     """
     portions = []
     if outgoing:
@@ -1244,6 +1247,8 @@ def monte_carlo_tag(
             hard_pdg_ = np.abs(hard_pdg_)
             list_ = np.abs(list_)
         hard_mask = np.isin(hard_pdg_, list_, invert=(whitelist is None))
+        if not np.any(hard_mask):
+            raise IndexError("No partons matching filters found.")
         hard_pmu = hard_pmu[hard_mask]
         hard_pdg = hard_pdg[hard_mask]
     cluster_pmu = gcl.calculate.aggregate_momenta(
