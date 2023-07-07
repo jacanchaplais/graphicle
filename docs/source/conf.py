@@ -58,7 +58,12 @@ extensions = [
     "sphinx_immaterial",
     "sphinx_immaterial.apidoc.python.apigen",
     "sphinx.ext.linkcode",
+    "sphinx.ext.extlinks",
 ]
+
+extlinks = {
+    "doi": ("https://dx.doi.org/%s", "doi:%s"),
+}
 
 autoapi_dirs = [proj_dir]
 autodoc_default_options = {
