@@ -6,7 +6,10 @@ Algorithms for performing common HEP calculations using graphicle data
 structures.
 """
 import contextlib as ctx
+import functools as fn
+import itertools as it
 import math
+import operator as op
 import typing as ty
 import warnings
 from functools import lru_cache, partial
@@ -31,6 +34,7 @@ __all__ = [
     "combined_mass",
     "flow_trace",
     "cluster_pmu",
+    "aggregate_momenta",
 ]
 
 
@@ -498,3 +502,33 @@ def _thread_scope(num_threads: int):
         yield None
     finally:
         nb.set_num_threads(prev_threads)
+
+
+def aggregate_momenta(
+    pmu: "MomentumArray", cluster_masks: ty.Iterable["MaskArray"]
+) -> "MomentumArray":
+    """Calculates the aggregate momenta for a sequence of clusters over
+    the same point cloud of particles.
+
+    :group: calculate
+
+    .. versionadded:: 0.2.14
+
+    Parameters
+    ----------
+    pmu : MomentumArray
+        Four-momenta of particles in the point cloud.
+    cluster_masks : Iterable[MaskArray]
+        Iterable of boolean masks identifying which particles belong to
+        each of the clusterings.
+
+    Returns
+    -------
+    MomentumArray
+        Where each element represents the sum aggregate four-momenta of
+        each cluster, in the same order passed via ``clusters``.
+    """
+    momentum_class = type(pmu)
+    pmus = map(fn.partial(op.getitem, pmu), cluster_masks)
+    pmu_sums = map(fn.partial(np.sum, axis=0), pmus)
+    return momentum_class(list(it.chain.from_iterable(pmu_sums)))

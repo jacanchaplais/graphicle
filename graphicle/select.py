@@ -14,6 +14,7 @@ import numpy as np
 import numpy.lib.recfunctions as rfn
 import pandas as pd
 import pyjet
+import scipy.optimize as opt
 from pyjet import ClusterSequence, PseudoJet
 from scipy.sparse.csgraph import breadth_first_tree
 
@@ -34,6 +35,8 @@ __all__ = [
     "centroid_prune",
     "color_singlets",
     "clusters",
+    "arg_closest",
+    "monte_carlo_tag",
 ]
 
 
@@ -1122,3 +1125,192 @@ def clusters(
     return gcl.MaskGroup(
         cl.OrderedDict(zip(flat_hier.keys(), flat_hier_final)), agg_op="or"
     )
+
+
+def arg_closest(
+    focus: gcl.MomentumArray, candidate: gcl.MomentumArray
+) -> ty.List[int]:
+    """Assigns four-momenta elements in ``candidate`` to the nearest
+    four-momenta elements in ``focus``. Elements in ``candidate`` are
+    assigned to one element in ``focus`` only.
+
+    :group: select
+
+    .. versionadded:: 0.2.14
+
+    Parameters
+    ----------
+    focus : MomentumArray
+        Four-momenta of objects to receive assignments to nearest
+        ``candidate`` objects.
+    candidate : MomentumArray
+        Four-momenta of candidate objects to draw from until ``focus``
+        objects have each received an assignment.
+
+    Returns
+    -------
+    list[int]
+        Indices of elements in ``candidate`` assigned to each respective
+        element in ``focus``. This will be the same length as ``focus``.
+
+    See Also
+    --------
+    monte_carlo_tag : MC truth parton assignment to particle clustering.
+
+    Notes
+    -----
+    Since only one ``focus`` element can receive a given ``candidate``
+    element, this must be regarded a cost-minimisation problem. The
+    costs here are the distances in the azimuth-rapidity plane between
+    elements. To illustrate, if one ``candidate`` element is the closest
+    for two ``focus`` elements, it must be assigned to the smaller
+    distance of the two, and the remaining ``focus`` element must be
+    assigned the next-nearest ``candidate`` element. This is equivalent
+    to the Assignment Problem [1]_ for a complete bipartite graph, and
+    uses SciPy's modified *Jonker-Volgenant algorithm* with no
+    initialisation ref. [2]_ under the hood.
+
+    References
+    ----------
+    .. [1] https://en.wikipedia.org/wiki/Assignment_problem
+
+    .. [2] DF Crouse. On implementing 2D rectangular assignment
+       algorithms. *IEEE Transactions on Aerospace and Electronic
+       Systems*, 52(4):1679-1696, August 2016,
+       :doi:`10.1109/TAES.2016.140952`
+    """
+    _, idxs = opt.linear_sum_assignment(focus.delta_R(candidate, pseudo=False))
+    return idxs.tolist()
+
+
+def monte_carlo_tag(
+    particles: gcl.ParticleSet,
+    cluster_masks: ty.List[gcl.MaskArray],
+    intermediate: bool = False,
+    outgoing: bool = True,
+    sign_sensitive: bool = False,
+    blacklist: ty.Optional[ty.Sequence[int]] = None,
+    whitelist: ty.Optional[ty.Sequence[int]] = None,
+) -> gcl.MaskGroup[gcl.MaskArray]:
+    """Assigns clusters to nearest Monte-Carlo truth partons in the hard
+    process. Clusters are drawn from ``cluster_masks``, until each
+    each parton is assigned.
+
+    :group: select
+
+    .. versionadded:: 0.2.14
+
+    Parameters
+    ----------
+    particles : ParticleSet
+        Monte-Carlo particle data record for the whole event.
+    cluster_masks : list[MaskArray]
+        List of boolean masks identifying which particles belong to each
+        of the clusterings. These are defined over the final particles.
+    intermediate : bool
+        If ``True`` includes partons from the intermediate stage of the
+        hard process. Default is ``False``.
+    outgoing : bool
+        If ``True`` includes partons from the outgoing stage of the
+        hard process. Default is ``True``.
+    sign_sensitive : bool
+        If ``False``, the sign of PDG codes in the ``blacklist`` are
+        ignored. **ie.** Particles and anti-particles are not
+        distinguished. Default is ``False``.
+    blacklist : Sequence[int], optional
+        A sequence of PDG codes, identifying particles in the hard
+        process which should not be assigned a cluster.
+    whitelist : Sequence[int], optional
+        A sequence of PDG codes, identifying particles in the hard
+        process which exclusively should be assigned clusters.
+
+    Returns
+    -------
+    MaskGroup[MaskArray]
+        Mapping of the particle names within the hard process to the
+        assigned closest clusters, with ``agg_op=OR``.
+
+    Raises
+    ------
+    ValueError
+        If ``intermediate`` and ``outgoing`` are simultaneously set to
+        ``False``, or ``blacklist`` and ``whitelist`` are simultaneously
+        not ``None``.
+    IndexError
+        If after applying ``blacklist`` or ``whitelist``, no matching
+        partons remain in the hard process.
+
+    See Also
+    --------
+    arg_closest : indices of closest 4-momenta objects between two sets.
+
+    Examples
+    --------
+    Boosted top decay, clustered with anti-kt, and tagged with MC truth:
+
+        >>> print(gcl.select.hierarchy(graph))  # hard process tree
+        MaskGroup(agg_op=OR)
+        ├── W+
+        │   ├── e+
+        │   ├── nu(e)
+        │   └── latent
+        └── t~
+            ├── W-
+            │   ├── d
+            │   ├── u~
+            │   └── latent
+            ├── b~
+            └── latent
+        >>> final_pmu = graph.pmu[graph.final]
+        ... clusters = gcl.select.fastjet_clusters(  # anti-kt clusters
+        ...     pmu=final_pmu,
+        ...     radius=0.3,
+        ...     p_val=-1,
+        ...     eta_cut=3.0,
+        ...     pt_cut=10.0,
+        ...     top_k=10,
+        ... )
+        ... tagged_clusters = gcl.select.monte_carlo_tag(
+        ...     particles=graph.particles,
+        ...     cluster_masks=clusters,
+        ...     blacklist=[11, 12],
+        ... )
+        ... tagged_clusters  # subset of anti-kt tagged to MC truth
+        MaskGroup(masks=["b~", "d", "u~"], agg_op=OR)
+        >>> # calculate combined mass of clusters from top quark
+        ... np.sum(final_pmu[tagged_clusters], axis=0).mass
+        array([163.33889956])
+    """
+    portions = []
+    if outgoing:
+        portions.append("outgoing")
+    if intermediate:
+        portions.append("intermediate")
+    if not portions:
+        raise ValueError(
+            "At least one of either intermediate or outgoing must be True."
+        )
+    portion_mask = particles.status.hard_mask[portions].data
+    hard_pmu = particles.pmu[portion_mask]
+    hard_pdg = particles.pdg[portion_mask]
+    if blacklist and whitelist:
+        raise ValueError("Cannot simultaneously blacklist and whitelist.")
+    if list_ := (blacklist or whitelist):
+        hard_pdg_ = hard_pdg
+        if not sign_sensitive:
+            hard_pdg_ = np.abs(hard_pdg_)
+            list_ = np.abs(list_)
+        hard_mask = np.isin(hard_pdg_, list_, invert=(whitelist is None))
+        if not np.any(hard_mask):
+            raise IndexError("No partons matching filters found.")
+        hard_pmu = hard_pmu[hard_mask]
+        hard_pdg = hard_pdg[hard_mask]
+    cluster_pmu = gcl.calculate.aggregate_momenta(
+        particles.pmu[particles.final], cluster_masks
+    )
+    idxs = arg_closest(hard_pmu, cluster_pmu)
+    tagged_clusters = op.itemgetter(*idxs)(cluster_masks)
+    if len(idxs) == 1:
+        tagged_clusters = (tagged_clusters,)
+    names = _pdgs_to_keys(hard_pdg)
+    return gcl.MaskGroup(dict(zip(names, tagged_clusters)), agg_op="or")
