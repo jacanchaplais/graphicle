@@ -1151,8 +1151,11 @@ def arg_closest(
     -------
     list[int]
         Indices of elements in ``candidate`` assigned to each respective
-        element in ``focus``. This list will be the same length as
-        ``focus``.
+        element in ``focus``. This will be the same length as ``focus``.
+
+    See Also
+    --------
+    monte_carlo_tag : MC truth parton assignment to particle clustering.
 
     Notes
     -----
@@ -1163,8 +1166,18 @@ def arg_closest(
     for two ``focus`` elements, it must be assigned to the smaller
     distance of the two, and the remaining ``focus`` element must be
     assigned the next-nearest ``candidate`` element. This is equivalent
-    to the Assignment Problem for a complete bipartite graph, and uses
-    SciPy's modified **Jonker-Volgenant algorithm** under the hood.
+    to the Assignment Problem [1]_ for a complete bipartite graph, and
+    uses SciPy's modified *Jonker-Volgenant algorithm* with no
+    initialisation ref. [2]_ under the hood.
+
+    References
+    ----------
+    .. [1] https://en.wikipedia.org/wiki/Assignment_problem
+
+    .. [2] DF Crouse. On implementing 2D rectangular assignment
+       algorithms. *IEEE Transactions on Aerospace and Electronic
+       Systems*, 52(4):1679-1696, August 2016,
+       :doi:`10.1109/TAES.2016.140952`
     """
     _, idxs = opt.linear_sum_assignment(focus.delta_R(candidate, pseudo=False))
     return idxs.tolist()
@@ -1175,13 +1188,13 @@ def monte_carlo_tag(
     cluster_masks: ty.List[gcl.MaskArray],
     intermediate: bool = False,
     outgoing: bool = True,
-    sign_sensitive: bool = True,
+    sign_sensitive: bool = False,
     blacklist: ty.Optional[ty.Sequence[int]] = None,
     whitelist: ty.Optional[ty.Sequence[int]] = None,
 ) -> gcl.MaskGroup[gcl.MaskArray]:
-    """Selects and tags a subset of passed ``cluster_masks`` with
-    Monte-Carlo truth data to the closest outgoing partons of the hard
-    process.
+    """Assigns clusters to nearest Monte-Carlo truth partons in the hard
+    process. Clusters are drawn from ``cluster_masks``, until each
+    each parton is assigned.
 
     :group: select
 
@@ -1190,10 +1203,10 @@ def monte_carlo_tag(
     Parameters
     ----------
     particles : ParticleSet
-        Monte-Carlo particle data record for the event.
+        Monte-Carlo particle data record for the whole event.
     cluster_masks : list[MaskArray]
         List of boolean masks identifying which particles belong to each
-        of the clusterings.
+        of the clusterings. These are defined over the final particles.
     intermediate : bool
         If ``True`` includes partons from the intermediate stage of the
         hard process. Default is ``False``.
@@ -1203,7 +1216,7 @@ def monte_carlo_tag(
     sign_sensitive : bool
         If ``False``, the sign of PDG codes in the ``blacklist`` are
         ignored. **ie.** Particles and anti-particles are not
-        distinguished. Default is ``True``.
+        distinguished. Default is ``False``.
     blacklist : Sequence[int], optional
         A sequence of PDG codes, identifying particles in the hard
         process which should not be assigned a cluster.
@@ -1226,6 +1239,47 @@ def monte_carlo_tag(
     IndexError
         If after applying ``blacklist`` or ``whitelist``, no matching
         partons remain in the hard process.
+
+    See Also
+    --------
+    arg_closest : indices of closest 4-momenta objects between two sets.
+
+    Examples
+    --------
+    Boosted top decay, clustered with anti-kt, and tagged with MC truth:
+
+        >>> print(gcl.select.hierarchy(graph))  # hard process tree
+        MaskGroup(agg_op=OR)
+        ├── W+
+        │   ├── e+
+        │   ├── nu(e)
+        │   └── latent
+        └── t~
+            ├── W-
+            │   ├── d
+            │   ├── u~
+            │   └── latent
+            ├── b~
+            └── latent
+        >>> final_pmu = graph.pmu[graph.final]
+        ... clusters = gcl.select.fastjet_clusters(  # anti-kt clusters
+        ...     pmu=final_pmu,
+        ...     radius=0.3,
+        ...     p_val=-1,
+        ...     eta_cut=3.0,
+        ...     pt_cut=10.0,
+        ...     top_k=10,
+        ... )
+        ... tagged_clusters = gcl.select.monte_carlo_tag(
+        ...     particles=graph.particles,
+        ...     cluster_masks=clusters,
+        ...     blacklist=[11, 12],
+        ... )
+        ... tagged_clusters  # subset of anti-kt tagged to MC truth
+        MaskGroup(masks=["b~", "d", "u~"], agg_op=OR)
+        >>> # calculate combined mass of clusters from top quark
+        ... np.sum(final_pmu[tagged_clusters], axis=0).mass
+        array([163.33889956])
     """
     portions = []
     if outgoing:
