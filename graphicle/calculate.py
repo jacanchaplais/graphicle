@@ -280,9 +280,9 @@ def flow_trace(
             list(target), blacklist=False, sign_sensitive=True
         )
         hard_graph = hard_graph[target_mask]
-    names, vtxs = tuple(hard_graph.pdg.name), tuple(hard_graph.edges["out"])
+    names, vtxs = tuple(hard_graph.pdg.name), tuple(hard_graph.edges["dst"])
     # out vertices of user specified particles
-    focus_pcls = graph.edges[mask]["out"]
+    focus_pcls = graph.edges[mask]["dst"]
     trc = np.array(
         [
             _trace_vector(

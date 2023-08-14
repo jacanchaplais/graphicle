@@ -194,8 +194,8 @@ def find_vertex(
                 aggfunc=lambda x: tuple(x.to_list()),
             )
 
-        pcls_in = vtx_pdg_pivot("in")
-        pcls_out = vtx_pdg_pivot("out")
+        pcls_in = vtx_pdg_pivot("src")
+        pcls_out = vtx_pdg_pivot("dst")
         # join in and out vertex pdgs into single dataframe
         vtxs = pcls_out.join(
             pcls_in, how="outer", lsuffix="_in", rsuffix="_out"
@@ -246,9 +246,9 @@ def vertex_descendants(adj: gcl.AdjacencyList, vertex: int) -> gcl.MaskArray:
         Boolean mask over the graphicle objects associated with the
         passed AdjacencyList.
     """
-    vertex_mask = adj.edges["in"] == vertex
+    vertex_mask = adj.edges["src"] == vertex
     if not np.any(vertex_mask):
-        return gcl.MaskArray(adj.edges["out"] == vertex)
+        return gcl.MaskArray(adj.edges["dst"] == vertex)
     sparse = adj._sparse_signed
     vertex = sparse.row[vertex_mask][0]
     bft = breadth_first_tree(adj._sparse_csr, vertex)
@@ -308,7 +308,7 @@ def hadron_vertices(
         Indices of the hadronisation vertices in the generation DAG,
         returned in no particular order.
     """
-    vtx_arr = np.unique(adj.edges[status.in_range(80, 90)]["in"])
+    vtx_arr = np.unique(adj.edges[status.in_range(80, 90)]["src"])
     return tuple(map(int, vtx_arr))
 
 
@@ -335,7 +335,7 @@ def _hadron_vtx_parton_iter(
         vertices which have radiation from the hard process incident.
     """
     vtxs = hadron_vertices(adj, status)
-    in_parton_masks = map(np.equal, vtxs, it.repeat(adj.edges["out"]))
+    in_parton_masks = map(np.equal, vtxs, it.repeat(adj.edges["dst"]))
     in_parton_masks, in_parton_masks_ = it.tee(in_parton_masks)
     hard_overlap = map(np.bitwise_and, in_parton_masks_, it.repeat(from_hard))
     has_hard_incident = map(np.any, hard_overlap)
@@ -432,7 +432,7 @@ def partition_descendants(
         vtx_desc = vertex_descendants(graph.adj, vtx_id)
         for name, branch in hier.items():
             for _, mask in _leaf_mask_iter(name, branch):
-                if vtx_id not in graph.edges["out"][mask]:
+                if vtx_id not in graph.edges["dst"][mask]:
                     continue
                 mask.data = _partition_vertex(
                     mask,
@@ -671,7 +671,7 @@ def hard_descendants(
             raise ValueError(f"Missing PDGs in hard process: {missing_str}.")
         hard_graph = hard_graph[target_mask]
     pdg_keys = _pdgs_to_keys(hard_graph.pdg)
-    pcl_out_vtxs = map(int, hard_graph.edges["out"])
+    pcl_out_vtxs = map(int, hard_graph.edges["dst"])
     descs = map(vertex_descendants, it.repeat(graph.adj), pcl_out_vtxs)
     group = gcl.MaskGroup(cl.OrderedDict(zip(pdg_keys, descs)), agg_op="or")
     for key, idx in zip(pdg_keys, np.flatnonzero(hard_mask)):
@@ -832,8 +832,8 @@ def _make_tree(
                 )
             else:
                 mask = desc[parton]
-                in_edge = adj.edges["in"][mask][0]
-                initial_parton_mask = adj.edges["out"] == in_edge
+                in_edge = adj.edges["src"][mask][0]
+                initial_parton_mask = adj.edges["dst"] == in_edge
                 if np.sum(initial_parton_mask) == 1:
                     mask.data[initial_parton_mask] = True
                 branch[parton] = mask

@@ -94,7 +94,9 @@ DHUGE = np.finfo(np.dtype("<f8")).max * 0.1
 def _map_invert(mapping: ty.Dict[str, ty.Set[str]]) -> ty.Dict[str, str]:
     return dict(
         it.chain.from_iterable(
-            map(it.product, mapping.values(), mapping.keys())
+            it.starmap(
+                lambda key, val: zip(val, it.repeat(key)), mapping.items()
+            )
         )
     )
 
@@ -104,12 +106,12 @@ _MOMENTUM_MAP = _map_invert(
         "x": {"x", "px"},
         "y": {"y", "py"},
         "z": {"z", "pz"},
-        "e": {"e", "pe", "tau", "t"},
+        "e": {"e", "pe"},
     }
 )
 _MOMENTUM_ORDER = tuple("xyze")
-_EDGE_MAP = _map_invert({"in": {"in", "src"}, "out": {"out", "dst"}})
-_EDGE_ORDER = ("in", "out")
+_EDGE_MAP = _map_invert({"src": {"in", "src"}, "dst": {"out", "dst"}})
+_EDGE_ORDER = ("src", "dst")
 
 
 class MomentumElement(ty.NamedTuple):
@@ -297,6 +299,20 @@ def _reorder_pmu(array: base.VoidVector) -> base.VoidVector:
     return array[name_reorder]
 
 
+def _reorder_edges(array: base.VoidVector) -> base.VoidVector:
+    """Ensures passed structured arrays of COO edges have their fields
+    mapped in the same order as graphicle's ``AdjacencyList`` underlying
+    convention.
+    """
+    names = array.dtype.names
+    assert names is not None
+    if names == _EDGE_ORDER:
+        return array
+    gcl_to_ext = dict(zip(map(_EDGE_MAP.__getitem__, names), names))
+    name_reorder = list(map(gcl_to_ext.__getitem__, _EDGE_ORDER))
+    return array[name_reorder]
+
+
 def _row_contiguous(func: ty.Callable[..., base.AnyVector]):
     """Decorator to ensure that numpy arrays returned from functions are
     row-contiguous.
@@ -349,6 +365,8 @@ def _array_field(dtype: npt.DTypeLike, num_cols: int = 1):
             assert names is not None
             if num_cols == 4:
                 values = _reorder_pmu(values)
+            elif (num_cols == 2) and (set(_EDGE_MAP.keys()) & set(names)):
+                values = _reorder_edges(values)
             values = rfn.structured_to_unstructured(values)
         array = np.asarray(values, dtype=dtype)
         shape = array.shape
@@ -2038,6 +2056,9 @@ class AdjacencyList(base.AdjacencyBase):
     .. versionchanged:: 0.2.4
        Added internal numpy interfaces for greater interoperability.
 
+    .. versionchanged:: 0.3.0
+       Renamed "in" / "out" fields to "src" / "dst".
+
     Parameters
     ----------
     data : ndarray[int32] or ndarray[void]
@@ -2058,7 +2079,7 @@ class AdjacencyList(base.AdjacencyBase):
     _HANDLED_TYPES: ty.Tuple[ty.Type, ...] = field(init=False, repr=False)
 
     def __attrs_post_init__(self):
-        self.dtype = np.dtype(list(zip(("in", "out"), ("<i4",) * 2)))
+        self.dtype = np.dtype(list(zip(("src", "dst"), ("<i4",) * 2)))
         self._HANDLED_TYPES = (np.ndarray, nm.Number, cla.Sequence)
 
     @property
@@ -2263,13 +2284,13 @@ class AdjacencyList(base.AdjacencyBase):
         Returns
         -------
         coo_array
-            COO-formatted sparse array, where rows are ``"in"`` and cols
-            are ``"out"`` indices for ``AdjacencyList.edges``.
+            COO-formatted sparse array, where rows are ``"src"`` and cols
+            are ``"dst"`` indices for ``AdjacencyList.edges``.
         """
         abs_edges = self._edge_relabel
         size = np.max(abs_edges) + 1
         if data is None:
-            data = np.sign(self.data["out"]) == 1
+            data = np.sign(self.data["dst"]) == 1
         return coo_array(
             (data, (abs_edges[:, 0], abs_edges[:, 1])),
             shape=(size, size),
@@ -2335,7 +2356,7 @@ class AdjacencyList(base.AdjacencyBase):
 
         # form edges with data for easier ancestry tracking
         edges = make_data_dicts(
-            orig=(self.edges["in"], self.edges["out"]),
+            orig=(self.edges["src"], self.edges["dst"]),
             data=edge_data,
         )
         nodes = make_data_dicts(
