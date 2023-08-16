@@ -49,7 +49,6 @@ import warnings
 from copy import deepcopy
 from enum import Enum
 
-import deprecation
 import numpy as np
 import numpy.typing as npt
 from attr import Factory, cmp_using, define, field, setters
@@ -780,18 +779,6 @@ class MaskGroup(base.MaskBase, ty.MutableMapping[str, MaskGeneric]):
             agg_op=self._agg_op,  # type: ignore
         )
 
-    @property
-    @deprecation.deprecated(
-        deprecated_in="0.2.6",
-        removed_in="0.3.0",
-        details="Use ``MaskGroup.keys()`` instead.",
-    )
-    def names(self) -> ty.List[str]:
-        """Provides the string values of the keys to the top-level
-        nested ``MaskBase`` objects as a list.
-        """
-        return list(self._mask_arrays.keys())
-
     def bitwise_or(self) -> MaskArray:
         return MaskArray(
             np.bitwise_or.reduce(  # type: ignore
@@ -822,16 +809,6 @@ class MaskGroup(base.MaskBase, ty.MutableMapping[str, MaskGeneric]):
                 "Aggregation operation over MaskGroup not implemented. "
                 "Please contact developers with a bug report."
             )
-
-    @property
-    @deprecation.deprecated(
-        deprecated_in="0.2.6",
-        removed_in="0.3.0",
-        details="Use ``MaskGroup.to_dict()`` instead.",
-    )
-    def dict(self) -> ty.Dict[str, base.BoolVector]:
-        """Masks nested in a dictionary instead of a ``MaskGroup``."""
-        return {key: val.data for key, val in self._mask_arrays.items()}
 
     def to_dict(self) -> ty.Dict[str, base.BoolVector]:
         """Masks nested in a dictionary instead of a ``MaskGroup``."""
@@ -2294,78 +2271,6 @@ class AdjacencyList(base.AdjacencyBase):
         return coo_array(
             (data, (abs_edges[:, 0], abs_edges[:, 1])),
             shape=(size, size),
-        )
-
-    @deprecation.deprecated(
-        deprecated_in="0.2.6",
-        removed_in="0.3.0",
-        details="Inconsistent behaviour, too niche to maintain. Use "
-        "other interfaces, such as ``AdjacencyList.to_sparse() "
-        "or ``AdjacencyList.matrix``, instead.",
-    )
-    def to_dicts(
-        self,
-        edge_data: ty.Optional[
-            ty.Dict[str, ty.Union[base.ArrayBase, base.AnyVector]]
-        ] = None,
-        node_data: ty.Optional[
-            ty.Dict[str, ty.Union[base.ArrayBase, base.AnyVector]]
-        ] = None,
-    ) -> AdjDict:
-        """Returns data in dictionary format, which is more easily
-        parsed by external libraries, such as ``NetworkX``.
-
-        Parameters
-        ----------
-        edge_data : dict[str, ArrayBase | ndarray[any]], optional
-            Values to encode on each edge.
-        node_data : dict[str, ArrayBase | ndarray[any]], optional
-            Values to encode on each node.
-
-        Returns
-        -------
-        AdjDict
-            Dictionary with ``"edges"`` and ``"nodes"`` keys, which
-            refer to a tuple of tuples, representing the edges or nodes
-            of the graph. Associated data is encoded in the final
-            element of each of the innermost tuples, which is a
-            dictionary providing labels and values for the data.
-        """
-        if edge_data is None:
-            edge_data = dict()
-        if node_data is None:
-            node_data = dict()
-
-        def make_data_dicts(
-            orig: ty.Tuple[ty.Any, ...],
-            data: ty.Dict[str, ty.Union[base.ArrayBase, base.AnyVector]],
-        ):
-            def array_iterator(array_dict):
-                for array in array_dict.values():
-                    if isinstance(array, base.ArrayBase):
-                        yield array.data
-                    elif isinstance(array, np.ndarray):
-                        yield array
-                    else:
-                        raise TypeError("Data structure not supported.")
-
-            data_rows = zip(*array_iterator(data))
-            dicts = (dict(zip(data.keys(), row)) for row in data_rows)
-            combo = it.zip_longest(*orig, dicts, fillvalue=dict())
-            return tuple(combo)  # type: ignore
-
-        # form edges with data for easier ancestry tracking
-        edges = make_data_dicts(
-            orig=(self.edges["src"], self.edges["dst"]),
-            data=edge_data,
-        )
-        nodes = make_data_dicts(
-            orig=(self.nodes,),
-            data=node_data,
-        )
-        return dict(
-            edges=edges,
-            nodes=nodes,
         )
 
 
