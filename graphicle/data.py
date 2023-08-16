@@ -2063,7 +2063,7 @@ class AdjacencyList(base.AdjacencyBase):
     ----------
     data : ndarray[int32] or ndarray[void]
         COO formatted edge pairs, either given as a (n-2)-dimensional
-        array, or a structured array with field names ``('in', 'out')``.
+        array, or a structured array with field names ``('src', 'dst')``.
     weights : np.ndarray[float64]
         Weights attributed to each edge in the COO list.
 
@@ -2165,7 +2165,7 @@ class AdjacencyList(base.AdjacencyBase):
 
     @property
     def edges(self) -> base.VoidVector:
-        """COO edge list, with field names ``('in', 'out')``."""
+        """COO edge list, with field names ``('src', 'dst')``."""
         return self.data
 
     @property
@@ -2481,7 +2481,7 @@ class Graphicle:
             COO formatted pairs of vertex ids, of shape ``(N, 2)``,
             where ``N`` is the number of particles in the graph.
             Alternatively, supply a structured array with field names
-            ``('in', 'out')``.
+            ``('src', 'dst')``.
         weights : ndarray[Number], optional
             Weights to be associated with each edge in the COO edge
             list, provided in the same order.
@@ -2551,7 +2551,7 @@ class Graphicle:
 
     @property
     def edges(self) -> base.VoidVector:
-        """COO edge list, with field names ``('in', 'out')``."""
+        """COO edge list, with field names ``('src', 'dst')``."""
         return self.adj.edges
 
     @property
