@@ -67,7 +67,7 @@ class EventInterface(ty.Protocol):
         Status codes annotating particles describing their generation.
     final : ndarray[bool_]
         Mask identifying final particles in the event's ancestry.
-    edges : ndarray[int32], fields ("in", "out")
+    edges : ndarray[int32], fields ("src", "dst")
         Ancestry of particles in event, encoded as a COO list of
         integers, describing a graph structure.
     """

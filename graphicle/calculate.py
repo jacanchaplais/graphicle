@@ -14,13 +14,10 @@ import typing as ty
 import warnings
 from functools import lru_cache, partial
 
-import deprecation
 import networkx as nx
 import numba as nb
 import numpy as np
 import numpy.lib.recfunctions as rfn
-import pyjet
-from pyjet import ClusterSequence, PseudoJet
 
 from . import base
 
@@ -33,7 +30,6 @@ __all__ = [
     "rapidity_centre",
     "combined_mass",
     "flow_trace",
-    "cluster_pmu",
     "aggregate_momenta",
 ]
 
@@ -280,9 +276,9 @@ def flow_trace(
             list(target), blacklist=False, sign_sensitive=True
         )
         hard_graph = hard_graph[target_mask]
-    names, vtxs = tuple(hard_graph.pdg.name), tuple(hard_graph.edges["out"])
+    names, vtxs = tuple(hard_graph.pdg.name), tuple(hard_graph.edges["dst"])
     # out vertices of user specified particles
-    focus_pcls = graph.edges[mask]["out"]
+    focus_pcls = graph.edges[mask]["dst"]
     trc = np.array(
         [
             _trace_vector(
@@ -302,80 +298,6 @@ def flow_trace(
     for i, name in enumerate(names):
         traces[name] = array_fmt(trc[:, i, :])
     return traces
-
-
-@deprecation.deprecated(
-    deprecated_in="0.2.3",
-    removed_in="0.3.0",
-    details="Use ``graphicle.select.fastjet_clusters()`` instead.",
-)
-def cluster_pmu(
-    pmu: "MomentumArray",
-    radius: float,
-    p_val: float,
-    pt_cut: ty.Optional[float] = None,
-    eta_cut: ty.Optional[float] = None,
-) -> "MaskGroup":
-    """Clusters particles using the generalised-kt algorithm.
-
-    :group: calculate
-
-    .. versionadded:: 0.1.4
-
-    Parameters
-    ----------
-    pmu: MomentumArray
-        The momenta of each particle in the point cloud.
-    radius : float
-        The radius of the clusters to be produced.
-    p_val : float
-        The exponent parameter determining the transverse momentum (pt)
-        dependence of iterative pseudojet merges. Positive values
-        cluster low pt particles first, positive values cluster high pt
-        particles first, and a value of zero corresponds to no pt
-        dependence.
-    pt_cut : float, optional
-        Jet transverse momentum threshold, below which jets will be
-        discarded.
-    eta_cut : float, optional
-        Jet pseudorapidity threshold, above which jets will be
-        discarded.
-
-    Returns
-    -------
-    clusters : MaskGroup
-        MaskGroup object, containing boolean masks over the input data
-        for each jet clustering.
-
-    Notes
-    -----
-    This is a wrapper around FastJet's implementation.
-
-    ``p_val`` set to ``-1`` gives anti-kT, ``0`` gives Cambridge-Aachen,
-    and ``1`` gives kT clusterings.
-    """
-    from graphicle.data import MaskGroup
-
-    pmu_pyjet = pmu.data[["e", "x", "y", "z"]]
-    pmu_pyjet.dtype.names = "E", "px", "py", "pz"
-    pmu_pyjet_idx = rfn.append_fields(
-        pmu_pyjet, "idx", np.arange(len(pmu_pyjet))
-    )
-    sequence: ClusterSequence = pyjet.cluster(
-        pmu_pyjet_idx, R=radius, p=p_val, ep=True
-    )
-    jets: ty.Iterable[PseudoJet] = sequence.inclusive_jets()
-    if pt_cut is not None:
-        jets = filter(lambda jet: jet.pt > pt_cut, jets)
-    if eta_cut is not None:
-        jets = filter(lambda jet: abs(jet.eta) < eta_cut, jets)
-    cluster_mask = MaskGroup()
-    cluster_mask.agg_op = "or"
-    for i, jet in enumerate(jets):
-        mask = np.zeros_like(pmu_pyjet, dtype="<?")
-        mask[list(map(lambda pcl: pcl.idx, jet))] = True  # type: ignore
-        cluster_mask[f"{i}"] = mask
-    return cluster_mask
 
 
 @nb.vectorize([nb.float64(nb.float64, nb.float64)])
