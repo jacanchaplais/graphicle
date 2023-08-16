@@ -70,8 +70,8 @@ def particle_as_node(adj_list: gcl.AdjacencyList) -> gcl.AdjacencyList:
     # node labels set as particle indices in original edge array
     for i, node_triplet in enumerate(edges_as_nodes):
         key = node_triplet["key"]
-        node = node_triplet[["in", "out"]]
-        sign = -1 * check_sign(node["in"] * node["out"])
+        node = node_triplet[["src", "dst"]]
+        sign = -1 * check_sign(node["src"] * node["dst"])
         node_idxs[i] = sign * (np.where(edges == node)[0][key] + 1)
     nx_node_graph = _nx.relabel_nodes(
         nx_node_graph,
