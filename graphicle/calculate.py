@@ -20,7 +20,7 @@ import numpy as np
 import numpy.lib.recfunctions as rfn
 from deprecation import deprecated
 
-from . import _version, base
+from . import base
 
 if ty.TYPE_CHECKING is True:
     from graphicle.data import *
@@ -39,7 +39,6 @@ __all__ = [
 @deprecated(
     deprecated_in="0.3.1",
     removed_in="0.4.0",
-    current_version=_version.__version__,
     details="Use the resultant_coords function instead.",
 )
 def azimuth_centre(pmu: "MomentumArray", pt_weight: bool = True) -> float:
@@ -77,7 +76,6 @@ def azimuth_centre(pmu: "MomentumArray", pt_weight: bool = True) -> float:
 @deprecated(
     deprecated_in="0.3.1",
     removed_in="0.4.0",
-    current_version=_version.__version__,
     details="Use the resultant_coords function instead.",
 )
 def pseudorapidity_centre(pmu: "MomentumArray") -> float:
@@ -105,7 +103,6 @@ def pseudorapidity_centre(pmu: "MomentumArray") -> float:
 @deprecated(
     deprecated_in="0.3.1",
     removed_in="0.4.0",
-    current_version=_version.__version__,
     details="Use the resultant_coords function instead.",
 )
 def rapidity_centre(pmu: "MomentumArray") -> float:

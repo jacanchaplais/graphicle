@@ -15,7 +15,7 @@ from typicle.convert import cast_array
 
 import graphicle as gcl
 
-from . import _version, base
+from . import base
 
 __all__ = ["particle_as_node", "centre_angle", "centre_pseudorapidity"]
 
@@ -25,7 +25,6 @@ _types = Types()
 @deprecated(
     deprecated_in="0.3.1",
     removed_in="0.4.0",
-    current_version=_version.__version__,
     details="See networkx.line_graph() for potential replacement.",
 )
 def particle_as_node(adj_list: gcl.AdjacencyList) -> gcl.AdjacencyList:
@@ -93,7 +92,6 @@ def particle_as_node(adj_list: gcl.AdjacencyList) -> gcl.AdjacencyList:
 @deprecated(
     deprecated_in="0.3.1",
     removed_in="0.4.0",
-    current_version=_version.__version__,
     details="Use calculate.resultant_coords() and data.MomentumArray"
     ".shift_phi() instead.",
 )
@@ -133,7 +131,6 @@ def centre_angle(
 @deprecated(
     deprecated_in="0.3.1",
     removed_in="0.4.0",
-    current_version=_version.__version__,
     details="Use calculate.resultant_coords() and data.MomentumArray"
     ".shift_eta() instead.",
 )
