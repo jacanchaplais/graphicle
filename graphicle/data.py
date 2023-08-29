@@ -1435,12 +1435,12 @@ class MomentumArray(base.ArrayBase):
         of ``np.nan``.
         """
         pmu = self.copy()
-        if bool(experimental) is True:
+        if experimental:
             eta = self.eta + shift
             pmu.z[...] = self.pt * np.sinh(eta)
             pmu.energy[...] = np.nan
             return pmu
-        eta_mid = calculate.pseudorapidity_centre(pmu)
+        eta_mid, _ = calculate.resultant_coords(pmu, pseudo=True)
         target = eta_mid + shift
         converged = False
         for _ in range(max_corrections):
@@ -1449,7 +1449,7 @@ class MomentumArray(base.ArrayBase):
                 break
             correction = target - eta_mid
             pmu = pmu.shift_rapidity(correction)
-            eta_mid = calculate.pseudorapidity_centre(pmu)
+            eta_mid, _ = calculate.resultant_coords(pmu, pseudo=True)
         if converged is not True:
             warnings.warn(
                 f"Unable to converge within a tolerance of {abs_tol}."
