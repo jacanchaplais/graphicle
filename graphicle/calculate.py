@@ -41,6 +41,11 @@ def azimuth_centre(pmu: "MomentumArray", pt_weight: bool = True) -> float:
 
     .. versionadded:: 0.1.7
 
+    .. versionchanged:: 0.3.1
+       The ``pt_weight`` parameter implementation has been corrected.
+       Previous versions resulted in :math:`p_T`-weighting when
+       ``False``, and :math:`p_T^2`-weighting when ``True``.
+
     Parameters
     ----------
     pmu : MomentumArray
@@ -56,8 +61,8 @@ def azimuth_centre(pmu: "MomentumArray", pt_weight: bool = True) -> float:
         The centre of the particle set in the azimuth dimension.
     """
     pol = pmu._xy_pol
-    if pt_weight is True:
-        pol = pol * pmu.pt
+    if not pt_weight:
+        pol = pol / pmu.pt
     return np.angle(pol.sum()).item()
 
 
