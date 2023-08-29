@@ -1447,7 +1447,8 @@ class MomentumArray(base.ArrayBase):
             if math.isclose(eta_mid, target, rel_tol=0.0, abs_tol=abs_tol):
                 converged = True
                 break
-            correction = target - eta_mid
+            rap_mid, _ = calculate.resultant_coords(pmu, pseudo=False)
+            correction = target - rap_mid
             pmu = pmu.shift_rapidity(correction)
             eta_mid, _ = calculate.resultant_coords(pmu, pseudo=True)
         if converged is not True:
