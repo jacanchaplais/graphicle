@@ -3,9 +3,13 @@
 =======================
 
 Utilities for manipulating the graph structure of particle data.
+
+.. deprecated:: 0.3.1
+   Module is out of date, and will be removed in 0.4.0.
 """
 import networkx as _nx
 import numpy as np
+from deprecation import deprecated
 from typicle import Types
 from typicle.convert import cast_array
 
@@ -18,6 +22,11 @@ __all__ = ["particle_as_node", "centre_angle", "centre_pseudorapidity"]
 _types = Types()
 
 
+@deprecated(
+    deprecated_in="0.3.1",
+    removed_in="0.4.0",
+    details="See ``networkx.line_graph()`` for potential replacement.",
+)
 def particle_as_node(adj_list: gcl.AdjacencyList) -> gcl.AdjacencyList:
     """Converts an ``AdjacencyList`` in which the particles are
     represented as edges, to one in which the particles are the nodes.
@@ -80,6 +89,12 @@ def particle_as_node(adj_list: gcl.AdjacencyList) -> gcl.AdjacencyList:
     return gcl.AdjacencyList(np.array(nx_node_graph.edges))
 
 
+@deprecated(
+    deprecated_in="0.3.1",
+    removed_in="0.4.0",
+    details="Use ``calculate.resultant_coords()`` and "
+    "``data.MomentumArray.shift_phi()`` instead.",
+)
 def centre_angle(
     angle: base.DoubleVector, pt: base.DoubleVector
 ) -> base.DoubleVector:
@@ -113,6 +128,12 @@ def centre_angle(
     return np.angle(pos_centred)  # type: ignore
 
 
+@deprecated(
+    deprecated_in="0.3.1",
+    removed_in="0.4.0",
+    details="Use ``calculate.resultant_coords()`` and "
+    "``data.MomentumArray.shift_eta()`` instead.",
+)
 def centre_pseudorapidity(
     eta: base.DoubleVector, pt: base.DoubleVector
 ) -> base.DoubleVector:

@@ -18,6 +18,7 @@ import networkx as nx
 import numba as nb
 import numpy as np
 import numpy.lib.recfunctions as rfn
+from deprecation import deprecated
 
 from . import base
 
@@ -28,18 +29,29 @@ __all__ = [
     "azimuth_centre",
     "pseudorapidity_centre",
     "rapidity_centre",
+    "resultant_coords",
     "combined_mass",
     "flow_trace",
     "aggregate_momenta",
 ]
 
 
+@deprecated(
+    deprecated_in="0.3.1",
+    removed_in="0.4.0",
+    details="Use ``resultant_coords()`` instead.",
+)
 def azimuth_centre(pmu: "MomentumArray", pt_weight: bool = True) -> float:
     """Calculates the central point in azimuth for a set of particles.
 
     :group: calculate
 
     .. versionadded:: 0.1.7
+
+    .. versionchanged:: 0.3.1
+       The ``pt_weight`` parameter implementation has been corrected.
+       Previous versions resulted in :math:`p_T`-weighting when
+       ``False``, and :math:`p_T^2`-weighting when ``True``.
 
     Parameters
     ----------
@@ -56,11 +68,16 @@ def azimuth_centre(pmu: "MomentumArray", pt_weight: bool = True) -> float:
         The centre of the particle set in the azimuth dimension.
     """
     pol = pmu._xy_pol
-    if pt_weight is True:
-        pol = pol * pmu.pt
+    if not pt_weight:
+        pol = pol / pmu.pt
     return np.angle(pol.sum()).item()
 
 
+@deprecated(
+    deprecated_in="0.3.1",
+    removed_in="0.4.0",
+    details="Use ``resultant_coords()`` instead.",
+)
 def pseudorapidity_centre(pmu: "MomentumArray") -> float:
     """Calculates the central point in pseudorapidity for a set of
     particles.
@@ -83,6 +100,11 @@ def pseudorapidity_centre(pmu: "MomentumArray") -> float:
     return ((pmu.eta * pmu.pt).sum() / pmu.pt.sum()).item()
 
 
+@deprecated(
+    deprecated_in="0.3.1",
+    removed_in="0.4.0",
+    details="Use ``resultant_coords()`` instead.",
+)
 def rapidity_centre(pmu: "MomentumArray") -> float:
     """Calculates the central point in rapidity for a set of particles.
 
@@ -102,6 +124,49 @@ def rapidity_centre(pmu: "MomentumArray") -> float:
         rapidity dimension.
     """
     return (pmu.rapidity * pmu.pt).sum() / pmu.pt.sum()
+
+
+def resultant_coords(
+    pmu: "MomentumArray", pseudo: bool = True
+) -> ty.Tuple[float, float]:
+    """Returns the resulting (pseudo)rapidity and azimuthal coordinates
+    when summing the momenta of a particle set.
+
+    Parameters
+    ----------
+    pmu : MomentumArray
+        Momenta of the particles in the set.
+    pseudo : bool
+        If ``True``, will use pseudorapidity. If ``False``, will use
+        true rapidity. Default is ``True``.
+
+    Returns
+    -------
+    rapidity_centre, azimuth_centre : float
+        The central location on the (pseudo)rapidity-azimuth plane for
+        the given particle set.
+
+    Notes
+    -----
+    While this does provide central coordinates, which are effectively
+    weighted by :math:`p_T`, this is **not** mathematically equivalent
+    to the :math:`p_T`-weighted centroid. The :math:`p_T`-weighted
+    centroid pseudorapidity coordinate is given by:
+
+    .. math::
+       \\bar \\eta = \\dfrac{\\sum_j p_{T j} \\eta_j} {\\sum_k p_{T k}}
+
+    For azimuth, :math:`\\eta` is swapped for :math:`\\phi`, and the
+    result is shifted to remain in the :math:`[-\\pi, +\\pi]` range.
+
+    However, this function takes a sum of the underlying momenta, and
+    gives the central coordinates as the coordinates of the
+    reconstructed object.
+    """
+    pmu_sum: "MomentumArray" = np.sum(pmu, axis=0)
+    rap = (pmu_sum.eta if pseudo else pmu_sum.rapidity).item()
+    phi = pmu_sum.phi.item()
+    return rap, phi
 
 
 def combined_mass(

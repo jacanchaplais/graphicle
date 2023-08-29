@@ -950,12 +950,10 @@ def centroid_prune(
         pmu = pmu[mask]
         event_mask = np.zeros_like(mask, "<?")
     if centre is None:
-        eta_mid = (pmu.eta * pmu.pt).sum() / pmu.pt.sum()
-        phi_sum_ = (pmu._xy_pol * pmu.pt).sum()
-        phi_mid_ = phi_sum_ / np.abs(phi_sum_)
+        eta_mid, phi_mid = gcl.calculate.resultant_coords(pmu, pseudo=True)
     else:
         eta_mid, phi_mid = centre
-        phi_mid_ = np.exp(complex(0, phi_mid))
+    phi_mid_ = np.exp(complex(0, phi_mid))
     dist = np.hypot(pmu.eta - eta_mid, np.angle(pmu._xy_pol * phi_mid_.conj()))
     is_within = dist < radius
     if mask is None:
