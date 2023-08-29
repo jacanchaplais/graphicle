@@ -146,7 +146,7 @@ def resultant_coords(
     -------
     rapidity_centre, azimuth_centre : float
         The central location on the (pseudo)rapidity-azimuth plane for
-        the give particle set.
+        the given particle set.
 
     Notes
     -----
