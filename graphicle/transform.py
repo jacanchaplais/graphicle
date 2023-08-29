@@ -25,7 +25,7 @@ _types = Types()
 @deprecated(
     deprecated_in="0.3.1",
     removed_in="0.4.0",
-    details="See networkx.line_graph() for potential replacement.",
+    details="See ``networkx.line_graph()`` for potential replacement.",
 )
 def particle_as_node(adj_list: gcl.AdjacencyList) -> gcl.AdjacencyList:
     """Converts an ``AdjacencyList`` in which the particles are
@@ -92,8 +92,8 @@ def particle_as_node(adj_list: gcl.AdjacencyList) -> gcl.AdjacencyList:
 @deprecated(
     deprecated_in="0.3.1",
     removed_in="0.4.0",
-    details="Use calculate.resultant_coords() and data.MomentumArray"
-    ".shift_phi() instead.",
+    details="Use ``calculate.resultant_coords()`` and "
+    "``data.MomentumArray.shift_phi()`` instead.",
 )
 def centre_angle(
     angle: base.DoubleVector, pt: base.DoubleVector
@@ -131,8 +131,8 @@ def centre_angle(
 @deprecated(
     deprecated_in="0.3.1",
     removed_in="0.4.0",
-    details="Use calculate.resultant_coords() and data.MomentumArray"
-    ".shift_eta() instead.",
+    details="Use ``calculate.resultant_coords()`` and "
+    "``data.MomentumArray.shift_eta()`` instead.",
 )
 def centre_pseudorapidity(
     eta: base.DoubleVector, pt: base.DoubleVector

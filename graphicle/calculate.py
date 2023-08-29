@@ -39,7 +39,7 @@ __all__ = [
 @deprecated(
     deprecated_in="0.3.1",
     removed_in="0.4.0",
-    details="Use the resultant_coords function instead.",
+    details="Use ``resultant_coords()`` instead.",
 )
 def azimuth_centre(pmu: "MomentumArray", pt_weight: bool = True) -> float:
     """Calculates the central point in azimuth for a set of particles.
@@ -76,7 +76,7 @@ def azimuth_centre(pmu: "MomentumArray", pt_weight: bool = True) -> float:
 @deprecated(
     deprecated_in="0.3.1",
     removed_in="0.4.0",
-    details="Use the resultant_coords function instead.",
+    details="Use ``resultant_coords()`` instead.",
 )
 def pseudorapidity_centre(pmu: "MomentumArray") -> float:
     """Calculates the central point in pseudorapidity for a set of
@@ -103,7 +103,7 @@ def pseudorapidity_centre(pmu: "MomentumArray") -> float:
 @deprecated(
     deprecated_in="0.3.1",
     removed_in="0.4.0",
-    details="Use the resultant_coords function instead.",
+    details="Use ``resultant_coords()`` instead.",
 )
 def rapidity_centre(pmu: "MomentumArray") -> float:
     """Calculates the central point in rapidity for a set of particles.
