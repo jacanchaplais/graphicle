@@ -30,6 +30,7 @@ __all__ = [
     "azimuth_centre",
     "pseudorapidity_centre",
     "rapidity_centre",
+    "weighted_centroid",
     "resultant_coords",
     "combined_mass",
     "flow_trace",
