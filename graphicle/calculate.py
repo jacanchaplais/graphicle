@@ -5,6 +5,7 @@
 Algorithms for performing common HEP calculations using graphicle data
 structures.
 """
+import cmath
 import contextlib as ctx
 import functools as fn
 import itertools as it
@@ -29,6 +30,7 @@ __all__ = [
     "azimuth_centre",
     "pseudorapidity_centre",
     "rapidity_centre",
+    "weighted_centroid",
     "resultant_coords",
     "combined_mass",
     "flow_trace",
@@ -39,7 +41,7 @@ __all__ = [
 @deprecated(
     deprecated_in="0.3.1",
     removed_in="0.4.0",
-    details="Use ``resultant_coords()`` instead.",
+    details="Use ``weighted_centroid()`` or ``resultant_coords()`` instead.",
 )
 def azimuth_centre(pmu: "MomentumArray", pt_weight: bool = True) -> float:
     """Calculates the central point in azimuth for a set of particles.
@@ -76,7 +78,7 @@ def azimuth_centre(pmu: "MomentumArray", pt_weight: bool = True) -> float:
 @deprecated(
     deprecated_in="0.3.1",
     removed_in="0.4.0",
-    details="Use ``resultant_coords()`` instead.",
+    details="Use ``weighted_centroid()`` or ``resultant_coords()`` instead.",
 )
 def pseudorapidity_centre(pmu: "MomentumArray") -> float:
     """Calculates the central point in pseudorapidity for a set of
@@ -103,7 +105,7 @@ def pseudorapidity_centre(pmu: "MomentumArray") -> float:
 @deprecated(
     deprecated_in="0.3.1",
     removed_in="0.4.0",
-    details="Use ``resultant_coords()`` instead.",
+    details="Use ``weighted_centroid()`` or ``resultant_coords()`` instead.",
 )
 def rapidity_centre(pmu: "MomentumArray") -> float:
     """Calculates the central point in rapidity for a set of particles.
@@ -126,11 +128,60 @@ def rapidity_centre(pmu: "MomentumArray") -> float:
     return (pmu.rapidity * pmu.pt).sum() / pmu.pt.sum()
 
 
+def weighted_centroid(
+    pmu: "MomentumArray", pseudo: bool = True
+) -> ty.Tuple[float, float]:
+    """Calculates the :math:`p_T`-weighted centroid for a set of
+    particles in the (pseudo)rapidity-azimuth plane.
+
+    :group: calculate
+
+    .. versionadded:: 0.3.1
+
+    Parameters
+    ----------
+    pmu : MomentumArray
+        Momenta of the particles in the set.
+    pseudo : bool
+        If ``True``, will use pseudorapidity. If ``False``, will use
+        true rapidity. Default is ``True``.
+
+    Returns
+    -------
+    rapidity_centre, azimuth_centre : float
+        The :math:`p_T`-weighted centroid of the particles.
+
+    See Also
+    --------
+    resultant_coords : Coordinates of the momentum sum.
+
+    Notes
+    -----
+    The :math:`p_T`-weighted centroid pseudorapidity is given by:
+
+    .. math::
+       \\bar \\eta = \\dfrac{\\sum_j p_{T j} \\eta_j} {\\sum_k p_{T k}}
+
+    For azimuth, :math:`\\eta` is swapped for :math:`\\phi`, and the
+    result is shifted to remain in the :math:`[-\\pi, +\\pi]` range.
+    """
+    pt_sum = pmu.pt.sum()
+    rap = pmu.eta if pseudo else pmu.rapidity
+    rap_mid = ((rap * pmu.pt).sum() / pt_sum).item()
+    phi_mid_unbound = ((pmu.phi * pmu.pt).sum() / pt_sum).item()
+    phi_mid = cmath.phase(cmath.exp(complex(0, phi_mid_unbound)))
+    return rap_mid, phi_mid
+
+
 def resultant_coords(
     pmu: "MomentumArray", pseudo: bool = True
 ) -> ty.Tuple[float, float]:
     """Returns the resulting (pseudo)rapidity and azimuthal coordinates
     when summing the momenta of a particle set.
+
+    :group: calculate
+
+    .. versionadded:: 0.3.1
 
     Parameters
     ----------
@@ -146,22 +197,20 @@ def resultant_coords(
         The central location on the (pseudo)rapidity-azimuth plane for
         the given particle set.
 
+    See Also
+    --------
+    weighted_centroid : :math:`p_T`-weighted average coordinates.
+
     Notes
     -----
     While this does provide central coordinates, which are effectively
     weighted by :math:`p_T`, this is **not** mathematically equivalent
-    to the :math:`p_T`-weighted centroid. The :math:`p_T`-weighted
-    centroid pseudorapidity coordinate is given by:
-
-    .. math::
-       \\bar \\eta = \\dfrac{\\sum_j p_{T j} \\eta_j} {\\sum_k p_{T k}}
-
-    For azimuth, :math:`\\eta` is swapped for :math:`\\phi`, and the
-    result is shifted to remain in the :math:`[-\\pi, +\\pi]` range.
-
-    However, this function takes a sum of the underlying momenta, and
-    gives the central coordinates as the coordinates of the
-    reconstructed object.
+    to the :math:`p_T`-weighted centroid, see ``weighted_centroid()``.
+    This function takes a sum of the underlying momenta, and gives the
+    the coordinates of the reconstructed object. This is often more
+    desirable, as the calculation is implicitly consistent with the
+    detector geometry, whereas ``weighted_centroid()`` treats the
+    (pseudo)rapidity-azimuth plane as Cartesian.
     """
     pmu_sum: "MomentumArray" = np.sum(pmu, axis=0)
     rap = (pmu_sum.eta if pseudo else pmu_sum.rapidity).item()
