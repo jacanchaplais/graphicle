@@ -10,7 +10,7 @@ networks.
 Installation
 ------------
 
-::
+.. code:: bash
 
    pip install graphicle
 
