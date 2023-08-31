@@ -88,6 +88,7 @@ EdgeLike = ty.Union[
     base.IntVector, base.VoidVector, ty.Sequence[ty.Tuple[int, int]]
 ]
 DHUGE = np.finfo(np.dtype("<f8")).max * 0.1
+ZERO_TOL = 1.0e-10
 
 
 def _map_invert(mapping: ty.Dict[str, ty.Set[str]]) -> ty.Dict[str, str]:
@@ -111,6 +112,12 @@ _MOMENTUM_MAP = _map_invert(
 _MOMENTUM_ORDER = tuple("xyze")
 _EDGE_MAP = _map_invert({"src": {"in", "src"}, "dst": {"out", "dst"}})
 _EDGE_ORDER = ("src", "dst")
+
+
+class NumericalStabilityWarning(UserWarning):
+    """Raised when the result of a calculation may not be numerically
+    stable.
+    """
 
 
 class MomentumElement(ty.NamedTuple):
@@ -1321,6 +1328,17 @@ class MomentumArray(base.ArrayBase):
     @fn.cached_property
     def phi(self) -> base.DoubleVector:
         """Azimuth component of particle momenta, :math:`\\phi`."""
+        invalid = np.isclose(self.pt, 0.0, atol=ZERO_TOL)
+        if np.any(invalid):
+            idxs = np.flatnonzero(invalid).tolist()
+            e_tol = ZERO_TOL * 1.0e9
+            warnings.warn(
+                f"The transverse momenta of {len(idxs)} particles fall below "
+                f"{e_tol} eV. This may result in these particles giving "
+                "unstable or invalid values for the azimuthal angle.\n"
+                f"The indices of these particles are:\n{idxs}",
+                NumericalStabilityWarning,
+            )
         return np.angle(self._xy_pol).reshape(-1)
 
     @fn.cached_property
