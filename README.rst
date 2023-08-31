@@ -21,9 +21,14 @@ Object oriented interface to track-level particle data for collider
 physics, with routines for constructing and performing calculations over
 graph-structured data.
 
-Provides data structures for: \* 4-momenta \* PDG codes \* Particle
-status codes \* Color codes \* Helicity / spin polarisation data \* COO
-adjacency lists (for graph-structured data)
+Provides data structures for:
+
+* 4-momenta
+* PDG codes
+* Particle status codes
+* Color codes
+* Helicity / spin polarisation data
+* COO adjacency lists (for graph-structured data)
 
 .. code:: python3
 
