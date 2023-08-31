@@ -18,8 +18,7 @@ jobs:
           environment-name: test-env
           create-args: >-
             python=${{ matrix.pyver }}
-            pytest=6.2.5
-            hypothesis=6.62.0
+            pytest>=6.2.5
           init-shell: bash
           cache-environment: true
           post-cleanup: 'all'
