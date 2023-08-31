@@ -5,14 +5,39 @@ build-backend = "setuptools.build_meta"
 [tool.setuptools_scm]
 write_to = "graphicle/_version.py"
 
+[project]
+name = "graphicle"
+dynamic = ["version"]
+authors = [{name = "Jacan Chaplais"}]
+maintainers = [{name = "Jacan Chaplais"}]
+description = "Encode particle physics data onto graph structures."
+readme = {file = "README.rst", content-type = "text/x-rst"}
+requires-python = ">=3.8"
+license = {file = "LICENSE.txt"}
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: BSD License",
+    "Operating System :: OS Independent"
+]
+dependencies = [
+    "attrs",
+    "numpy >=1.21",
+    "scipy >=1.8.0",
+    "numba",
+    "mcpid",
+    "typicle >=0.1.4",
+    "networkx",
+    "pyjet ==1.9.0",
+    "rich",
+    "deprecation",
+]
+
+[project.urls]
+repository = "https://github.com/jacanchaplais/graphicle"
+documentation = "https://graphicle.readthedocs.io"
+
 [tool.black]
 line-length = 79
-
-[tool.pytest.ini_options]
-addopts = "--cov=graphicle"
-testpaths = [
-    "tests",
-]
 
 [tool.mypy]
 mypy_path = "graphicle"
