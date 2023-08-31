@@ -1,7 +1,7 @@
 graphicle
 =========
 
-|PyPI version| |Documentation| |License| |pre-commit| |Code style:
+|PyPI version| |Tests| |Documentation| |License| |pre-commit| |Code style:
 black|
 
 Utilities for representing high energy physics data as graphs /
@@ -176,6 +176,7 @@ More information on the API is available in the
 
 .. |PyPI version| image:: https://img.shields.io/pypi/v/graphicle.svg
    :target: https://pypi.org/project/graphicle/
+.. |Tests| image:: https://github.com/jacanchaplais/graphicle/actions/workflows/tests.yml/badge.svg
 .. |Documentation| image:: https://readthedocs.org/projects/graphicle/badge/?version=latest
    :target: https://graphicle.readthedocs.io
 .. |License| image:: https://img.shields.io/pypi/l/graphicle
