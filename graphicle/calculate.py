@@ -472,9 +472,10 @@ def _root_diff_two_squares(
         Root difference of two squares. This is a scalar if both `x1`
         and `x2` are scalars.
     """
-    diff = x1 - x2
+    x1_, x2_ = abs(x1), abs(x2)
+    diff = x1_ - x2_
     sqrt_diff = math.copysign(math.sqrt(abs(diff)), diff)
-    sqrt_sum = math.sqrt(x1 + x2)
+    sqrt_sum = math.sqrt(x1_ + x2_)
     return sqrt_diff * sqrt_sum  # type: ignore
 
 
