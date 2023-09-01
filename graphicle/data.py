@@ -1399,7 +1399,7 @@ class MomentumArray(base.ArrayBase):
         shift: ty.Union[float, base.DoubleVector],
         experimental: bool = False,
         max_corrections: int = 10,
-        abs_tol: float = 1.0e-14,
+        abs_tol: float = ZERO_TOL,
     ) -> "MomentumArray":
         """Performs a Lorentz boost to a new frame, with a
         pseudorapidity increased by ``shift``.
