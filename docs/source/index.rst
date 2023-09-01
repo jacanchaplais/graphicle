@@ -17,4 +17,4 @@ included on this page, too.
 
    API Reference <api>
 
-.. mdinclude:: ../../README.md
+.. include:: ../../README.rst
