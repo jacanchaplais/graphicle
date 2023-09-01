@@ -50,3 +50,10 @@ Algorithms to query event record, providing masks which select specific
 regions of collision events.
 
 .. python-apigen-group:: select
+
+Exceptions and warnings
+-------------------
+Custom classes indicating to users specific issues relating to the unique
+cross-over between high energy physics and graph algorithms.
+
+.. python-apigen-group:: errors_warnings
