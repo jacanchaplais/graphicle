@@ -117,6 +117,10 @@ _EDGE_ORDER = ("src", "dst")
 class NumericalStabilityWarning(UserWarning):
     """Raised when the result of a calculation may not be numerically
     stable.
+
+    :group: errors_warnings
+
+    .. versionadded:: 0.3.1
     """
 
 
@@ -1319,12 +1323,23 @@ class MomentumArray(base.ArrayBase):
 
     @fn.cached_property
     def rapidity(self) -> base.DoubleVector:
-        """Rapidity component of the particle momenta, :math:`y`."""
+        """Rapidity component of the particle momenta, :math:`y`.
+
+        .. versionchanged:: 0.3.1
+           Explicitly handled zero division, replacing with ``np.inf``
+           with the appropriate sign.
+        """
         return calculate._rapidity(self.energy, self.z, ZERO_TOL).reshape(-1)
 
     @fn.cached_property
     def phi(self) -> base.DoubleVector:
-        """Azimuth component of particle momenta, :math:`\\phi`."""
+        """Azimuth component of particle momenta, :math:`\\phi`.
+
+        .. versionchanged:: 0.3.1
+           Where :math:`p_T` is very small, rendering azimuthal angles
+           numerically unstable, ``np.nan`` is given to enable user
+           handling.
+        """
         invalid = np.isclose(self.pt, 0.0, atol=ZERO_TOL)
         phi_ = np.angle(self._xy_pol).reshape(-1)
         if np.any(invalid):
@@ -1354,7 +1369,11 @@ class MomentumArray(base.ArrayBase):
 
     @fn.cached_property
     def mass_t(self) -> base.DoubleVector:
-        """Transverse component of particle mass, :math:`m_T`."""
+        """Transverse component of particle mass, :math:`m_T`.
+
+        .. versionchanged:: 0.3.1
+           Fixed bug for momenta with negative :math:`p_z`.
+        """
         return calculate._root_diff_two_squares(self.energy, self.z).reshape(
             -1
         )
