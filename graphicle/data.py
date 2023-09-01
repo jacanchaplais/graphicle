@@ -114,16 +114,6 @@ _EDGE_MAP = _map_invert({"src": {"in", "src"}, "dst": {"out", "dst"}})
 _EDGE_ORDER = ("src", "dst")
 
 
-class NumericalStabilityWarning(UserWarning):
-    """Raised when the result of a calculation may not be numerically
-    stable.
-
-    :group: errors_warnings
-
-    .. versionadded:: 0.3.1
-    """
-
-
 class MomentumElement(ty.NamedTuple):
     """Named tuple container for the four-momentum of a single particle.
 
@@ -1350,7 +1340,7 @@ class MomentumArray(base.ArrayBase):
                 f"{e_tol} eV. This may result in these particles giving "
                 "unstable or invalid values for the azimuthal angle. These "
                 "angles have been replaced with NaN.",
-                NumericalStabilityWarning,
+                base.NumericalStabilityWarning,
             )
             phi_[invalid] = np.nan
         return phi_
@@ -1450,7 +1440,7 @@ class MomentumArray(base.ArrayBase):
 
         Warns
         -----
-        UserWarning
+        NumericalStabilityWarning
             If the method is unable to converge within ``abs_tol`` after
             ``max_corrections`` corrective iterations.
 
@@ -1489,7 +1479,8 @@ class MomentumArray(base.ArrayBase):
             eta_mid, _ = calculate.resultant_coords(pmu, pseudo=True)
         if converged is not True:
             warnings.warn(
-                f"Unable to converge within a tolerance of {abs_tol}."
+                f"Unable to converge within a tolerance of {abs_tol}.",
+                base.NumericalStabilityWarning,
             )
         return pmu
 
