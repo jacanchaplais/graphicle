@@ -1551,11 +1551,9 @@ class MomentumArray(base.ArrayBase):
         passing the same instance to the ``other`` parameter.
         """
         get_rapidity = op.attrgetter("eta")
-        if pseudo is False:
+        if not pseudo:
             get_rapidity = op.attrgetter("rapidity")
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            rap1, rap2 = get_rapidity(self), get_rapidity(other)
+        rap1, rap2 = get_rapidity(self), get_rapidity(other)
         with calculate._thread_scope(threads):
             if self is other:
                 return calculate._delta_R_symmetric(rap1, self._xy_pol)
