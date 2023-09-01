@@ -1,6 +1,7 @@
 import cmath
 import dataclasses as dc
 import math
+import random
 
 import numpy as np
 
@@ -63,6 +64,15 @@ def test_pmu_coords() -> None:
 def test_pmu_transform() -> None:
     momentum = MomentumExample()
     pmu = momentum.to_momentum_array()
+    shift = random.uniform(0.0, 10.0)
+    assert np.allclose(pmu, pmu.shift_phi(shift).shift_phi(-shift))
+    assert np.allclose(pmu, pmu.shift_rapidity(shift).shift_rapidity(-shift))
+
+
+def test_pmu_zero_pt() -> None:
+    momentum = MomentumExample()
+    pmu = momentum.to_momentum_array()
     zero_transverse = pmu.shift_phi(math.pi) + pmu
     assert math.isclose(0.0, zero_transverse.pt.item(), abs_tol=ZERO_TOL)
     assert math.isclose(zero_transverse.mass.item(), 6.0)
+    assert math.isnan(zero_transverse.phi.item())
