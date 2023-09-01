@@ -1320,26 +1320,25 @@ class MomentumArray(base.ArrayBase):
     @fn.cached_property
     def rapidity(self) -> base.DoubleVector:
         """Rapidity component of the particle momenta, :math:`y`."""
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            rap = 0.5 * np.log((self.energy + self.z) / (self.energy - self.z))
-        return rap.reshape(-1)
+        return calculate._rapidity(self.energy, self.z, ZERO_TOL).reshape(-1)
 
     @fn.cached_property
     def phi(self) -> base.DoubleVector:
         """Azimuth component of particle momenta, :math:`\\phi`."""
         invalid = np.isclose(self.pt, 0.0, atol=ZERO_TOL)
+        phi_ = np.angle(self._xy_pol).reshape(-1)
         if np.any(invalid):
-            idxs = np.flatnonzero(invalid).tolist()
+            num_nan = np.sum(invalid, dtype=np.int32).item()
             e_tol = ZERO_TOL * 1.0e9
             warnings.warn(
-                f"The transverse momenta of {len(idxs)} particles fall below "
+                f"The transverse momenta of {num_nan} particles fall below "
                 f"{e_tol} eV. This may result in these particles giving "
-                "unstable or invalid values for the azimuthal angle.\n"
-                f"The indices of these particles are:\n{idxs}",
+                "unstable or invalid values for the azimuthal angle. These "
+                "angles have been replaced with NaN.",
                 NumericalStabilityWarning,
             )
-        return np.angle(self._xy_pol).reshape(-1)
+            phi_[invalid] = np.nan
+        return phi_
 
     @fn.cached_property
     def theta(self) -> base.DoubleVector:
