@@ -414,6 +414,37 @@ def flow_trace(
     return traces
 
 
+@nb.njit("float64[:](float64[:], float64[:], float64)")
+def _rapidity(
+    energy: base.DoubleVector, z: base.DoubleVector, zero_tol: float
+) -> base.DoubleVector:
+    """Numpy ufunc to calculate the rapidity of a set of particles.
+
+    Parameters
+    ----------
+    energy, z : array_like
+        Components of the particles' four-momenta.
+    zero_tol : float
+        Absolute tolerance for energy values to be considered close to
+        zero.
+
+    Returns
+    -------
+    ndarray or float
+        Rapidity of the particles.
+    """
+    rap = np.empty_like(energy)
+    for i in range(len(rap)):
+        z_ = abs(z[i])
+        diff = energy[i] - z_
+        if abs(diff) < zero_tol:
+            rap_ = math.inf
+        else:
+            rap_ = 0.5 * math.log((energy[i] + z_) / diff)
+        rap[i] = math.copysign(rap_, z[i])
+    return rap
+
+
 @nb.vectorize([nb.float64(nb.float64, nb.float64)])
 def _root_diff_two_squares(
     x1: base.DoubleUfunc, x2: base.DoubleUfunc
