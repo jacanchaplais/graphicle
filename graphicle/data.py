@@ -88,6 +88,7 @@ EdgeLike = ty.Union[
     base.IntVector, base.VoidVector, ty.Sequence[ty.Tuple[int, int]]
 ]
 DHUGE = np.finfo(np.dtype("<f8")).max * 0.1
+ZERO_TOL = 1.0e-10
 
 
 def _map_invert(mapping: ty.Dict[str, ty.Set[str]]) -> ty.Dict[str, str]:
@@ -1312,16 +1313,37 @@ class MomentumArray(base.ArrayBase):
 
     @fn.cached_property
     def rapidity(self) -> base.DoubleVector:
-        """Rapidity component of the particle momenta, :math:`y`."""
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            rap = 0.5 * np.log((self.energy + self.z) / (self.energy - self.z))
-        return rap.reshape(-1)
+        """Rapidity component of the particle momenta, :math:`y`.
+
+        .. versionchanged:: 0.3.1
+           Explicitly handled zero division, replacing with ``np.inf``
+           with the appropriate sign.
+        """
+        return calculate._rapidity(self.energy, self.z, ZERO_TOL).reshape(-1)
 
     @fn.cached_property
     def phi(self) -> base.DoubleVector:
-        """Azimuth component of particle momenta, :math:`\\phi`."""
-        return np.angle(self._xy_pol).reshape(-1)
+        """Azimuth component of particle momenta, :math:`\\phi`.
+
+        .. versionchanged:: 0.3.1
+           Where :math:`p_T` is very small, rendering azimuthal angles
+           numerically unstable, ``np.nan`` is given to enable user
+           handling.
+        """
+        invalid = np.isclose(self.pt, 0.0, atol=ZERO_TOL)
+        phi_ = np.angle(self._xy_pol).reshape(-1)
+        if np.any(invalid):
+            num_nan = np.sum(invalid, dtype=np.int32).item()
+            e_tol = ZERO_TOL * 1.0e9
+            warnings.warn(
+                f"The transverse momenta of {num_nan} particles fall below "
+                f"{e_tol} eV. This may result in these particles giving "
+                "unstable or invalid values for the azimuthal angle. These "
+                "angles have been replaced with NaN.",
+                base.NumericalStabilityWarning,
+            )
+            phi_[invalid] = np.nan
+        return phi_
 
     @fn.cached_property
     def theta(self) -> base.DoubleVector:
@@ -1337,7 +1359,11 @@ class MomentumArray(base.ArrayBase):
 
     @fn.cached_property
     def mass_t(self) -> base.DoubleVector:
-        """Transverse component of particle mass, :math:`m_T`."""
+        """Transverse component of particle mass, :math:`m_T`.
+
+        .. versionchanged:: 0.3.1
+           Fixed bug for momenta with negative :math:`p_z`.
+        """
         return calculate._root_diff_two_squares(self.energy, self.z).reshape(
             -1
         )
@@ -1373,7 +1399,7 @@ class MomentumArray(base.ArrayBase):
         shift: ty.Union[float, base.DoubleVector],
         experimental: bool = False,
         max_corrections: int = 10,
-        abs_tol: float = 1.0e-14,
+        abs_tol: float = ZERO_TOL,
     ) -> "MomentumArray":
         """Performs a Lorentz boost to a new frame, with a
         pseudorapidity increased by ``shift``.
@@ -1414,7 +1440,7 @@ class MomentumArray(base.ArrayBase):
 
         Warns
         -----
-        UserWarning
+        NumericalStabilityWarning
             If the method is unable to converge within ``abs_tol`` after
             ``max_corrections`` corrective iterations.
 
@@ -1453,7 +1479,8 @@ class MomentumArray(base.ArrayBase):
             eta_mid, _ = calculate.resultant_coords(pmu, pseudo=True)
         if converged is not True:
             warnings.warn(
-                f"Unable to converge within a tolerance of {abs_tol}."
+                f"Unable to converge within a tolerance of {abs_tol}.",
+                base.NumericalStabilityWarning,
             )
         return pmu
 
@@ -1534,11 +1561,9 @@ class MomentumArray(base.ArrayBase):
         passing the same instance to the ``other`` parameter.
         """
         get_rapidity = op.attrgetter("eta")
-        if pseudo is False:
+        if not pseudo:
             get_rapidity = op.attrgetter("rapidity")
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            rap1, rap2 = get_rapidity(self), get_rapidity(other)
+        rap1, rap2 = get_rapidity(self), get_rapidity(other)
         with calculate._thread_scope(threads):
             if self is other:
                 return calculate._delta_R_symmetric(rap1, self._xy_pol)

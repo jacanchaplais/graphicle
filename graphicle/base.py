@@ -28,6 +28,7 @@ __all__ = [
     "AdjacencyBase",
     "MaskBase",
     "MaskLike",
+    "NumericalStabilityWarning",
 ]
 
 DoubleVector = npt.NDArray[np.float64]
@@ -248,3 +249,13 @@ class MaskBase(ABC):
     @abstractmethod
     def __bool__(self) -> bool:
         pass
+
+
+class NumericalStabilityWarning(UserWarning):
+    """Raised when the result of a calculation may not be numerically
+    stable.
+
+    :group: errors_warnings
+
+    .. versionadded:: 0.3.1
+    """
