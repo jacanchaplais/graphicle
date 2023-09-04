@@ -54,6 +54,7 @@ import numpy as np
 import numpy.typing as npt
 import typing_extensions as tyx
 from attr import Factory, asdict, cmp_using, define, field, setters
+from deprecation import deprecated
 from mcpid.lookup import PdgRecords
 from numpy.lib import recfunctions as rfn
 from rich.console import Console
@@ -812,6 +813,11 @@ class MaskGroup(base.MaskBase, ty.MutableMapping[str, MaskGeneric]):
                 "Please contact developers with a bug report."
             )
 
+    @deprecated(
+        deprecated_in="0.3.2",
+        removed_in="0.4.0",
+        details="Use MaskGroup.serialize() instead.",
+    )
     def to_dict(self) -> ty.Dict[str, base.BoolVector]:
         """Masks nested in a dictionary instead of a ``MaskGroup``."""
         return {key: val.data for key, val in self._mask_arrays.items()}
