@@ -1987,12 +1987,12 @@ class ParticleSetSerialized(tyx.TypedDict, total=False):
     .. versionadded:: 0.3.2
     """
 
-    pdg: ty.List[int]
-    pmu: ty.List[ty.Tuple[float, float, float, float]]
-    color: ty.List[ty.Tuple[int, int]]
-    helicity: ty.List[int]
-    status: ty.List[int]
-    final: ty.List[bool]
+    pdg: ty.Tuple[int, ...]
+    pmu: ty.Tuple[MomentumElement, ...]
+    color: ty.Tuple[ColorElement, ...]
+    helicity: ty.Tuple[int, ...]
+    status: ty.Tuple[int, ...]
+    final: ty.Tuple[bool, ...]
 
 
 @define
@@ -2390,13 +2390,13 @@ class GraphicleSerialized(tyx.TypedDict, total=False):
     .. versionadded:: 0.3.2
     """
 
-    pdg: ty.List[int]
-    pmu: ty.List[ty.Tuple[float, float, float, float]]
-    color: ty.List[ty.Tuple[int, int]]
-    helicity: ty.List[int]
-    status: ty.List[int]
-    final: ty.List[bool]
-    adj: ty.List[ty.Tuple[int, int]]
+    pdg: ty.Tuple[int, ...]
+    pmu: ty.Tuple[MomentumElement, ...]
+    color: ty.Tuple[ColorElement, ...]
+    helicity: ty.Tuple[int, ...]
+    status: ty.Tuple[int, ...]
+    final: ty.Tuple[bool, ...]
+    adj: ty.Tuple[VertexPair, ...]
 
 
 @define
