@@ -778,6 +778,7 @@ class MaskGroup(base.MaskBase, ty.MutableMapping[str, MaskGeneric]):
         return _mask_neq(self, other)
 
     def copy(self) -> "MaskGroup[MaskGeneric]":
+        """Copies the underlying data into a new MaskGroup instance."""
         mask_copies = map(op.methodcaller("copy"), self._mask_arrays.values())
         return self.__class__(
             cl.OrderedDict(zip(self._mask_arrays.keys(), mask_copies)),
@@ -1072,6 +1073,7 @@ class PdgArray(base.ArrayBase):
         self._data = values  # type: ignore
 
     def copy(self) -> "PdgArray":
+        """Copies the underlying data into a new PdgArray instance."""
         return self.__class__(self._data.copy())
 
     def mask(
@@ -1274,6 +1276,7 @@ class MomentumArray(base.ArrayBase):
         return _array_ne(self, other)
 
     def copy(self) -> "MomentumArray":
+        """Copies the underlying data into a new MomentumArray instance."""
         return self.__class__(self._data.copy())
 
     @property
@@ -1665,7 +1668,7 @@ class ColorArray(base.ArrayBase):
         self._data = values  # type: ignore
 
     def copy(self) -> "ColorArray":
-        """Produces a deepcopy of the data."""
+        """Copies the underlying data into a new ColorArray instance."""
         return self.__class__(self._data.copy())
 
     def __getitem__(self, key) -> "ColorArray":
@@ -1753,7 +1756,7 @@ class HelicityArray(base.ArrayBase):
         self._data = values  # type: ignore
 
     def copy(self) -> "HelicityArray":
-        """Produces a deepcopy of the data."""
+        """Copies the underlying data into a new HelicityArray instance."""
         return self.__class__(self._data.copy())
 
     def __getitem__(self, key) -> "HelicityArray":
@@ -1869,7 +1872,7 @@ class StatusArray(base.ArrayBase):
         self._data = values  # type: ignore
 
     def copy(self) -> "StatusArray":
-        """Returns a deepcopy of the data."""
+        """Copies the underlying data into a new StatusArray instance."""
         return self.__class__(self._data.copy())
 
     def in_range(
@@ -2053,7 +2056,7 @@ class ParticleSet(base.ParticleBase):
         return _composite_len(self)
 
     def copy(self) -> "ParticleSet":
-        """Produces a deepcopy of the data."""
+        """Copies the underlying data into a new ParticleSet instance."""
         return _composite_copy(self)
 
     @classmethod
@@ -2200,6 +2203,7 @@ class AdjacencyList(base.AdjacencyBase):
         return self.__class__(self._data[key].reshape(-1, 2))
 
     def copy(self) -> "AdjacencyList":
+        """Copies the underlying data into a new AdjacencyList instance."""
         return self.__class__(self._data.copy())
 
     @fn.cached_property
@@ -2436,6 +2440,7 @@ class Graphicle:
         return _composite_len(self)
 
     def copy(self) -> "Graphicle":
+        """Copies the underlying data into a new Graphicle instance."""
         return _composite_copy(self)
 
     @classmethod
