@@ -147,8 +147,8 @@ class ColorElement(ty.NamedTuple):
 
 
 class VertexPair(ty.NamedTuple):
-    """Named tuple container for the color / anticolor pair of a single
-    particle.
+    """Named tuple container for the src and dst nodes representing an
+    edge in a graph.
 
     :group: datastructure
 
