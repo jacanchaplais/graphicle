@@ -1976,6 +1976,13 @@ def _composite_copy(instance: CompositeGeneric) -> CompositeGeneric:
 
 
 class ParticleSetSerialized(tyx.TypedDict, total=False):
+    """Typed dictionary format of a serialized ParticleSet instance.
+
+    .. versionadded:: 0.3.2
+
+    :group: datastructure
+    """
+
     pdg: ty.List[int]
     pmu: ty.List[ty.Tuple[float, float, float, float]]
     color: ty.List[ty.Tuple[int, int]]
@@ -2371,6 +2378,13 @@ class AdjacencyList(base.AdjacencyBase):
 
 
 class GraphicleSerialized(tyx.TypedDict, total=False):
+    """Typed dictionary format of a serialized Graphicle instance.
+
+    .. versionadded:: 0.3.2
+
+    :group: datastructure
+    """
+
     pdg: ty.List[int]
     pmu: ty.List[ty.Tuple[float, float, float, float]]
     color: ty.List[ty.Tuple[int, int]]
