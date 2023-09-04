@@ -1977,9 +1977,9 @@ def _composite_copy(instance: CompositeGeneric) -> CompositeGeneric:
 class ParticleSetSerialized(tyx.TypedDict, total=False):
     """Typed dictionary format of a serialized ParticleSet instance.
 
-    .. versionadded:: 0.3.2
-
     :group: datastructure
+
+    .. versionadded:: 0.3.2
     """
 
     pdg: ty.List[int]
@@ -2379,9 +2379,9 @@ class AdjacencyList(base.AdjacencyBase):
 class GraphicleSerialized(tyx.TypedDict, total=False):
     """Typed dictionary format of a serialized Graphicle instance.
 
-    .. versionadded:: 0.3.2
-
     :group: datastructure
+
+    .. versionadded:: 0.3.2
     """
 
     pdg: ty.List[int]
