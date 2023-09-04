@@ -76,9 +76,11 @@ __all__ = [
     "HelicityArray",
     "StatusArray",
     "ParticleSet",
+    "ParticleSetSerialized",
     "AdjacencyList",
     "VertexPair",
     "Graphicle",
+    "GraphicleSerialized",
 ]
 
 
