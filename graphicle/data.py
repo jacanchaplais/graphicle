@@ -49,9 +49,11 @@ import warnings
 from copy import deepcopy
 from enum import Enum
 
+import more_itertools as mit
 import numpy as np
 import numpy.typing as npt
-from attr import Factory, cmp_using, define, field, setters
+import typing_extensions as tyx
+from attr import Factory, asdict, cmp_using, define, field, setters
 from mcpid.lookup import PdgRecords
 from numpy.lib import recfunctions as rfn
 from rich.console import Console
@@ -412,16 +414,6 @@ class MaskArray(base.MaskBase, base.ArrayBase):
     data : sequence[bool]
         Boolean values consituting the mask.
 
-    Attributes
-    ----------
-    data : ndarray[bool_]
-        Numpy representation of the boolean mask.
-
-    Methods
-    -------
-    copy()
-        Provides a deepcopy of the data.
-
     Examples
     --------
     Instantiating, copying, updating by index, and comparison:
@@ -461,9 +453,10 @@ class MaskArray(base.MaskBase, base.ArrayBase):
         return _array_ufunc(self, ufunc, method, *inputs, **kwargs)
 
     def __iter__(self) -> ty.Iterator[bool]:
-        return map(bool, self.data)
+        yield from map(op.methodcaller("item"), self.data)
 
     def copy(self) -> "MaskArray":
+        """Copies the underlying data into a new MaskArray instance."""
         return self.__class__(self._data.copy())
 
     def __repr__(self) -> str:
@@ -520,6 +513,7 @@ class MaskArray(base.MaskBase, base.ArrayBase):
 
     @property
     def data(self) -> base.BoolVector:
+        """Numpy representation of the boolean mask."""
         return self._data
 
     @data.setter
@@ -527,6 +521,13 @@ class MaskArray(base.MaskBase, base.ArrayBase):
         self, values: ty.Union[base.BoolVector, ty.Sequence[bool]]
     ) -> None:
         self._data = values  # type: ignore
+
+    def serialize(self) -> ty.Tuple[bool, ...]:
+        """Provides a serialized version of the underlying data.
+
+        .. versionadded:: 0.3.2
+        """
+        return tuple(self.data.tolist())
 
 
 def _mask_compat(*masks: base.MaskLike) -> bool:
@@ -897,6 +898,13 @@ class MaskGroup(base.MaskBase, ty.MutableMapping[str, MaskGeneric]):
             "or",
         )
 
+    def serialize(self) -> ty.Dict[str, ty.Any]:
+        """Returns serialized data as a dictionary.
+
+        .. versionadded:: 0.3.2
+        """
+        return {key: val.serialize() for key, val in self._mask_arrays.items()}
+
 
 @define(eq=False)
 class PdgArray(base.ArrayBase):
@@ -1018,7 +1026,7 @@ class PdgArray(base.ArrayBase):
         return _array_repr(self)
 
     def __iter__(self) -> ty.Iterator[int]:
-        yield from map(int, self.data)
+        yield from map(op.methodcaller("item"), self.data)
 
     def __len__(self) -> int:
         return len(self.data)
@@ -1156,6 +1164,13 @@ class PdgArray(base.ArrayBase):
     def charge_parity(self) -> base.DoubleVector:
         return self.__get_prop("c")
 
+    def serialize(self) -> ty.Tuple[int, ...]:
+        """Provides a serialized version of the underlying data.
+
+        .. versionadded:: 0.3.2
+        """
+        return tuple(self.data.tolist())
+
 
 @define(eq=False)
 class MomentumArray(base.ArrayBase):
@@ -1222,8 +1237,8 @@ class MomentumArray(base.ArrayBase):
         return cls(array)
 
     def __iter__(self) -> ty.Iterator[MomentumElement]:
-        flat_vals = map(float, self._data.flatten())
-        elems = zip(*(flat_vals,) * 4)  # type: ignore
+        flat_vals = map(op.methodcaller("item"), self._data.flatten())
+        elems = mit.ichunked(flat_vals, 4)
         yield from it.starmap(MomentumElement, elems)
 
     def __len__(self) -> int:
@@ -1569,6 +1584,13 @@ class MomentumArray(base.ArrayBase):
                 return calculate._delta_R_symmetric(rap1, self._xy_pol)
             return calculate._delta_R(rap1, rap2, self._xy_pol, other._xy_pol)
 
+    def serialize(self) -> ty.Tuple[MomentumElement, ...]:
+        """Provides a serialized version of the underlying data.
+
+        .. versionadded:: 0.3.2
+        """
+        return tuple(self)
+
 
 @define(eq=False)
 class ColorArray(base.ArrayBase):
@@ -1619,8 +1641,8 @@ class ColorArray(base.ArrayBase):
         return _array_repr(self)
 
     def __iter__(self) -> ty.Iterator[ColorElement]:
-        flat_vals = map(int, it.chain.from_iterable(self.data))
-        elems = zip(*(flat_vals,) * 2)
+        flat_vals = map(op.methodcaller("item"), self._data.flatten())
+        elems = mit.ichunked(flat_vals, 2)
         yield from it.starmap(ColorElement, elems)
 
     @property
@@ -1658,6 +1680,13 @@ class ColorArray(base.ArrayBase):
         self, other: ty.Union[base.ArrayBase, base.AnyVector]
     ) -> MaskArray:
         return _array_ne(self, other)
+
+    def serialize(self) -> ty.Tuple[ColorElement, ...]:
+        """Provides a serialized version of the underlying data.
+
+        .. versionadded:: 0.3.2
+        """
+        return tuple(self)
 
 
 @define(eq=False)
@@ -1705,7 +1734,7 @@ class HelicityArray(base.ArrayBase):
         return _array_repr(self)
 
     def __iter__(self) -> ty.Iterator[int]:
-        yield from map(int, self.data)
+        yield from map(op.methodcaller("item"), self.data)
 
     @property
     def data(self) -> base.HalfIntVector:
@@ -1739,6 +1768,13 @@ class HelicityArray(base.ArrayBase):
         self, other: ty.Union[base.ArrayBase, base.AnyVector]
     ) -> MaskArray:
         return _array_ne(self, other)
+
+    def serialize(self) -> ty.Tuple[int, ...]:
+        """Provides a serialized version of the underlying data.
+
+        .. versionadded:: 0.3.2
+        """
+        return tuple(self.data.tolist())
 
 
 @define(eq=False)
@@ -1792,7 +1828,7 @@ class StatusArray(base.ArrayBase):
         return _array_repr(self)
 
     def __iter__(self) -> ty.Iterator[int]:
-        yield from map(int, self.data)
+        yield from map(op.methodcaller("item"), self.data)
 
     def __getitem__(self, key) -> "StatusArray":
         if isinstance(key, base.MaskBase):
@@ -1880,6 +1916,13 @@ class StatusArray(base.ArrayBase):
         )
         return masks
 
+    def serialize(self) -> ty.Tuple[int, ...]:
+        """Provides a serialized version of the underlying data.
+
+        .. versionadded:: 0.3.2
+        """
+        return tuple(self.data.tolist())
+
 
 DsetPair = ty.Tuple[ty.Iterator[str], ty.Iterator[base.ArrayBase]]
 CompositeType = ty.Union["ParticleSet", "Graphicle"]
@@ -1923,6 +1966,15 @@ def _composite_copy(instance: CompositeGeneric) -> CompositeGeneric:
     names, data = _nonempty_dsets(instance)
     copies = map(op.methodcaller("copy"), data)
     return instance.__class__(**dict(zip(names, copies)))
+
+
+class ParticleSetSerialized(tyx.TypedDict, total=False):
+    pdg: ty.List[int]
+    pmu: ty.List[ty.Tuple[float, float, float, float]]
+    color: ty.List[ty.Tuple[int, int]]
+    helicity: ty.List[int]
+    status: ty.List[int]
+    final: ty.List[bool]
 
 
 @define
@@ -2041,10 +2093,14 @@ class ParticleSet(base.ParticleBase):
             final=optional(MaskArray, final),
         )
 
+    def serialize(self) -> ParticleSetSerialized:
+        """Returns serialized data as a dictionary.
 
-class AdjDict(ty.TypedDict):
-    edges: ty.Tuple[ty.Tuple[int, int, ty.Dict[str, ty.Any]], ...]
-    nodes: ty.Tuple[ty.Tuple[int, ty.Dict[str, ty.Any]], ...]
+        .. versionadded:: 0.3.2
+        """
+        return {
+            key: getattr(self, key).serialize() for key in asdict(self).keys()
+        }  # type: ignore
 
 
 @define
@@ -2100,8 +2156,8 @@ class AdjacencyList(base.AdjacencyBase):
         return _array_repr(self)
 
     def __iter__(self) -> ty.Iterator[VertexPair]:
-        flat_vals = map(int, it.chain.from_iterable(self._data))
-        elems = zip(*(flat_vals,) * 2)
+        flat_vals = map(op.methodcaller("item"), self._data.flatten())
+        elems = mit.ichunked(flat_vals, 2)
         yield from it.starmap(VertexPair, elems)
 
     def __len__(self) -> int:
@@ -2299,6 +2355,23 @@ class AdjacencyList(base.AdjacencyBase):
             shape=(size, size),
         )
 
+    def serialize(self) -> ty.Tuple[VertexPair, ...]:
+        """Provides a serialized version of the underlying data.
+
+        .. versionadded:: 0.3.2
+        """
+        return tuple(self)
+
+
+class GraphicleSerialized(tyx.TypedDict, total=False):
+    pdg: ty.List[int]
+    pmu: ty.List[ty.Tuple[float, float, float, float]]
+    color: ty.List[ty.Tuple[int, int]]
+    helicity: ty.List[int]
+    status: ty.List[int]
+    final: ty.List[bool]
+    adj: ty.List[ty.Tuple[int, int]]
+
 
 @define
 class Graphicle:
@@ -2489,3 +2562,9 @@ class Graphicle:
     def nodes(self) -> base.IntVector:
         """Vertex ids of each particle with at least one edge."""
         return self.adj.nodes
+
+    def serialize(self) -> GraphicleSerialized:
+        """Returns serialized data as a dictionary."""
+        out_dict: GraphicleSerialized = self.particles.serialize()
+        out_dict["adj"] = self.adj.serialize()
+        return out_dict
