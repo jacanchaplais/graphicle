@@ -120,9 +120,9 @@ _EDGE_ORDER = ("src", "dst")
 class MomentumElement(ty.NamedTuple):
     """Named tuple container for the four-momentum of a single particle.
 
-    .. versionadded:: 0.2.0
-
     :group: datastructure
+
+    .. versionadded:: 0.2.0
     """
 
     x: float
@@ -135,9 +135,9 @@ class ColorElement(ty.NamedTuple):
     """Named tuple container for the color / anticolor pair of a single
     particle.
 
-    .. versionadded:: 0.2.0
-
     :group: datastructure
+
+    .. versionadded:: 0.2.0
     """
 
     color: int
@@ -148,9 +148,9 @@ class VertexPair(ty.NamedTuple):
     """Named tuple container for the color / anticolor pair of a single
     particle.
 
-    .. versionadded:: 0.2.0
-
     :group: datastructure
+
+    .. versionadded:: 0.2.0
     """
 
     src: int
@@ -403,12 +403,12 @@ def _truthy(data: ty.Union[base.ArrayBase, base.AdjacencyBase]) -> bool:
 class MaskArray(base.MaskBase, base.ArrayBase):
     """Boolean mask over Graphicle data structures.
 
+    :group: datastructure
+
     .. versionadded:: 0.1.0
 
     .. versionchanged:: 0.2.0
        Added internal numpy interfaces for greater interoperability.
-
-    :group: datastructure
 
     Parameters
     ----------
@@ -616,14 +616,13 @@ class MaskGroup(base.MaskBase, ty.MutableMapping[str, MaskGeneric]):
     """Data structure to compose groups of masks over particle arrays.
     Can be nested to form complex hierarchies.
 
-    .. versionadded:: 0.1.0
+    :group: datastructure
 
+    .. versionadded:: 0.1.0
     .. versionchanged:: 0.2.6
        Changed ``bitwise_or`` and ``bitwise_and`` properties into
        methods.
        Added generic type hinting for elements within ``MaskGroup``.
-
-    :group: datastructure
 
     Parameters
     ----------
@@ -918,12 +917,12 @@ class PdgArray(base.ArrayBase):
     """Returns data structure containing PDG integer codes for particle
     data.
 
+    :group: datastructure
+
     .. versionadded:: 0.1.0
 
     .. versionchanged:: 0.2.0
        Added internal numpy interfaces for greater interoperability.
-
-    :group: datastructure
 
     Parameters
     ----------
@@ -1183,6 +1182,8 @@ class PdgArray(base.ArrayBase):
 class MomentumArray(base.ArrayBase):
     """Data structure containing four-momentum of particle list.
 
+    :group: datastructure
+
     .. versionadded:: 0.1.0
 
     .. versionchanged:: 0.2.0
@@ -1193,8 +1194,6 @@ class MomentumArray(base.ArrayBase):
 
     .. versionchanged:: 0.2.11
        Added ``mass_t`` attribute.
-
-    :group: datastructure
 
     Parameters
     ----------
@@ -1604,12 +1603,12 @@ class ColorArray(base.ArrayBase):
     """Returns data structure of color / anti-color pairs for particle
     shower.
 
+    :group: datastructure
+
     .. versionadded:: 0.1.0
 
     .. versionchanged:: 0.2.0
        Added internal numpy interfaces for greater interoperability.
-
-    :group: datastructure
 
     Parameters
     ----------
@@ -1701,12 +1700,12 @@ class HelicityArray(base.ArrayBase):
     """Data structure containing helicity / polarisation values for
     particle set.
 
+    :group: datastructure
+
     .. versionadded:: 0.1.0
 
     .. versionchanged:: 0.2.0
        Added internal numpy interfaces for greater interoperability.
-
-    :group: datastructure
 
     Parameters
     ----------
@@ -1788,12 +1787,12 @@ class HelicityArray(base.ArrayBase):
 class StatusArray(base.ArrayBase):
     """Data structure containing status values for particle set.
 
+    :group: datastructure
+
     .. versionadded:: 0.1.0
 
     .. versionchanged:: 0.2.0
        Added internal numpy interfaces for greater interoperability.
-
-    :group: datastructure
 
     Parameters
     ----------
@@ -1995,9 +1994,9 @@ class ParticleSetSerialized(tyx.TypedDict, total=False):
 class ParticleSet(base.ParticleBase):
     """Composite of data structures containing particle set description.
 
-    .. versionadded:: 0.1.0
-
     :group: datastructure
+
+    .. versionadded:: 0.1.0
 
     Parameters
     ----------
@@ -2122,6 +2121,8 @@ class AdjacencyList(base.AdjacencyBase):
     """Describes relations between particles in particle set using a
     COO edge list, and provides methods to convert representation.
 
+    :group: datastructure
+
     .. versionadded:: 0.1.0
 
     .. versionchanged:: 0.2.4
@@ -2129,8 +2130,6 @@ class AdjacencyList(base.AdjacencyBase):
 
     .. versionchanged:: 0.3.0
        Renamed "in" / "out" fields to "src" / "dst".
-
-    :group: datastructure
 
     Parameters
     ----------
@@ -2399,12 +2398,12 @@ class Graphicle:
     """Composite object, combining particle set data with relational
     information between particles.
 
+    :group: datastructure
+
     .. versionadded:: 0.1.0
 
     .. versionchanged:: 0.2.4
        Removed ``hard_vertex`` attribute.
-
-    :group: datastructure
 
     Parameters
     ----------
