@@ -49,7 +49,6 @@ import warnings
 from copy import deepcopy
 from enum import Enum
 
-import more_itertools as mit
 import numpy as np
 import numpy.typing as npt
 import typing_extensions as tyx
@@ -456,7 +455,7 @@ class MaskArray(base.MaskBase, base.ArrayBase):
         return _array_ufunc(self, ufunc, method, *inputs, **kwargs)
 
     def __iter__(self) -> ty.Iterator[bool]:
-        yield from map(op.methodcaller("item"), self.data)
+        yield from self._data.tolist()
 
     def copy(self) -> "MaskArray":
         """Copies the underlying data into a new MaskArray instance."""
@@ -1035,7 +1034,7 @@ class PdgArray(base.ArrayBase):
         return _array_repr(self)
 
     def __iter__(self) -> ty.Iterator[int]:
-        yield from map(op.methodcaller("item"), self.data)
+        yield from self._data.tolist()
 
     def __len__(self) -> int:
         return len(self.data)
@@ -1247,8 +1246,7 @@ class MomentumArray(base.ArrayBase):
         return cls(array)
 
     def __iter__(self) -> ty.Iterator[MomentumElement]:
-        flat_vals = map(op.methodcaller("item"), self._data.flatten())
-        elems = mit.ichunked(flat_vals, 4)
+        elems = map(op.methodcaller("tolist"), self._data)
         yield from it.starmap(MomentumElement, elems)
 
     def __len__(self) -> int:
@@ -1652,8 +1650,7 @@ class ColorArray(base.ArrayBase):
         return _array_repr(self)
 
     def __iter__(self) -> ty.Iterator[ColorElement]:
-        flat_vals = map(op.methodcaller("item"), self._data.flatten())
-        elems = mit.ichunked(flat_vals, 2)
+        elems = map(op.methodcaller("tolist"), self._data)
         yield from it.starmap(ColorElement, elems)
 
     @property
@@ -1745,7 +1742,7 @@ class HelicityArray(base.ArrayBase):
         return _array_repr(self)
 
     def __iter__(self) -> ty.Iterator[int]:
-        yield from map(op.methodcaller("item"), self.data)
+        yield from self._data.tolist()
 
     @property
     def data(self) -> base.HalfIntVector:
@@ -1839,7 +1836,7 @@ class StatusArray(base.ArrayBase):
         return _array_repr(self)
 
     def __iter__(self) -> ty.Iterator[int]:
-        yield from map(op.methodcaller("item"), self.data)
+        yield from self._data.tolist()
 
     def __getitem__(self, key) -> "StatusArray":
         if isinstance(key, base.MaskBase):
@@ -2174,8 +2171,7 @@ class AdjacencyList(base.AdjacencyBase):
         return _array_repr(self)
 
     def __iter__(self) -> ty.Iterator[VertexPair]:
-        flat_vals = map(op.methodcaller("item"), self._data.flatten())
-        elems = mit.ichunked(flat_vals, 2)
+        elems = map(op.methodcaller("tolist"), self._data)
         yield from it.starmap(VertexPair, elems)
 
     def __len__(self) -> int:
