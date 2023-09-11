@@ -40,6 +40,7 @@ For more details, see individual docstrings.
 import collections as cl
 import collections.abc as cla
 import functools as fn
+import io
 import itertools as it
 import math
 import numbers as nm
@@ -49,6 +50,7 @@ import warnings
 from copy import deepcopy
 from enum import Enum
 
+import more_itertools as mit
 import numpy as np
 import numpy.typing as npt
 import typing_extensions as tyx
@@ -59,6 +61,7 @@ from numpy.lib import recfunctions as rfn
 from rich.console import Console
 from rich.tree import Tree
 from scipy.sparse import coo_array, csr_array
+from tabulate import tabulate
 from typicle import Types
 
 from . import base, calculate
@@ -287,6 +290,60 @@ def _array_repr(instance: ty.Union[base.ArrayBase, base.AdjacencyBase]) -> str:
     dtype_str = idnt + dtype_str
     rows = "\n".join(map(op.add, it.repeat(idnt), data_splits))
     return f"{class_name}({first_str}\n{rows},\n{dtype_str})"
+
+
+def _table_repr(
+    headers: ty.Tuple[str, ...],
+    rows: ty.Iterable[ty.Iterable[ty.Any]],
+    num_rows: int,
+    html: bool,
+    max_rows=60,
+) -> str:
+    """Provides a table representation for composite objects.
+
+    Parameters
+    ----------
+    headers : tuple[str, ...]
+        Header names for the table.
+    rows : Iterable[Iterable[Any]]
+        Each element corresponds to a row, which contains an element
+        for each column defined by ``headers``.
+    num_rows : int
+        Length of the ``rows`` iterable.
+    html : bool
+        Whether or not the output string should be rendered as an HTML
+        table.
+    max_rows : int
+        The maximum number of rows to display before truncating the
+        output. Default is 60.
+
+    Returns
+    -------
+    tabular_string : str
+        String representation of the composite objects as a table,
+        either plain or HTML formatted.
+    """
+    if num_rows > max_rows:
+        head = mit.take(4, rows)
+        miss = (None for _ in headers)
+        tail = mit.tail(4, rows)
+        rows = it.chain(head, [miss], tail)
+    output = io.StringIO(
+        tabulate(
+            list(rows),
+            headers=headers,
+            tablefmt="html" if html else "plain",
+            floatfmt=".2E",
+            missingval="...",
+        )
+    )
+    output.seek(0, io.SEEK_END)
+    num_attrs = len(headers)
+    stat_line = f"{num_rows} particles x {num_attrs} attributes"
+    if not html:
+        stat_line = f"[{stat_line}]"
+    output.write(f"\n\n{stat_line}")
+    return output.getvalue()
 
 
 def _reorder_pmu(array: base.VoidVector) -> base.VoidVector:
@@ -2052,6 +2109,40 @@ class ParticleSet(base.ParticleBase):
     def __len__(self) -> int:
         return _composite_len(self)
 
+    def _table_list(
+        self,
+    ) -> ty.Tuple[ty.Tuple[str, ...], ty.Iterable[ty.Iterable[ty.Any]]]:
+        """Provides the serialised tabular data for converting into a
+        string representation.
+        """
+        column_names = ("pdg", "pmu", "color", "helicity", "status", "final")
+        columns_max = (getattr(self, prop) for prop in column_names)
+        headers_ = []
+        columns_ = []
+        for name, column in zip(column_names, columns_max):
+            if column:
+                if name == "pdg":
+                    headers_.append("name")
+                    column = column.name.tolist()
+                elif name == "pmu":
+                    headers_.extend(["px", "py", "pz", "energy"])
+                elif name == "color":
+                    headers_.extend(["color", "anticolor"])
+                else:
+                    headers_.append(name)
+                columns_.append(column)
+        rows_nest = zip(*columns_)
+        rows_flat = map(tuple, map(mit.collapse, rows_nest))
+        return tuple(headers_), rows_flat
+
+    def _repr_html_(self) -> str:
+        headers, rows_flat = self._table_list()
+        return _table_repr(headers, rows_flat, num_rows=len(self), html=True)
+
+    def __str__(self) -> str:
+        headers, rows_flat = self._table_list()
+        return _table_repr(headers, rows_flat, num_rows=len(self), html=False)
+
     def copy(self) -> "ParticleSet":
         """Copies the underlying data into a new ParticleSet instance."""
         return _composite_copy(self)
@@ -2434,6 +2525,24 @@ class Graphicle:
 
     def __len__(self) -> int:
         return _composite_len(self)
+
+    def _repr_html_(self) -> str:
+        num_rows = len(self)
+        headers, rows = self.particles._table_list()
+        if not self.adj:
+            return _table_repr(headers, rows, num_rows, True)
+        headers = headers + ("src", "dst")
+        rows = map(lambda row, edge: row + edge, rows, self.adj)
+        return _table_repr(headers, rows, num_rows, True)
+
+    def __str__(self) -> str:
+        num_rows = len(self)
+        headers, rows = self.particles._table_list()
+        if not self.adj:
+            return _table_repr(headers, rows, num_rows, False)
+        headers = headers + ("src", "dst")
+        rows = map(lambda row, edge: row + edge, rows, self.adj)
+        return _table_repr(headers, rows, num_rows, False)
 
     def copy(self) -> "Graphicle":
         """Copies the underlying data into a new Graphicle instance."""
