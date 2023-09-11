@@ -446,7 +446,7 @@ def _rapidity(
     return rap
 
 
-@nb.vectorize([nb.float64(nb.float64, nb.float64)])
+@nb.vectorize("float64(float64, float64)")
 def _root_diff_two_squares(
     x1: base.DoubleUfunc, x2: base.DoubleUfunc
 ) -> base.DoubleUfunc:
@@ -481,9 +481,7 @@ def _root_diff_two_squares(
 
 
 @nb.njit(
-    nb.float64[:, :](
-        nb.float64[:], nb.float64[:], nb.complex128[:], nb.complex128[:]
-    ),
+    "float64[:, :](float64[:], float64[:], complex128[:], complex128[:])",
     parallel=True,
 )
 def _delta_R(
@@ -523,10 +521,7 @@ def _delta_R(
     return result
 
 
-@nb.njit(
-    nb.float64[:, :](nb.float64[:], nb.complex128[:]),
-    parallel=True,
-)
+@nb.njit("float64[:, :](float64[:], complex128[:])", parallel=True)
 def _delta_R_symmetric(
     rapidity: base.DoubleVector, xy_pol: base.ComplexVector
 ) -> base.DoubleVector:
