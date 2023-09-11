@@ -338,7 +338,7 @@ def _table_repr(
         )
     )
     num_attrs = len(headers)
-    stat_line = f"{num_rows} particles x {num_attrs} attributes"
+    stat_line = f"{num_rows} particles \u00D7 {num_attrs} attributes"
     if not html:
         stat_line = f"[{stat_line}]"
     output.seek(0, io.SEEK_END)
