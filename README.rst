@@ -142,8 +142,6 @@ wrapped with ``showerpipe``.
    MaskGroup(mask_arrays=["W+", "W-"], agg_op=OR)
    # filter data record to get final state W+ boson descendants
    >>> Wp_desc = graph[W_mask["W+"] & graph.final]
-   >>> Wp_desc.pdg
-   PdgArray([ 22  16 -16 211  22  22  22  22], dtype=int32)
    >>> print(Wp_desc)
    name            px         py         pz    energy    color    anticolor    helicity    status  final      src    dst
    gamma     2.46E-05  -5.65E-06  -1.54E-05  2.95E-05        0            0           9        51  True      -350    353
