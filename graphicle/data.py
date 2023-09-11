@@ -2135,13 +2135,15 @@ class ParticleSet(base.ParticleBase):
         rows_flat = map(tuple, map(mit.collapse, rows_nest))
         return tuple(headers_), rows_flat
 
-    def _repr_html_(self) -> str:
+    def _table_str(self, html: bool) -> str:
         headers, rows_flat = self._table_list()
-        return _table_repr(headers, rows_flat, num_rows=len(self), html=True)
+        return _table_repr(headers, rows_flat, num_rows=len(self), html=html)
+
+    def _repr_html_(self) -> str:
+        return self._table_str(html=True)
 
     def __str__(self) -> str:
-        headers, rows_flat = self._table_list()
-        return _table_repr(headers, rows_flat, num_rows=len(self), html=False)
+        return self._table_str(html=False)
 
     def copy(self) -> "ParticleSet":
         """Copies the underlying data into a new ParticleSet instance."""
@@ -2526,23 +2528,20 @@ class Graphicle:
     def __len__(self) -> int:
         return _composite_len(self)
 
-    def _repr_html_(self) -> str:
+    def _table_str(self, html: bool) -> str:
         num_rows = len(self)
         headers, rows = self.particles._table_list()
         if not self.adj:
-            return _table_repr(headers, rows, num_rows, True)
+            return _table_repr(headers, rows, num_rows, html)
         headers = headers + ("src", "dst")
         rows = map(lambda row, edge: row + edge, rows, self.adj)
-        return _table_repr(headers, rows, num_rows, True)
+        return _table_repr(headers, rows, num_rows, html)
+
+    def _repr_html_(self) -> str:
+        return self._table_str(html=True)
 
     def __str__(self) -> str:
-        num_rows = len(self)
-        headers, rows = self.particles._table_list()
-        if not self.adj:
-            return _table_repr(headers, rows, num_rows, False)
-        headers = headers + ("src", "dst")
-        rows = map(lambda row, edge: row + edge, rows, self.adj)
-        return _table_repr(headers, rows, num_rows, False)
+        return self._table_str(html=False)
 
     def copy(self) -> "Graphicle":
         """Copies the underlying data into a new Graphicle instance."""
