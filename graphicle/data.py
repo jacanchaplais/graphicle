@@ -337,11 +337,11 @@ def _table_repr(
             missingval="...",
         )
     )
-    output.seek(0, io.SEEK_END)
     num_attrs = len(headers)
     stat_line = f"{num_rows} particles x {num_attrs} attributes"
     if not html:
         stat_line = f"[{stat_line}]"
+    output.seek(0, io.SEEK_END)
     output.write(f"\n\n{stat_line}")
     return output.getvalue()
 
