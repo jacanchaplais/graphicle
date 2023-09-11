@@ -324,9 +324,9 @@ def _table_repr(
         either plain or HTML formatted.
     """
     if num_rows > max_rows:
-        head = mit.take(4, rows)
-        miss = (None for _ in headers)
-        tail = mit.tail(4, rows)
+        head = mit.take(5, rows)
+        miss = (None,) * len(headers)
+        tail = mit.tail(5, rows)
         rows = it.chain(head, [miss], tail)
     output = io.StringIO(
         tabulate(
