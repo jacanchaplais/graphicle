@@ -31,6 +31,8 @@ dependencies = [
     "rich",
     "deprecation",
     "typing-extensions >=4.7.1",
+    "more-itertools",
+    "tabulate",
 ]
 
 [project.urls]
