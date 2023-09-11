@@ -656,7 +656,7 @@ def hard_descendants(
     del hard_mask["incoming"]
     hard_graph = graph[hard_mask]
     if target is not None:
-        target_pdgs = set(target)
+        target_pdgs = set(target) if sign_sensitive else set(map(abs, target))
         target_mask = hard_graph.pdg.mask(
             target=tuple(target_pdgs),
             blacklist=False,
@@ -664,9 +664,12 @@ def hard_descendants(
         )
         if not np.any(target_mask):
             raise ValueError("No target PDGs found in hard process.")
-        if (strict is True) and (np.sum(target_mask) != len(target_pdgs)):
-            found_pdgs = set(map(int, hard_graph.pdg[target_mask]))
-            missing_pdgs = target_pdgs - found_pdgs
+        found_pdgs_ = hard_graph.pdg[target_mask]
+        if not sign_sensitive:
+            found_pdgs_ = np.abs(found_pdgs_)
+        found_pdgs = set(found_pdgs_)
+        missing_pdgs = target_pdgs - found_pdgs
+        if strict and missing_pdgs:
             missing_str = ", ".join(map(str, missing_pdgs))
             raise ValueError(f"Missing PDGs in hard process: {missing_str}.")
         hard_graph = hard_graph[target_mask]
