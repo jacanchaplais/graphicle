@@ -418,11 +418,12 @@ def flow_trace(
 def _rapidity(
     energy: base.DoubleVector, z: base.DoubleVector, zero_tol: float
 ) -> base.DoubleVector:
-    """Numpy ufunc to calculate the rapidity of a set of particles.
+    """Calculate the rapidity of a set of particles using energy
+    and longitudinal components of their four-momenta.
 
     Parameters
     ----------
-    energy, z : array_like
+    energy, z : ndarray[float64]
         Components of the particles' four-momenta.
     zero_tol : float
         Absolute tolerance for energy values to be considered close to
@@ -430,18 +431,18 @@ def _rapidity(
 
     Returns
     -------
-    ndarray or float
+    ndarray[float64]
         Rapidity of the particles.
     """
     rap = np.empty_like(energy)
-    for i in range(len(rap)):
-        z_ = abs(z[i])
-        diff = energy[i] - z_
-        if abs(diff) < zero_tol:
-            rap_ = math.inf
+    for idx, (e_val, z_val) in enumerate(zip(energy, z)):
+        z_val_abs = abs(z_val)
+        diff = e_val - z_val_abs
+        if abs(diff) > zero_tol:
+            rap_val = 0.5 * math.log((e_val + z_val_abs) / diff)
         else:
-            rap_ = 0.5 * math.log((energy[i] + z_) / diff)
-        rap[i] = math.copysign(rap_, z[i])
+            rap_val = math.inf
+        rap[idx] = math.copysign(rap_val, z_val)
     return rap
 
 
