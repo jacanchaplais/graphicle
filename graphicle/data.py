@@ -2120,17 +2120,18 @@ class ParticleSet(base.ParticleBase):
         headers_ = []
         columns_ = []
         for name, column in zip(column_names, columns_max):
-            if column:
-                if name == "pdg":
-                    headers_.append("name")
-                    column = column.name.tolist()
-                elif name == "pmu":
-                    headers_.extend(["px", "py", "pz", "energy"])
-                elif name == "color":
-                    headers_.extend(["color", "anticolor"])
-                else:
-                    headers_.append(name)
-                columns_.append(column)
+            if not column:
+                continue
+            if name == "pdg":
+                headers_.append("name")
+                column = column.name.tolist()
+            elif name == "pmu":
+                headers_.extend(["px", "py", "pz", "energy"])
+            elif name == "color":
+                headers_.extend(["color", "anticolor"])
+            else:
+                headers_.append(name)
+            columns_.append(column)
         rows_nest = zip(*columns_)
         rows_flat = map(tuple, map(mit.collapse, rows_nest))
         return tuple(headers_), rows_flat
