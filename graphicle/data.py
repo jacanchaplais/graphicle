@@ -1274,6 +1274,7 @@ class MomentumArray(base.ArrayBase):
     _HANDLED_TYPES: ty.Tuple[ty.Type, ...] = field(init=False, repr=False)
 
     def __attrs_post_init__(self):
+        self._data = self._data.reshape(-1, 4)
         self.dtype = np.dtype(list(zip("xyze", it.repeat("<f8"))))
         self._HANDLED_TYPES = (np.ndarray, nm.Number, cla.Sequence)
 
