@@ -35,6 +35,7 @@ __all__ = [
     "combined_mass",
     "flow_trace",
     "aggregate_momenta",
+    "cluster_coeff_distbn",
 ]
 
 
@@ -556,6 +557,54 @@ def _delta_R_symmetric(
             dphi = np.angle(xy_pol[i] * xy_pol[j].conjugate())
             result[i, j] = result[j, i] = np.hypot(drap, dphi)
     return result
+
+
+@nb.njit("float32[:](bool_[:, :])")
+def _clust_coeffs(adj: base.BoolVector) -> base.FloatVector:
+    num_nodes = adj.shape[0]
+    coefs = np.empty(num_nodes, dtype=np.float32)
+    for node_idx, row in enumerate(adj):
+        neibs = np.flatnonzero(row)
+        num_neibs = neibs.shape[0]
+        if num_neibs < 2:
+            coefs[node_idx] = 0.0
+            continue
+        num_interlinks_x2 = np.sum(adj[neibs, :][:, neibs], dtype=np.float32)
+        coefs[node_idx] = num_interlinks_x2 / (num_neibs * (num_neibs - 1))
+    return coefs
+
+
+def cluster_coeff_distbn(
+    pmu: "MomentumArray", radius: float, pseudo: bool = True
+) -> base.FloatVector:
+    """A measure of clustering for a particle point-cloud. Transforms
+    point-cloud into a graph, where node neighbourhood is determined by
+    which particles fall within a distance on the :math:`\\eta-\\phi`
+    plane below ``radius``. The clustering coefficients of these nodes
+    are then computed.
+
+    :group: calculate
+
+    .. versionadded:: 0.3.4
+
+    Parameters
+    ----------
+    pmu : MomentumArray
+        Four-momenta of particles in the point-cloud.
+    radius : float
+        Pairwise distance below which nodes are considered adjacent.
+    pseudo : bool
+        If True, will use pseudorapidity, rather than true rapidity.
+        Default is True.
+
+    Returns
+    -------
+    ndarray[float32]
+        Clustering coefficients of the particles in the point-cloud.
+    """
+    adj = pmu.delta_R(pmu, pseudo) < radius
+    np.fill_diagonal(adj, False)
+    return _clust_coeffs(adj)
 
 
 @ctx.contextmanager

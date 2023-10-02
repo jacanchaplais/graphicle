@@ -32,6 +32,7 @@ __all__ = [
 ]
 
 DoubleVector = npt.NDArray[np.float64]
+FloatVector = npt.NDArray[np.float32]
 ComplexVector = npt.NDArray[np.complex128]
 BoolVector = npt.NDArray[np.bool_]
 IntVector = npt.NDArray[np.int32]
