@@ -2111,30 +2111,29 @@ class ParticleSet(base.ParticleBase):
 
     def _table_list(
         self,
-    ) -> ty.Tuple[ty.Tuple[str, ...], ty.Iterable[ty.Iterable[ty.Any]]]:
+    ) -> ty.Tuple[ty.Tuple[str, ...], ty.Iterable[ty.Tuple[ty.Any, ...]]]:
         """Provides the serialised tabular data for converting into a
         string representation.
         """
         column_names = ("pdg", "pmu", "color", "helicity", "status", "final")
-        columns_max = (getattr(self, prop) for prop in column_names)
-        headers_ = []
-        columns_ = []
-        for name, column in zip(column_names, columns_max):
+        headers, columns = [], []
+        for name in column_names:
+            column = getattr(self, name)
             if not column:
                 continue
             if name == "pdg":
-                headers_.append("name")
+                headers.append("name")
                 column = column.name.tolist()
             elif name == "pmu":
-                headers_.extend(["px", "py", "pz", "energy"])
+                headers.extend(["px", "py", "pz", "energy"])
             elif name == "color":
-                headers_.extend(["color", "anticolor"])
+                headers.extend(["color", "anticolor"])
             else:
-                headers_.append(name)
-            columns_.append(column)
-        rows_nest = zip(*columns_)
-        rows_flat = map(tuple, map(mit.collapse, rows_nest))
-        return tuple(headers_), rows_flat
+                headers.append(name)
+            columns.append(column)
+        rows_nest = zip(*columns)
+        rows = map(tuple, map(mit.collapse, rows_nest))
+        return tuple(headers), rows
 
     def _table_str(self, html: bool) -> str:
         headers, rows_flat = self._table_list()
