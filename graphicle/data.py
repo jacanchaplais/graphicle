@@ -1671,6 +1671,9 @@ class ColorArray(base.ArrayBase):
     .. versionchanged:: 0.2.0
        Added internal numpy interfaces for greater interoperability.
 
+    .. versionchanged:: 0.3.4
+       Added ``color`` and ``anticolor`` attributes.
+
     Parameters
     ----------
     data : ndarray[int32] or ndarray[void]
@@ -1721,6 +1724,16 @@ class ColorArray(base.ArrayBase):
     @data.setter
     def data(self, values: npt.ArrayLike) -> None:
         self._data = values  # type: ignore
+
+    @property
+    def color(self) -> base.IntVector:
+        """Color component of the color / anticolor codes."""
+        return self.data["color"].reshape(-1)
+
+    @property
+    def anticolor(self) -> base.IntVector:
+        """Anticolor component of the color / anticolor codes."""
+        return self.data["anticolor"].reshape(-1)
 
     def copy(self) -> "ColorArray":
         """Copies the underlying data into a new ColorArray instance."""
