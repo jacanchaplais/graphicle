@@ -1274,6 +1274,7 @@ class MomentumArray(base.ArrayBase):
     _HANDLED_TYPES: ty.Tuple[ty.Type, ...] = field(init=False, repr=False)
 
     def __attrs_post_init__(self):
+        self._data = self._data.reshape(-1, 4)
         self.dtype = np.dtype(list(zip("xyze", it.repeat("<f8"))))
         self._HANDLED_TYPES = (np.ndarray, nm.Number, cla.Sequence)
 
@@ -1670,6 +1671,9 @@ class ColorArray(base.ArrayBase):
     .. versionchanged:: 0.2.0
        Added internal numpy interfaces for greater interoperability.
 
+    .. versionchanged:: 0.3.4
+       Added ``color`` and ``anticolor`` attributes.
+
     Parameters
     ----------
     data : ndarray[int32] or ndarray[void]
@@ -1720,6 +1724,16 @@ class ColorArray(base.ArrayBase):
     @data.setter
     def data(self, values: npt.ArrayLike) -> None:
         self._data = values  # type: ignore
+
+    @property
+    def color(self) -> base.IntVector:
+        """Color component of the color / anticolor codes."""
+        return self.data["color"].reshape(-1)
+
+    @property
+    def anticolor(self) -> base.IntVector:
+        """Anticolor component of the color / anticolor codes."""
+        return self.data["anticolor"].reshape(-1)
 
     def copy(self) -> "ColorArray":
         """Copies the underlying data into a new ColorArray instance."""

@@ -1119,6 +1119,7 @@ def clusters(
     parton_pmus = map(op.getitem, it.repeat(graph.pmu), parton_masks)
     parton_centroids = map(op.attrgetter("eta", "phi"), parton_pmus)
     for leaf, centroid in zip(colored_leaves, parton_centroids):
+        centroid = tuple(map(op.methodcaller("item"), centroid))
         leaf.data[...] = centroid_prune(graph.pmu, radius, leaf, centroid).data
     hier.recursive_drop(inplace=True)
     flat_hier = hier.flatten("rise")
