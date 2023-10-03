@@ -10,12 +10,11 @@ import itertools as it
 import operator as op
 import typing as ty
 
+import awkward as ak
+import fastjet
 import numpy as np
-import numpy.lib.recfunctions as rfn
 import pandas as pd
-import pyjet
 import scipy.optimize as opt
-from pyjet import ClusterSequence, PseudoJet
 from scipy.sparse.csgraph import breadth_first_tree
 
 import graphicle as gcl
@@ -108,24 +107,37 @@ def fastjet_clusters(
     ``p_val`` set to ``-1`` gives **anti-kT**, ``0`` gives
     **Cambridge-Aachen**, and ``1`` gives **kT** clusterings.
     """
-    _param_check(pmu, "pmu", gcl.MomentumArray)
-    pmu_pyjet = pmu.data[["e", "x", "y", "z"]]
-    pmu_pyjet.dtype.names = "E", "px", "py", "pz"
-    pmu_pyjet_idx = rfn.append_fields(
-        pmu_pyjet, "idx", np.arange(len(pmu_pyjet))
-    )
-    sequence: ClusterSequence = pyjet.cluster(
-        pmu_pyjet_idx, R=radius, p=p_val, ep=True
-    )
-    jets: ty.Iterable[PseudoJet] = sequence.inclusive_jets()
+    num_pcls = len(pmu)
+    pmu_renamed = pmu.data.copy()[["e", "x", "y", "z"]]
+    pmu_renamed.dtype.names = "E", "px", "py", "pz"
+    pmu_ak = ak.from_numpy(pmu_renamed)
+    extra_param = tuple()
+    if p_val == -1:
+        algo = fastjet.antikt_algorithm
+    elif p_val == 0:
+        algo = fastjet.cambridge_algorithm
+    elif p_val == 1:
+        algo = fastjet.kt_algorithm
+    else:
+        algo = fastjet.genkt_algorithm
+        extra_param = (p_val,)
+    jetdef = fastjet.JetDefinition(algo, radius, *extra_param)
+    sequence = fastjet.ClusterSequence(pmu_ak, jetdef)
+    jets = sequence.inclusive_jets()
+    jet_pmus = gcl.MomentumArray(jets.to_numpy())
+    pt_descend_idxs = np.argsort(jet_pmus.pt)[::-1].tolist()
+    jet_pmus = jet_pmus[pt_descend_idxs]
+    cuts = np.ones(len(pt_descend_idxs), dtype=np.bool_)
     if pt_cut is not None:
-        jets = filter(lambda jet: jet.pt > pt_cut, jets)
+        cuts = jet_pmus.pt > pt_cut
     if eta_cut is not None:
-        jets = filter(lambda jet: abs(jet.eta) < eta_cut, jets)
+        cuts = np.logical_and(cuts, np.abs(jet_pmus.eta) < eta_cut)
+    jet_idxs = sequence.constituent_index().to_list()
+    jet_idxs = op.itemgetter(*pt_descend_idxs)(jet_idxs)
+    jet_idxs = it.compress(jet_idxs, cuts)
     if top_k is not None:
-        jets = it.islice(jets, top_k)
-    jet_idxs = map(lambda j: list(map(op.attrgetter("idx"), j)), jets)
-    mask_empty = gcl.MaskArray(np.zeros_like(pmu_pyjet, dtype="<?"))
+        jet_idxs = it.islice(jet_idxs, top_k)
+    mask_empty = gcl.MaskArray(np.zeros(num_pcls, dtype="<?"))
     clusters: ty.List[gcl.MaskArray] = []
     for jet_idx in jet_idxs:
         mask = mask_empty.copy()

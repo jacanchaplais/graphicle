@@ -113,7 +113,7 @@ _MOMENTUM_MAP = _map_invert(
         "x": {"x", "px"},
         "y": {"y", "py"},
         "z": {"z", "pz"},
-        "e": {"e", "pe"},
+        "e": {"e", "pe", "E"},
     }
 )
 _MOMENTUM_ORDER = tuple("xyze")
