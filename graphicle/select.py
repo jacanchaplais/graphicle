@@ -11,11 +11,11 @@ import operator as op
 import typing as ty
 
 import awkward as ak
-import fastjet
+import fastjet as fj
 import numpy as np
 import pandas as pd
 import scipy.optimize as opt
-from scipy.sparse.csgraph import breadth_first_tree
+from scipy.sparse.csgraph import breadth_first_tree as _breadth_first_tree
 
 import graphicle as gcl
 
@@ -113,21 +113,22 @@ def fastjet_clusters(
     pmu_ak = ak.from_numpy(pmu_renamed)
     extra_param = tuple()
     if p_val == -1:
-        algo = fastjet.antikt_algorithm
+        algo = fj.antikt_algorithm
     elif p_val == 0:
-        algo = fastjet.cambridge_algorithm
+        algo = fj.cambridge_algorithm
     elif p_val == 1:
-        algo = fastjet.kt_algorithm
+        algo = fj.kt_algorithm
     else:
-        algo = fastjet.genkt_algorithm
+        algo = fj.genkt_algorithm
         extra_param = (p_val,)
-    jetdef = fastjet.JetDefinition(algo, radius, *extra_param)
-    sequence = fastjet.ClusterSequence(pmu_ak, jetdef)
+    jetdef = fj.JetDefinition(algo, radius, *extra_param)
+    sequence = fj.ClusterSequence(pmu_ak, jetdef)
     jets = sequence.inclusive_jets()
     jet_pmus = gcl.MomentumArray(jets.to_numpy())
+    num_jets = len(jet_pmus)
     pt_descend_idxs = np.argsort(jet_pmus.pt)[::-1].tolist()
     jet_pmus = jet_pmus[pt_descend_idxs]
-    cuts = np.ones(len(pt_descend_idxs), dtype=np.bool_)
+    cuts = np.ones(num_jets, dtype=np.bool_)
     if pt_cut is not None:
         cuts = jet_pmus.pt > pt_cut
     if eta_cut is not None:
@@ -263,7 +264,7 @@ def vertex_descendants(adj: gcl.AdjacencyList, vertex: int) -> gcl.MaskArray:
         return gcl.MaskArray(adj.edges["dst"] == vertex)
     sparse = adj._sparse_signed
     vertex = sparse.row[vertex_mask][0]
-    bft = breadth_first_tree(adj._sparse_csr, vertex)
+    bft = _breadth_first_tree(adj._sparse_csr, vertex)
     mask = np.isin(sparse.row, bft.indices)
     mask[sparse.row == vertex] = True  # include edges directly from parent
     return gcl.MaskArray(mask)

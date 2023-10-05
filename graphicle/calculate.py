@@ -559,12 +559,12 @@ def _delta_R_symmetric(
     return result
 
 
-@nb.njit("float32[:](bool_[:, :])")
+@nb.njit("float32[:](bool_[:, :])", parallel=True)
 def _clust_coeffs(adj: base.BoolVector) -> base.FloatVector:
     num_nodes = adj.shape[0]
     coefs = np.empty(num_nodes, dtype=np.float32)
-    for node_idx, row in enumerate(adj):
-        neibs = np.flatnonzero(row)
+    for node_idx in nb.prange(num_nodes):
+        neibs = np.flatnonzero(adj[node_idx, :])
         num_neibs = neibs.shape[0]
         if num_neibs < 2:
             coefs[node_idx] = 0.0
@@ -575,7 +575,10 @@ def _clust_coeffs(adj: base.BoolVector) -> base.FloatVector:
 
 
 def cluster_coeff_distbn(
-    pmu: "MomentumArray", radius: float, pseudo: bool = True
+    pmu: "MomentumArray",
+    radius: float,
+    pseudo: bool = True,
+    threads: int = 1,
 ) -> base.FloatVector:
     """A measure of clustering for a particle point-cloud. Transforms
     point-cloud into a graph, where node neighbourhood is determined by
@@ -596,15 +599,19 @@ def cluster_coeff_distbn(
     pseudo : bool
         If True, will use pseudorapidity, rather than true rapidity.
         Default is True.
+    threads : int
+        Number of threads to use in the parallel portions of the
+        calculation.
 
     Returns
     -------
     ndarray[float32]
         Clustering coefficients of the particles in the point-cloud.
     """
-    adj = pmu.delta_R(pmu, pseudo) < radius
+    adj = pmu.delta_R(pmu, pseudo, threads) < radius
     np.fill_diagonal(adj, False)
-    return _clust_coeffs(adj)
+    with _thread_scope(threads):
+        return _clust_coeffs(adj)
 
 
 @ctx.contextmanager
