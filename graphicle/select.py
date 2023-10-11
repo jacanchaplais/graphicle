@@ -870,8 +870,7 @@ def _leaf_mask_iter(
         for name, mask in branch.items():
             if exclude_latent and name == "latent":
                 continue
-            # TODO: look into contravariant type for this
-            yield from _leaf_mask_iter(name, mask, exclude_latent)  # type: ignore
+            yield from _leaf_mask_iter(name, mask, exclude_latent)
 
 
 def leaf_masks(mask_tree: gcl.MaskGroup) -> gcl.MaskGroup[gcl.MaskArray]:
@@ -881,6 +880,9 @@ def leaf_masks(mask_tree: gcl.MaskGroup) -> gcl.MaskGroup[gcl.MaskArray]:
     :group: select
 
     .. versionadded:: 0.1.11
+
+    .. versionchanged 0.3.7
+       Output ``MaskGroup`` matches agg_op of ``mask_tree``.
 
     Parameters
     ----------
@@ -893,7 +895,7 @@ def leaf_masks(mask_tree: gcl.MaskGroup) -> gcl.MaskGroup[gcl.MaskArray]:
     MaskGroup
         Flat ``MaskGroup`` of only the leaves of ``mask_tree``.
     """
-    mask_group = gcl.MaskGroup(agg_op="or")  # type: ignore
+    mask_group = gcl.MaskGroup(agg_op=mask_tree.agg_op)
     for name, branch in mask_tree.items():
         mask_group.update(dict(_leaf_mask_iter(name, branch)))  # type: ignore
     return mask_group
