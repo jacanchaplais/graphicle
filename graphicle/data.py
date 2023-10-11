@@ -938,7 +938,7 @@ class MaskGroup(base.MaskBase, ty.MutableMapping[str, MaskGeneric]):
             the aggregation operation over any ``MaskGroup``.
             ``leaves`` brings the innermosted nested ``MaskArray``
             instances to the top level, discarding the rest.
-            Default is``'rise'``.
+            Default is ``rise``.
 
         Returns
         -------
