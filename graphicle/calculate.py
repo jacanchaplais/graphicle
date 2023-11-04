@@ -721,3 +721,44 @@ def thrust(momenta: "MomentumArray") -> float:
         args=(momenta.data,),
     )
     return -optim.fun
+
+
+@nb.njit(
+    [
+        "float64(bool_[:], bool_[:], Optional(float64[:]))",
+        "float64(bool_[:], bool_[:], Omitted(None))",
+    ]
+)
+def jaccard_distance(
+    u: base.BoolVector,
+    v: base.BoolVector,
+    w: ty.Optional[base.DoubleVector] = None,
+) -> float:
+    """Computes the Jaccard distance for two sets.
+
+    Parameters
+    ----------
+    u, v : ndarray[bool_]
+        Boolean masks, identifying which elements belong
+        respective sets.
+    w : ndarray[float64]
+        Weights associated with each element. If not passed,
+        will assume weights are 1.
+
+    Returns
+    -------
+    float
+        Jaccard distance between sets.
+    """
+    difference_sum = 0.0
+    union_sum = 0.0
+    if w is None:
+        w = np.ones(u.shape, dtype=np.float64)
+    for u_elem, v_elem, weight in zip(u, v, w):
+        nonzero = u_elem | v_elem
+        unequal_nonzero = nonzero & (u_elem != v_elem)
+        union_sum += weight * nonzero
+        difference_sum += weight * unequal_nonzero
+    if union_sum == 0.0:
+        return 0.0
+    return difference_sum / union_sum
