@@ -19,6 +19,7 @@ import networkx as nx
 import numba as nb
 import numpy as np
 import numpy.lib.recfunctions as rfn
+import scipy.optimize as spo
 from deprecation import deprecated
 
 from . import base
@@ -36,7 +37,11 @@ __all__ = [
     "flow_trace",
     "aggregate_momenta",
     "cluster_coeff_distbn",
+    "thrust",
 ]
+
+
+PMU_DTYPE = nb.typeof(np.dtype(list(zip("xyze", ("<f8",) * 4))))
 
 
 @deprecated(
@@ -170,7 +175,7 @@ def weighted_centroid(
     rap = pmu.eta if pseudo else pmu.rapidity
     rap_mid = ((rap * pmu.pt).sum() / pt_sum).item()
     phi_mid_unbound = ((pmu.phi * pmu.pt).sum() / pt_sum).item()
-    phi_mid = cmath.phase(cmath.exp(complex(0, phi_mid_unbound)))
+    phi_mid = cmath.phase(cmath.rect(1, phi_mid_unbound))
     return rap_mid, phi_mid
 
 
@@ -652,3 +657,67 @@ def aggregate_momenta(
     pmus = map(fn.partial(op.getitem, pmu), cluster_masks)
     pmu_sums = map(fn.partial(np.sum, axis=0), pmus)
     return momentum_class(list(it.chain.from_iterable(pmu_sums)))
+
+
+@nb.njit("float64(float64, float64, float64)")
+def _three_norm(x: float, y: float, z: float) -> float:
+    max_component = max(abs(x), abs(y), abs(z))
+    max_recip = 1.0 / max_component
+    x *= max_recip
+    y *= max_recip
+    z *= max_recip
+    return max_component * np.sqrt(x * x + y * y + z * z)
+
+
+@nb.njit("UniTuple(float64, 3)(float64, float64)")
+def _angles_to_axis(
+    azimuth: float, inclination: float
+) -> ty.Tuple[float, float, float]:
+    polar = cmath.rect(1.0, azimuth) * cmath.rect(1.0, inclination)
+    real, phase = polar.real, cmath.phase(polar)
+    axis_x = real * math.cos(phase)
+    axis_y = real * math.sin(phase)
+    axis_z = math.sqrt(1.0 - pow(real, 2))
+    return axis_x, axis_y, axis_z
+
+
+@nb.njit(nb.float64(nb.float64[:], PMU_DTYPE))
+def _thrust_with_axis(
+    axis_angles: base.DoubleVector, momenta: base.VoidVector
+) -> float:
+    axis_x, axis_y, axis_z = _angles_to_axis(axis_angles[0], axis_angles[1])
+    abs_dot_sum = norm_sum = 0.0
+    for momentum in momenta:
+        x, y, z = momentum["x"], momentum["y"], momentum["z"]
+        dot_prod = (axis_x * x) + (axis_y * y) + (axis_z * z)
+        abs_dot_sum += abs(dot_prod)
+        norm_sum += _three_norm(x, y, z)
+    return abs_dot_sum / norm_sum
+
+
+def thrust(momenta: "MomentumArray") -> float:
+    """Computes the thrust of an event, from the final-state momenta.
+
+    :group: calculate
+
+    .. versionadded:: 0.3.8
+
+    Parameters
+    ----------
+    pmu : MomentumArray
+        Momentum of hadronised particles in the final state of the event
+        record.
+
+    Returns
+    -------
+    float
+        The thrust of the event.
+    """
+    domain = (-math.pi, math.pi)
+    optim = spo.minimize(
+        fun=lambda n, p: -_thrust_with_axis(n, p),
+        x0=np.zeros(2),
+        bounds=(domain, domain),
+        args=(momenta.data,),
+    )
+    return -optim.fun
