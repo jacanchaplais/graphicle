@@ -41,7 +41,9 @@ __all__ = [
 ]
 
 
-PMU_DTYPE = nb.typeof(np.dtype(list(zip("xyze", ("<f8",) * 4))))
+PMU_DTYPE = nb.typeof(
+    np.empty(1, dtype=np.dtype(list(zip("xyze", ("<f8",) * 4))))
+)
 
 
 @deprecated(
