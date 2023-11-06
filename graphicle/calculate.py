@@ -697,7 +697,63 @@ def _thrust_with_axis(
     return abs_dot_sum / norm_sum
 
 
-def thrust(momenta: "MomentumArray") -> float:
+@nb.njit(nb.float64[:](nb.float64[:], PMU_DTYPE))
+def _grad_thrust(
+    axis_angles: base.DoubleVector, momenta: base.VoidVector
+) -> base.DoubleVector:
+    """Computes the gradient of the thrust, with respect to the thrust
+    axis' azimuth and inclination angles, respectively.
+    """
+    azimuth, inclination = axis_angles[0], axis_angles[1]
+    grad_phi_sum = grad_theta_sum = magnitude_sum = 0.0
+    sin_theta, cos_theta = math.sin(inclination), math.cos(inclination)
+    sin_phi, cos_phi = math.sin(azimuth), math.cos(azimuth)
+    for momentum in momenta:
+        x, y, z = momentum["x"], momentum["y"], momentum["z"]
+        dot_prod = (
+            (x * sin_theta * cos_phi)
+            + (y * sin_theta * sin_phi)
+            + (z * cos_theta)
+        )
+        dot_prod_sign = math.copysign(1.0, dot_prod)
+        grad_phi = (y * sin_theta * cos_phi) - (x * sin_theta * sin_phi)
+        grad_theta = (
+            (x * cos_theta * cos_phi)
+            + (y * cos_theta * sin_phi)
+            - (z * sin_theta)
+        )
+        grad_phi_sum += dot_prod_sign * grad_phi
+        grad_theta_sum += dot_prod_sign * grad_theta
+        magnitude_sum += _three_norm(x, y, z)
+    return np.array(
+        [grad_phi_sum / magnitude_sum, grad_theta_sum / magnitude_sum],
+        dtype=np.float64,
+    )
+
+
+@ty.overload
+def thrust(
+    pmu: "MomentumArray",
+    return_axis: ty.Literal[False],
+    rng_seed: ty.Optional[int],
+) -> float:
+    ...
+
+
+@ty.overload
+def thrust(
+    pmu: "MomentumArray",
+    return_axis: ty.Literal[True],
+    rng_seed: ty.Optional[int],
+) -> ty.Tuple[float, base.DoubleVector]:
+    ...
+
+
+def thrust(
+    pmu: "MomentumArray",
+    return_axis: bool = False,
+    rng_seed: ty.Optional[int] = None,
+):
     """Computes the thrust of an event, from the final-state momenta.
 
     :group: calculate
