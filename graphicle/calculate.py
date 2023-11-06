@@ -675,12 +675,22 @@ def _three_norm(x: float, y: float, z: float) -> float:
 def _angles_to_axis(
     azimuth: float, inclination: float
 ) -> ty.Tuple[float, float, float]:
-    polar = cmath.rect(1.0, azimuth) * cmath.rect(1.0, inclination)
-    real, phase = polar.real, cmath.phase(polar)
-    axis_x = real * math.cos(phase)
-    axis_y = real * math.sin(phase)
-    axis_z = math.sqrt(1.0 - pow(real, 2))
-    return axis_x, axis_y, axis_z
+    """Given the azimuth and inclination angles, return the Cartesian
+    coordinates a unit vector.
+
+    Parameters
+    ----------
+    azimuth, inclination : float
+        Spherical coordinate angles.
+
+    Returns
+    -------
+    axis : tuple[float, float, float]
+        x, y, and z components of the unit vector, respectively.
+    """
+    sin_theta, cos_theta = math.sin(inclination), math.cos(inclination)
+    sin_phi, cos_phi = math.sin(azimuth), math.cos(azimuth)
+    return sin_theta * cos_phi, sin_theta * sin_phi, cos_theta
 
 
 @nb.njit(nb.float64(nb.float64[:], PMU_DTYPE))
@@ -788,6 +798,7 @@ def thrust(
         fun=lambda n, p: -_thrust_with_axis(n, p),
         x0=guess,
         bounds=(domain, domain),
+        method="L-BFGS-B",
         jac=lambda n, p: -_grad_thrust(n, p),
         args=(pmu.data,),
     )
