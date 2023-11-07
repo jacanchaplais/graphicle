@@ -806,7 +806,8 @@ def thrust(
     axis : ndarray[float64], optional
         The x, y, and z components of the thrust axis, respectively.
     """
-    domain = (0.0, 0.5 * math.pi)
+    half_pi = 0.5 * math.pi
+    domain = (-half_pi, half_pi)
     rng = np.random.default_rng(seed=rng_seed)
     guess = rng.uniform(*domain, size=2)
     optim = spo.minimize(
