@@ -671,26 +671,29 @@ def _three_norm(x: float, y: float, z: float) -> float:
     return max_component * np.sqrt(x * x + y * y + z * z)
 
 
-@nb.njit("UniTuple(float64, 3)(float64, float64)")
-def _angles_to_axis(
-    azimuth: float, inclination: float
-) -> ty.Tuple[float, float, float]:
+@nb.njit("float64[:](float64[:])")
+def _angles_to_axis(axis_angles: base.DoubleVector) -> base.DoubleVector:
     """Given the azimuth and inclination angles, return the Cartesian
     coordinates a unit vector.
 
     Parameters
     ----------
-    azimuth, inclination : float
-        Spherical coordinate angles.
+    axis_angles : ndarray[float64]
+        Array of shape (2,), containing azimuth and inclination angles
+        of thrust axis.
 
     Returns
     -------
-    axis : tuple[float, float, float]
-        x, y, and z components of the unit vector, respectively.
+    axis : ndarray[float64]
+        Array of shape (3,) containing the x, y, and z components of the
+        unit vector, respectively.
     """
+    azimuth, inclination = axis_angles[0], axis_angles[1]
     sin_theta, cos_theta = math.sin(inclination), math.cos(inclination)
     sin_phi, cos_phi = math.sin(azimuth), math.cos(azimuth)
-    return sin_theta * cos_phi, sin_theta * sin_phi, cos_theta
+    return np.array(
+        [sin_theta * cos_phi, sin_theta * sin_phi, cos_theta], dtype=np.float64
+    )
 
 
 @nb.njit(nb.types.Tuple((nb.float64, nb.float64[:]))(nb.float64[:], PMU_DTYPE))
@@ -801,7 +804,7 @@ def thrust(
     thrust : float
         The thrust of the event.
     axis : ndarray[float64], optional
-        The axis which maximises the thrust for the event.
+        The x, y, and z components of the thrust axis, respectively.
     """
     domain = (0.0, 0.5 * math.pi)
     rng = np.random.default_rng(seed=rng_seed)
@@ -816,7 +819,7 @@ def thrust(
     )
     thrust_val = -optim.fun
     if return_axis:
-        return thrust_val, optim.x
+        return thrust_val, _angles_to_axis(optim.x)
     return thrust_val
 
 
