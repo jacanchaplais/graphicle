@@ -791,7 +791,7 @@ def thrust(
     axis : ndarray[float64], optional
         The axis which maximises the thrust for the event.
     """
-    domain = (-math.pi, math.pi)
+    domain = (0.0, 0.5 * math.pi)
     rng = np.random.default_rng(seed=rng_seed)
     guess = rng.uniform(*domain, size=2)
     optim = spo.minimize(
