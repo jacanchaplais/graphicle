@@ -693,52 +693,64 @@ def _angles_to_axis(
     return sin_theta * cos_phi, sin_theta * sin_phi, cos_theta
 
 
-@nb.njit(nb.float64(nb.float64[:], PMU_DTYPE))
-def _thrust_with_axis(
+@nb.njit(nb.types.Tuple((nb.float64, nb.float64[:]))(nb.float64[:], PMU_DTYPE))
+def _thrust_with_grad(
     axis_angles: base.DoubleVector, momenta: base.VoidVector
-) -> float:
-    axis_x, axis_y, axis_z = _angles_to_axis(axis_angles[0], axis_angles[1])
-    abs_dot_sum = norm_sum = 0.0
-    for momentum in momenta:
-        x, y, z = momentum["x"], momentum["y"], momentum["z"]
-        dot_prod = (axis_x * x) + (axis_y * y) + (axis_z * z)
-        abs_dot_sum += abs(dot_prod)
-        norm_sum += _three_norm(x, y, z)
-    return abs_dot_sum / norm_sum
+) -> ty.Tuple[float, base.DoubleVector]:
+    """Computes the thrust for a thrust axis given by a pair of azimuth
+    and inclination angles, as well as the gradient of the thrust with
+    respect to these angles.
 
+    Parameters
+    ----------
+    axis_angles : ndarray[float64]
+        Array of shape (2,), containing azimuth and inclination angles
+        of thrust axis.
+    momenta : ndarray[void]
+        Structured array, containing fields labeled 'x', 'y', 'z',
+        of 64-bit floating point numbers for the components of a
+        momentum point cloud.
 
-@nb.njit(nb.float64[:](nb.float64[:], PMU_DTYPE))
-def _grad_thrust(
-    axis_angles: base.DoubleVector, momenta: base.VoidVector
-) -> base.DoubleVector:
-    """Computes the gradient of the thrust, with respect to the thrust
-    axis' azimuth and inclination angles, respectively.
+    Returns
+    -------
+    thrust_val : float
+        The (negated) value of thrust, with the given thrust axis.
+    thrust_grad : ndarray[float64]
+        Array of shape (2,) containing the (negated) gradient of the
+        thrust with respect to azimuth and inclination angles of the
+        thrust axis, respectively.
+
+    Notes
+    -----
+    This routine is defined to provide an objective for optimizers.
+    Specifically, the thrust must be maximized by finding a suitable
+    thrust axis, so the thrust and gradient are negated, so that they
+    can be passed to a minimizer.
     """
     azimuth, inclination = axis_angles[0], axis_angles[1]
-    grad_phi_sum = grad_theta_sum = magnitude_sum = 0.0
     sin_theta, cos_theta = math.sin(inclination), math.cos(inclination)
     sin_phi, cos_phi = math.sin(azimuth), math.cos(azimuth)
+    ax_x, ax_y, ax_z = sin_theta * cos_phi, sin_theta * sin_phi, cos_theta
+    abs_dot_sum = norm_sum = grad_phi_sum = grad_theta_sum = 0.0
     for momentum in momenta:
         x, y, z = momentum["x"], momentum["y"], momentum["z"]
-        dot_prod = (
-            (x * sin_theta * cos_phi)
-            + (y * sin_theta * sin_phi)
-            + (z * cos_theta)
-        )
-        dot_prod_sign = math.copysign(1.0, dot_prod)
         grad_phi = (y * sin_theta * cos_phi) - (x * sin_theta * sin_phi)
         grad_theta = (
             (x * cos_theta * cos_phi)
             + (y * cos_theta * sin_phi)
             - (z * sin_theta)
         )
+        dot_prod = (ax_x * x) + (ax_y * y) + (ax_z * z)
+        dot_prod_sign = math.copysign(1.0, dot_prod)
+        abs_dot_sum += abs(dot_prod)
         grad_phi_sum += dot_prod_sign * grad_phi
         grad_theta_sum += dot_prod_sign * grad_theta
-        magnitude_sum += _three_norm(x, y, z)
-    return np.array(
-        [grad_phi_sum / magnitude_sum, grad_theta_sum / magnitude_sum],
-        dtype=np.float64,
+        norm_sum += _three_norm(x, y, z)
+    func_val = abs_dot_sum / norm_sum
+    grad_vec = (
+        np.array([grad_phi_sum, grad_theta_sum], dtype=np.float64) / norm_sum
     )
+    return -func_val, -grad_vec
 
 
 @ty.overload
@@ -795,11 +807,11 @@ def thrust(
     rng = np.random.default_rng(seed=rng_seed)
     guess = rng.uniform(*domain, size=2)
     optim = spo.minimize(
-        fun=lambda n, p: -_thrust_with_axis(n, p),
+        fun=_thrust_with_grad,
         x0=guess,
         bounds=(domain, domain),
         method="L-BFGS-B",
-        jac=lambda n, p: -_grad_thrust(n, p),
+        jac=True,
         args=(pmu.data,),
     )
     thrust_val = -optim.fun
