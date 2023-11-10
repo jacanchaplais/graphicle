@@ -38,6 +38,8 @@ __all__ = [
     "aggregate_momenta",
     "cluster_coeff_distbn",
     "thrust",
+    "spherocity",
+    "jaccard_distance",
 ]
 
 
