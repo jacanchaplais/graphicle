@@ -979,7 +979,7 @@ def spherocity(
         "float64(bool_[:], bool_[:], Omitted(None))",
     ]
 )
-def jaccard_distance(
+def _jaccard_distance(
     u: base.BoolVector,
     v: base.BoolVector,
     w: ty.Optional[base.DoubleVector] = None,
@@ -1012,3 +1012,35 @@ def jaccard_distance(
     if union_sum == 0.0:
         return 0.0
     return difference_sum / union_sum
+
+
+def jaccard_distance(
+    mask_1: ty.Union[base.MaskBase, base.BoolVector],
+    mask_2: ty.Union[base.MaskBase, base.BoolVector],
+    weights: ty.Optional[base.DoubleVector] = None,
+) -> float:
+    """Computes the Jaccard distance between two sets.
+
+    :group: calculate
+
+    .. versionadded:: 0.3.8
+
+    Parameters
+    ----------
+    mask_1, mask_2 : ndarray[bool_] or MaskBase
+        Boolean masks, identifying which elements belong to the
+        respective sets.
+    weights : ndarray[float64]
+        Weights associated with each element. If not passed,
+        will assume weights are 1.
+
+    Returns
+    -------
+    float
+        Jaccard distance between sets.
+    """
+    if not isinstance(mask_1, np.ndarray):
+        mask_1 = mask_1.data
+    if not isinstance(mask_2, np.ndarray):
+        mask_2 = mask_2.data
+    return _jaccard_distance(mask_1, mask_2, weights)
