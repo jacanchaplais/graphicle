@@ -824,6 +824,58 @@ def thrust(
     return thrust_val
 
 
+@nb.njit(nb.types.Tuple((nb.float64, nb.float64[:]))(nb.float64[:], PMU_DTYPE))
+def spherocity_with_grad(
+    axis_angles: base.DoubleVector, momenta: base.VoidVector
+) -> ty.Tuple[float, base.DoubleVector]:
+    """ """
+    phi, theta = axis_angles[0], axis_angles[1]
+    # pre-compute trig ratios and spherocity axis
+    cos_phi, sin_phi = math.cos(phi), math.sin(phi)
+    cos_theta, sin_theta = math.cos(theta), math.sin(theta)
+    cos_2phi = 2.0 * cos_phi * cos_phi - 1.0
+    sin_2phi = 2.0 * cos_phi * sin_phi
+    cos_2theta = 2.0 * cos_theta * cos_theta - 1.0
+    sin_2theta = 2.0 * cos_theta * sin_theta
+    ax_x, ax_y, ax_z = sin_theta * cos_phi, sin_theta * sin_phi, cos_theta
+    # initialising accumulators
+    cross_norm_sum = norm_sum = grad_theta_sum = grad_phi_sum = 0.0
+    for momentum in momenta:
+        x, y, z = momentum["x"], momentum["y"], momentum["z"]
+        norm_sum += _three_norm(x, y, z)
+        # magnitude of the cross product
+        cross_x = y * ax_z - z * ax_y
+        cross_y = z * ax_x - x * ax_z
+        cross_z = x * ax_y - y * ax_x
+        cross_norm = _three_norm(cross_x, cross_y, cross_z)
+        cross_norm_sum += cross_norm
+        # accumulate gradient contributions
+        x_sq, y_sq = x * x, y * y
+        cross_norm_recip = 1.0 / cross_norm
+        grad_phi_sum += cross_norm_recip * (
+            0.5
+            * (cos_2theta - 1.0)
+            * ((2.0 * x * y * cos_2phi) - ((x_sq - y_sq) * sin_2phi))
+            - sin_2theta * ((y * z * cos_phi) - (x * z * sin_phi))
+        )
+        grad_theta_sum += cross_norm_recip * (
+            -2.0 * cos_2theta * ((x * y * cos_phi) + (y * z * sin_phi))
+            - 0.5
+            * sin_2theta
+            * (
+                (x_sq + y_sq)
+                + ((x_sq - y_sq) * cos_2phi)
+                - (2.0 * z * z)
+                + (2.0 * x * y * sin_2phi)
+            )
+        )
+    scale_factor = (4.0 / (math.pi * norm_sum)) ** 2
+    spherocity = scale_factor * cross_norm_sum * cross_norm_sum
+    grad_phi = scale_factor * cross_norm_sum * grad_phi_sum
+    grad_theta = scale_factor * cross_norm_sum * grad_theta_sum
+    return spherocity, np.array([grad_phi, grad_theta], dtype=np.float64)
+
+
 @nb.njit(
     [
         "float64(bool_[:], bool_[:], Optional(float64[:]))",
