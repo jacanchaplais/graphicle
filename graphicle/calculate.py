@@ -805,6 +805,10 @@ def thrust(
         The thrust of the event.
     axis : ndarray[float64], optional
         The x, y, and z components of the thrust axis, respectively.
+
+    See Also
+    --------
+    spherocity : Computes the spherocity from final state momenta.
     """
     half_pi = 0.5 * math.pi
     domain = (-half_pi, half_pi)
@@ -825,10 +829,32 @@ def thrust(
 
 
 @nb.njit(nb.types.Tuple((nb.float64, nb.float64[:]))(nb.float64[:], PMU_DTYPE))
-def spherocity_with_grad(
+def _spherocity_with_grad(
     axis_angles: base.DoubleVector, momenta: base.VoidVector
 ) -> ty.Tuple[float, base.DoubleVector]:
-    """ """
+    """Computes the spherocity for a unit vector given by a pair of
+    azimuth and inclination angles, as well as the gradient of the
+    spherocity with respect to these angles.
+
+    Parameters
+    ----------
+    axis_angles : ndarray[float64]
+        Array of shape (2,), containing azimuth and inclination angles
+        of the unit vector.
+    momenta : ndarray[void]
+        Structured array, containing fields labeled 'x', 'y', 'z',
+        of 64-bit floating point numbers for the components of a
+        momentum point cloud.
+
+    Returns
+    -------
+    spherocity_val : float
+        The value of spherocity, with the given unit vector.
+    spherocity_grad : ndarray[float64]
+        Array of shape (2,) containing the gradient of the spherocity
+        with respect to azimuth and inclination angles of the unit
+        vector, respectively.
+    """
     phi, theta = axis_angles[0], axis_angles[1]
     # pre-compute trig ratios and spherocity axis
     cos_phi, sin_phi = math.cos(phi), math.sin(phi)
@@ -874,6 +900,77 @@ def spherocity_with_grad(
     grad_phi = scale_factor * cross_norm_sum * grad_phi_sum
     grad_theta = scale_factor * cross_norm_sum * grad_theta_sum
     return spherocity, np.array([grad_phi, grad_theta], dtype=np.float64)
+
+
+@ty.overload
+def spherocity(
+    pmu: "MomentumArray",
+    return_axis: ty.Literal[False],
+    rng_seed: ty.Optional[int],
+) -> float:
+    ...
+
+
+@ty.overload
+def spherocity(
+    pmu: "MomentumArray",
+    return_axis: ty.Literal[True],
+    rng_seed: ty.Optional[int],
+) -> ty.Tuple[float, base.DoubleVector]:
+    ...
+
+
+def spherocity(
+    pmu: "MomentumArray",
+    return_axis: bool = False,
+    rng_seed: ty.Optional[int] = None,
+):
+    """Computes the spherocity of an event, from the final-state momenta.
+
+    :group: calculate
+
+    .. versionadded:: 0.3.8
+
+    Parameters
+    ----------
+    pmu : MomentumArray
+        Momentum of hadronised particles in the final state of the event
+        record.
+    return_axis : bool
+        If ``True``, will return a tuple with the spherocity, and the
+        axis unit vector which was found to minimize spherocity.
+    rng_seed : int, optional
+        Initial guess for the axis unit vector is sampled from a uniform
+        random distribution, over the surface of a sphere. If passed,
+        will initialise the random number generator with the provided
+        seed, enabling reproducible results.
+
+    Returns
+    -------
+    spherocity : float
+        The spherocity of the event.
+    axis : ndarray[float64], optional
+        The x, y, and z components of the spherocity axis, respectively.
+
+    See Also
+    --------
+    thrust : Computes the thrust from final state momenta.
+    """
+    half_pi = 0.5 * math.pi
+    domain = (-half_pi, half_pi)
+    rng = np.random.default_rng(seed=rng_seed)
+    guess = rng.uniform(*domain, size=2)
+    optim = spo.minimize(
+        fun=_spherocity_with_grad,
+        x0=guess,
+        bounds=(domain, domain),
+        jac=True,
+        args=(pmu.data,),
+    )
+    sph_val = optim.fun
+    if return_axis:
+        return sph_val, _angles_to_axis(optim.x)
+    return sph_val
 
 
 @nb.njit(
