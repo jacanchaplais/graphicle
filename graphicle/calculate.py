@@ -39,6 +39,7 @@ __all__ = [
     "cluster_coeff_distbn",
     "thrust",
     "spherocity",
+    "c_parameter",
     "jaccard_distance",
 ]
 
