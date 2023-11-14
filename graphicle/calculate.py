@@ -768,10 +768,33 @@ def thrust(
 
 
 @ty.overload
+def thrust(pmu: "MomentumArray", return_axis: ty.Literal[False]) -> float:
+    ...
+
+
+@ty.overload
+def thrust(pmu: "MomentumArray", rng_seed: ty.Optional[int]) -> float:
+    ...
+
+
+@ty.overload
+def thrust(pmu: "MomentumArray") -> float:
+    ...
+
+
+@ty.overload
 def thrust(
     pmu: "MomentumArray",
     return_axis: ty.Literal[True],
     rng_seed: ty.Optional[int],
+) -> ty.Tuple[float, base.DoubleVector]:
+    ...
+
+
+@ty.overload
+def thrust(
+    pmu: "MomentumArray",
+    return_axis: ty.Literal[True],
 ) -> ty.Tuple[float, base.DoubleVector]:
     ...
 
@@ -811,6 +834,7 @@ def thrust(
     See Also
     --------
     spherocity : Computes the spherocity from final state momenta.
+    c_parameter : Computes the C-parameter from the final state momenta.
     """
     half_pi = 0.5 * math.pi
     domain = (-half_pi, half_pi)
@@ -914,10 +938,33 @@ def spherocity(
 
 
 @ty.overload
+def spherocity(pmu: "MomentumArray", return_axis: ty.Literal[False]) -> float:
+    ...
+
+
+@ty.overload
+def spherocity(pmu: "MomentumArray", rng_seed: ty.Optional[int]) -> float:
+    ...
+
+
+@ty.overload
+def spherocity(pmu: "MomentumArray") -> float:
+    ...
+
+
+@ty.overload
 def spherocity(
     pmu: "MomentumArray",
     return_axis: ty.Literal[True],
     rng_seed: ty.Optional[int],
+) -> ty.Tuple[float, base.DoubleVector]:
+    ...
+
+
+@ty.overload
+def spherocity(
+    pmu: "MomentumArray",
+    return_axis: ty.Literal[True],
 ) -> ty.Tuple[float, base.DoubleVector]:
     ...
 
@@ -957,6 +1004,7 @@ def spherocity(
     See Also
     --------
     thrust : Computes the thrust from final state momenta.
+    c_parameter : Computes the C-parameter from the final state momenta.
     """
     half_pi = 0.5 * math.pi
     domain = (-half_pi, half_pi)
@@ -973,6 +1021,49 @@ def spherocity(
     if return_axis:
         return sph_val, _angles_to_axis(optim.x)
     return sph_val
+
+
+@nb.njit(nb.float64(PMU_DTYPE))
+def _c_parameter(momenta: base.VoidVector) -> float:
+    output = norm_sum = 0.0
+    for idx_i, pmu_i in enumerate(momenta):
+        x_i, y_i, z_i = pmu_i["x"], pmu_i["y"], pmu_i["z"]
+        norm_i = _three_norm(x_i, y_i, z_i)
+        norm_sum += norm_i
+        for pmu_j in momenta[idx_i:]:
+            x_j, y_j, z_j = pmu_j["x"], pmu_j["y"], pmu_j["z"]
+            norm_j = _three_norm(x_j, y_j, z_j)
+            norm_prod = norm_i * norm_j
+            i_dot_j = (x_i * x_j) + (y_i * y_j) + (z_i * z_j)
+            output += 2.0 * (norm_prod - (i_dot_j * i_dot_j / norm_prod))
+    return 1.5 * output / (norm_sum * norm_sum)
+
+
+def c_parameter(pmu: "MomentumArray") -> float:
+    """Computes the C-parameter for the event, from the final state
+    momenta.
+
+    :group: calculate
+
+    .. versionadded:: 0.3.8
+
+    Parameters
+    ----------
+    pmu : MomentumArray
+        Momentum of hadronised particles in the final state of the event
+        record.
+
+    Returns
+    -------
+    float
+        The C-parameter of the event.
+
+    See Also
+    --------
+    thrust : Computes the thrust from final state momenta.
+    spherocity : Computes the spherocity from final state momenta.
+    """
+    return _c_parameter(pmu.data)
 
 
 @nb.njit(
