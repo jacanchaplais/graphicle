@@ -975,7 +975,7 @@ def spherocity(
     return_axis: bool = False,
     rng_seed: ty.Optional[int] = None,
 ):
-    """Computes the spherocity of an event, from the final-state momenta.
+    """Computes the spherocity of an event, from final-state momenta.
 
     :group: calculate
 
