@@ -1155,6 +1155,9 @@ def arg_closest(
 
     .. versionadded:: 0.2.14
 
+    .. versionchanged:: 0.3.8
+       Modified the distance metric to include transverse momentum.
+
     Parameters
     ----------
     focus : MomentumArray
@@ -1196,7 +1199,13 @@ def arg_closest(
        Systems*, 52(4):1679-1696, August 2016,
        :doi:`10.1109/TAES.2016.140952`
     """
-    _, idxs = opt.linear_sum_assignment(focus.delta_R(candidate, pseudo=False))
+    dist_matrix = focus.delta_R(candidate, pseudo=False)
+    pt_dist = gcl.calculate._pt_distance.outer(focus.pt, candidate.pt)
+    np.divide(
+        dist_matrix, dist_matrix.max(axis=1, keepdims=True), out=dist_matrix
+    )
+    np.hypot(dist_matrix, pt_dist, out=dist_matrix)
+    _, idxs = opt.linear_sum_assignment(dist_matrix)
     return idxs.tolist()
 
 

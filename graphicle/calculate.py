@@ -652,3 +652,8 @@ def aggregate_momenta(
     pmus = map(fn.partial(op.getitem, pmu), cluster_masks)
     pmu_sums = map(fn.partial(np.sum, axis=0), pmus)
     return momentum_class(list(it.chain.from_iterable(pmu_sums)))
+
+
+@nb.vectorize("float64(float64, float64)")
+def _pt_distance(pt_1: float, pt_2: float) -> float:
+    return 1.0 - math.exp(-0.5 * pow((pt_1 - pt_2) / min(pt_1, pt_2), 2))
