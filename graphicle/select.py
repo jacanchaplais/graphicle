@@ -102,13 +102,36 @@ def fastjet_clusters(
         List containing masks over the input data for each jet
         clustering, in order of descending :math:`p_T`.
 
+    Raises
+    ------
+    ValueError
+        When a negative value is passed to ``eta_cut``, ``pt_cut``, or
+        ``radius``. Additionally, when ``top_k`` is passed as either a
+        non-integer, or with a value less than one.
+
     Notes
     -----
     ``p_val`` set to ``-1`` gives **anti-kT**, ``0`` gives
     **Cambridge-Aachen**, and ``1`` gives **kT** clusterings.
+
+    To prevent expensive repeated memory allocations, the underlying
+    masks are stored as a single contiguous array, where each row is the
+    data for the respective ``MaskArray`` in the output list. This may
+    cause undefined behaviour if you apply views on the underlying data
+    in a ``MaskArray`` without copying it.
     """
+    if pt_cut is None:
+        pt_cut = 0.0
+    elif pt_cut < 0.0:
+        raise ValueError("pt_cut must be non-negative.")
+    if radius < 0.0:
+        raise ValueError("radius must be non-negative.")
+    if (top_k is not None) and ((top_k < 1) or (not isinstance(top_k, int))):
+        raise ValueError(
+            "top_k must be an integer with a value greater than zero."
+        )
     num_pcls = len(pmu)
-    pmu_renamed = pmu.data.copy()[["e", "x", "y", "z"]]
+    pmu_renamed = pmu.data[["e", "x", "y", "z"]].copy()
     pmu_renamed.dtype.names = "E", "px", "py", "pz"
     pmu_ak = ak.from_numpy(pmu_renamed)
     extra_param = tuple()
@@ -121,30 +144,24 @@ def fastjet_clusters(
     else:
         algo = fj.genkt_algorithm
         extra_param = (p_val,)
-    jetdef = fj.JetDefinition(algo, radius, *extra_param)
-    sequence = fj.ClusterSequence(pmu_ak, jetdef)
-    jets = sequence.inclusive_jets()
+    jet_def = fj.JetDefinition(algo, radius, *extra_param)
+    sequence = fj.ClusterSequence(pmu_ak, jet_def)
+    jets = sequence.inclusive_jets(pt_cut)
     jet_pmus = gcl.MomentumArray(jets.to_numpy())
-    num_jets = len(jet_pmus)
     pt_descend_idxs = np.argsort(jet_pmus.pt)[::-1].tolist()
     jet_pmus = jet_pmus[pt_descend_idxs]
-    cuts = np.ones(num_jets, dtype=np.bool_)
-    if pt_cut is not None:
-        cuts = jet_pmus.pt > pt_cut
+    jet_idxs_ = sequence.constituent_index(pt_cut)[pt_descend_idxs]
     if eta_cut is not None:
-        cuts = np.logical_and(cuts, np.abs(jet_pmus.eta) < eta_cut)
-    jet_idxs = sequence.constituent_index().to_list()
-    jet_idxs = op.itemgetter(*pt_descend_idxs)(jet_idxs)
-    jet_idxs = it.compress(jet_idxs, cuts)
-    if top_k is not None:
-        jet_idxs = it.islice(jet_idxs, top_k)
-    mask_empty = gcl.MaskArray(np.zeros(num_pcls, dtype="<?"))
-    clusters: ty.List[gcl.MaskArray] = []
-    for jet_idx in jet_idxs:
-        mask = mask_empty.copy()
+        if eta_cut < 0.0:
+            raise ValueError("eta_cut must be non-negative.")
+        jet_idxs_ = jet_idxs_[np.abs(jet_pmus.eta) < eta_cut]
+    jet_idxs_ = jet_idxs_[:top_k]
+    jet_idxs = jet_idxs_.to_list()
+    num_jets = len(jet_idxs)
+    cluster_buffer = np.zeros((num_jets, num_pcls), dtype=np.bool_)
+    for mask, jet_idx in zip(cluster_buffer, jet_idxs):
         mask[jet_idx] = True
-        clusters.append(mask)
-    return clusters
+    return list(map(gcl.MaskArray, cluster_buffer))
 
 
 def find_vertex(
