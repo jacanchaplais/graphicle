@@ -656,4 +656,4 @@ def aggregate_momenta(
 
 @nb.vectorize("float64(float64, float64)")
 def _pt_distance(pt_1: float, pt_2: float) -> float:
-    return 1.0 - math.exp(-0.5 * pow((pt_1 - pt_2) / min(pt_1, pt_2), 2))
+    return -math.expm1(-0.5 * pow((pt_1 - pt_2) / min(pt_1, pt_2), 2))
