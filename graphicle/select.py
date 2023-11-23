@@ -1162,7 +1162,9 @@ def clusters(
 
 
 def arg_closest(
-    focus: gcl.MomentumArray, candidate: gcl.MomentumArray
+    focus: gcl.MomentumArray,
+    candidate: gcl.MomentumArray,
+    num_threads: int = 1,
 ) -> ty.List[int]:
     """Assigns four-momenta elements in ``candidate`` to the nearest
     four-momenta elements in ``focus``. Elements in ``candidate`` are
@@ -1183,6 +1185,9 @@ def arg_closest(
     candidate : MomentumArray
         Four-momenta of candidate objects to draw from until ``focus``
         objects have each received an assignment.
+    num_threads : int
+        Number of threads to parallelise the cost matrix computation
+        over. Default is 1.
 
     Returns
     -------
@@ -1216,13 +1221,14 @@ def arg_closest(
        Systems*, 52(4):1679-1696, August 2016,
        :doi:`10.1109/TAES.2016.140952`
     """
-    dist_matrix = focus.delta_R(candidate, pseudo=False)
-    pt_dist = gcl.calculate._pt_distance.outer(focus.pt, candidate.pt)
-    np.divide(
-        dist_matrix, dist_matrix.max(axis=1, keepdims=True), out=dist_matrix
-    )
-    np.hypot(dist_matrix, pt_dist, out=dist_matrix)
-    _, idxs = opt.linear_sum_assignment(dist_matrix)
+    with gcl.calculate._thread_scope(num_threads):
+        cost_matrix = gcl.calculate._assignment_cost(
+            focus.rapidity,
+            candidate.rapidity,
+            focus._xy_pol,
+            candidate._xy_pol,
+        )
+    _, idxs = opt.linear_sum_assignment(cost_matrix)
     return idxs.tolist()
 
 
