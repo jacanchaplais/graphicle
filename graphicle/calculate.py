@@ -666,7 +666,7 @@ def _assignment_cost(
 ) -> base.DoubleVector:
     dist_matrix = _delta_R(rapidity_1, rapidity_2, xy_pol_1, xy_pol_2)
     num_partons = dist_matrix.shape[0]
-    pt_2_cache = np.abs(xy_pol_2)
+    pt_2_cache = np.abs(xy_pol_2, out=rapidity_2)
     var_pt_recip = 1.0 / np.var(pt_2_cache)
     for parton_idx in nb.prange(num_partons):
         row = dist_matrix[parton_idx, :]

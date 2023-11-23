@@ -1228,6 +1228,7 @@ def arg_closest(
             focus._xy_pol,
             candidate._xy_pol,
         )
+    del candidate.rapidity  # inplace operation above invalidates cache
     _, idxs = opt.linear_sum_assignment(cost_matrix)
     return idxs.tolist()
 
