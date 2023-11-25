@@ -149,11 +149,11 @@ def fastjet_clusters(
     jets = sequence.inclusive_jets(pt_cut)
     jet_pmus = gcl.MomentumArray(jets.to_numpy())
     pt_descend_idxs = np.argsort(jet_pmus.pt)[::-1].tolist()
-    jet_pmus = jet_pmus[pt_descend_idxs]
     jet_idxs_ = sequence.constituent_index(pt_cut)[pt_descend_idxs]
     if eta_cut is not None:
         if eta_cut < 0.0:
             raise ValueError("eta_cut must be non-negative.")
+        jet_pmus = jet_pmus[pt_descend_idxs]
         jet_idxs_ = jet_idxs_[np.abs(jet_pmus.eta) < eta_cut]
     jet_idxs_ = jet_idxs_[:top_k]
     jet_idxs = jet_idxs_.to_list()
