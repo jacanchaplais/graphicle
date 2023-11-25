@@ -415,7 +415,7 @@ def flow_trace(
     return traces
 
 
-@nb.njit("float64[:](float64[:], float64[:], float64)")
+@nb.njit("float64[:](float64[:], float64[:], float64)", cache=True)
 def _rapidity(
     energy: base.DoubleVector, z: base.DoubleVector, zero_tol: float
 ) -> base.DoubleVector:
@@ -447,7 +447,7 @@ def _rapidity(
     return rap
 
 
-@nb.vectorize("float64(float64, float64)")
+@nb.vectorize("float64(float64, float64)", cache=True)
 def _root_diff_two_squares(
     x1: base.DoubleUfunc, x2: base.DoubleUfunc
 ) -> base.DoubleUfunc:
@@ -484,6 +484,7 @@ def _root_diff_two_squares(
 @nb.njit(
     "float64[:, :](float64[:], float64[:], complex128[:], complex128[:])",
     parallel=True,
+    cache=True,
 )
 def _delta_R(
     rapidity_1: base.DoubleVector,
@@ -522,7 +523,7 @@ def _delta_R(
     return result
 
 
-@nb.njit("float64[:, :](float64[:], complex128[:])", parallel=True)
+@nb.njit("float64[:, :](float64[:], complex128[:])", parallel=True, cache=True)
 def _delta_R_symmetric(
     rapidity: base.DoubleVector, xy_pol: base.ComplexVector
 ) -> base.DoubleVector:
@@ -559,7 +560,7 @@ def _delta_R_symmetric(
     return result
 
 
-@nb.njit("float32[:](bool_[:, :])", parallel=True)
+@nb.njit("float32[:](bool_[:, :])", parallel=True, cache=True)
 def _clust_coeffs(adj: base.BoolVector) -> base.FloatVector:
     num_nodes = adj.shape[0]
     coefs = np.empty(num_nodes, dtype=np.float32)
@@ -657,6 +658,7 @@ def aggregate_momenta(
 @nb.njit(
     "float64[:, :](float64[:], float64[:], complex128[:], complex128[:])",
     parallel=True,
+    cache=True,
 )
 def _assignment_cost(
     rapidity_1: base.DoubleVector,
