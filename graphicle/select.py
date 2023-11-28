@@ -1376,6 +1376,11 @@ def monte_carlo_tag(
     if clustered_pmu is None:
         clustered_pmu = particles.pmu[particles.final]
         ref_length = "particles.final"
+    if len(cluster_masks) < len(hard_pmu):
+        raise ValueError(
+            f"shape mismatch: only {len(cluster_masks)} clusters "
+            f"passed to tag {len(hard_pmu)} partons."
+        )
     if len(clustered_pmu) != len(cluster_masks[0]):
         raise ValueError(
             "shape mismatch: length of elements in cluster_masks must be the "
