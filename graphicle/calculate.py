@@ -19,6 +19,7 @@ import networkx as nx
 import numba as nb
 import numpy as np
 import numpy.lib.recfunctions as rfn
+import scipy.optimize as spo
 from deprecation import deprecated
 
 from . import base
@@ -36,7 +37,16 @@ __all__ = [
     "flow_trace",
     "aggregate_momenta",
     "cluster_coeff_distbn",
+    "thrust",
+    "spherocity",
+    "c_parameter",
+    "jaccard_distance",
 ]
+
+
+PMU_DTYPE = nb.typeof(
+    np.empty(1, dtype=np.dtype(list(zip("xyze", ("<f8",) * 4))))
+)
 
 
 @deprecated(
@@ -170,7 +180,7 @@ def weighted_centroid(
     rap = pmu.eta if pseudo else pmu.rapidity
     rap_mid = ((rap * pmu.pt).sum() / pt_sum).item()
     phi_mid_unbound = ((pmu.phi * pmu.pt).sum() / pt_sum).item()
-    phi_mid = cmath.phase(cmath.exp(complex(0, phi_mid_unbound)))
+    phi_mid = cmath.phase(cmath.rect(1, phi_mid_unbound))
     return rap_mid, phi_mid
 
 
@@ -653,6 +663,489 @@ def aggregate_momenta(
     pmus = map(fn.partial(op.getitem, pmu), cluster_masks)
     pmu_sums = map(fn.partial(np.sum, axis=0), pmus)
     return momentum_class(list(it.chain.from_iterable(pmu_sums)))
+
+
+@nb.njit("float64(float64, float64, float64)", cache=True)
+def _three_norm(x: float, y: float, z: float) -> float:
+    max_component = max(abs(x), abs(y), abs(z))
+    max_recip = 1.0 / max_component
+    x *= max_recip
+    y *= max_recip
+    z *= max_recip
+    return max_component * np.sqrt(x * x + y * y + z * z)
+
+
+@nb.njit("float64[:](float64[:])", cache=True)
+def _angles_to_axis(axis_angles: base.DoubleVector) -> base.DoubleVector:
+    """Given the azimuth and inclination angles, return the Cartesian
+    coordinates a unit vector.
+
+    Parameters
+    ----------
+    axis_angles : ndarray[float64]
+        Array of shape (2,), containing azimuth and inclination angles
+        of thrust axis.
+
+    Returns
+    -------
+    axis : ndarray[float64]
+        Array of shape (3,) containing the x, y, and z components of the
+        unit vector, respectively.
+    """
+    azimuth, inclination = axis_angles[0], axis_angles[1]
+    sin_theta, cos_theta = math.sin(inclination), math.cos(inclination)
+    sin_phi, cos_phi = math.sin(azimuth), math.cos(azimuth)
+    return np.array(
+        [sin_theta * cos_phi, sin_theta * sin_phi, cos_theta], dtype=np.float64
+    )
+
+
+@nb.njit(
+    nb.types.Tuple((nb.float64, nb.float64[:]))(nb.float64[:], PMU_DTYPE),
+    cache=True,
+)
+def _thrust_with_grad(
+    axis_angles: base.DoubleVector, momenta: base.VoidVector
+) -> ty.Tuple[float, base.DoubleVector]:
+    """Computes the thrust for a thrust axis given by a pair of azimuth
+    and inclination angles, as well as the gradient of the thrust with
+    respect to these angles.
+
+    Parameters
+    ----------
+    axis_angles : ndarray[float64]
+        Array of shape (2,), containing azimuth and inclination angles
+        of thrust axis.
+    momenta : ndarray[void]
+        Structured array, containing fields labeled 'x', 'y', 'z',
+        of 64-bit floating point numbers for the components of a
+        momentum point cloud.
+
+    Returns
+    -------
+    thrust_val : float
+        The (negated) value of thrust, with the given thrust axis.
+    thrust_grad : ndarray[float64]
+        Array of shape (2,) containing the (negated) gradient of the
+        thrust with respect to azimuth and inclination angles of the
+        thrust axis, respectively.
+
+    Notes
+    -----
+    This routine is defined to provide an objective for optimizers.
+    Specifically, the thrust must be maximized by finding a suitable
+    thrust axis, so the thrust and gradient are negated, so that they
+    can be passed to a minimizer.
+    """
+    azimuth, inclination = axis_angles[0], axis_angles[1]
+    sin_theta, cos_theta = math.sin(inclination), math.cos(inclination)
+    sin_phi, cos_phi = math.sin(azimuth), math.cos(azimuth)
+    ax_x, ax_y, ax_z = sin_theta * cos_phi, sin_theta * sin_phi, cos_theta
+    abs_dot_sum = norm_sum = grad_phi_sum = grad_theta_sum = 0.0
+    for momentum in momenta:
+        x, y, z = momentum["x"], momentum["y"], momentum["z"]
+        grad_phi = (y * sin_theta * cos_phi) - (x * sin_theta * sin_phi)
+        grad_theta = (
+            (x * cos_theta * cos_phi)
+            + (y * cos_theta * sin_phi)
+            - (z * sin_theta)
+        )
+        dot_prod = (ax_x * x) + (ax_y * y) + (ax_z * z)
+        dot_prod_sign = math.copysign(1.0, dot_prod)
+        abs_dot_sum += abs(dot_prod)
+        grad_phi_sum += dot_prod_sign * grad_phi
+        grad_theta_sum += dot_prod_sign * grad_theta
+        norm_sum += _three_norm(x, y, z)
+    func_val = abs_dot_sum / norm_sum
+    grad_vec = (
+        np.array([grad_phi_sum, grad_theta_sum], dtype=np.float64) / norm_sum
+    )
+    return -func_val, -grad_vec
+
+
+@ty.overload
+def thrust(
+    pmu: "MomentumArray",
+    return_axis: ty.Literal[False],
+    rng_seed: ty.Optional[int],
+) -> float:
+    ...
+
+
+@ty.overload
+def thrust(pmu: "MomentumArray", return_axis: ty.Literal[False]) -> float:
+    ...
+
+
+@ty.overload
+def thrust(pmu: "MomentumArray", rng_seed: ty.Optional[int]) -> float:
+    ...
+
+
+@ty.overload
+def thrust(pmu: "MomentumArray") -> float:
+    ...
+
+
+@ty.overload
+def thrust(
+    pmu: "MomentumArray",
+    return_axis: ty.Literal[True],
+    rng_seed: ty.Optional[int],
+) -> ty.Tuple[float, base.DoubleVector]:
+    ...
+
+
+@ty.overload
+def thrust(
+    pmu: "MomentumArray",
+    return_axis: ty.Literal[True],
+) -> ty.Tuple[float, base.DoubleVector]:
+    ...
+
+
+def thrust(
+    pmu: "MomentumArray",
+    return_axis: bool = False,
+    rng_seed: ty.Optional[int] = None,
+):
+    """Computes the thrust of an event, from the final-state momenta.
+
+    :group: calculate
+
+    .. versionadded:: 0.3.8
+
+    Parameters
+    ----------
+    pmu : MomentumArray
+        Momentum of hadronised particles in the final state of the event
+        record.
+    return_axis : bool
+        If ``True``, will return a tuple with the thrust, and the axis
+        unit vector which was found to maximise thrust.
+    rng_seed : int, optional
+        Initial guess for the axis unit vector is sampled from a uniform
+        random distribution, over the surface of a sphere. If passed,
+        will initialise the random number generator with the provided
+        seed, enabling reproducible results.
+
+    Returns
+    -------
+    thrust : float
+        The thrust of the event.
+    axis : ndarray[float64], optional
+        The x, y, and z components of the thrust axis, respectively.
+
+    See Also
+    --------
+    spherocity : Computes the spherocity from final state momenta.
+    c_parameter : Computes the C-parameter from the final state momenta.
+    """
+    half_pi = 0.5 * math.pi
+    domain = (-half_pi, half_pi)
+    rng = np.random.default_rng(seed=rng_seed)
+    guess = rng.uniform(*domain, size=2)
+    optim = spo.minimize(
+        fun=_thrust_with_grad,
+        x0=guess,
+        bounds=(domain, domain),
+        method="L-BFGS-B",
+        jac=True,
+        args=(pmu.data,),
+    )
+    thrust_val = -optim.fun
+    if return_axis:
+        return thrust_val, _angles_to_axis(optim.x)
+    return thrust_val
+
+
+@nb.njit(
+    nb.types.Tuple((nb.float64, nb.float64[:]))(nb.float64[:], PMU_DTYPE),
+    cache=True,
+)
+def _spherocity_with_grad(
+    axis_angles: base.DoubleVector, momenta: base.VoidVector
+) -> ty.Tuple[float, base.DoubleVector]:
+    """Computes the spherocity for a unit vector given by a pair of
+    azimuth and inclination angles, as well as the gradient of the
+    spherocity with respect to these angles.
+
+    Parameters
+    ----------
+    axis_angles : ndarray[float64]
+        Array of shape (2,), containing azimuth and inclination angles
+        of the unit vector.
+    momenta : ndarray[void]
+        Structured array, containing fields labeled 'x', 'y', 'z',
+        of 64-bit floating point numbers for the components of a
+        momentum point cloud.
+
+    Returns
+    -------
+    spherocity_val : float
+        The value of spherocity, with the given unit vector.
+    spherocity_grad : ndarray[float64]
+        Array of shape (2,) containing the gradient of the spherocity
+        with respect to azimuth and inclination angles of the unit
+        vector, respectively.
+    """
+    phi, theta = axis_angles[0], axis_angles[1]
+    # pre-compute trig ratios and spherocity axis
+    cos_phi, sin_phi = math.cos(phi), math.sin(phi)
+    cos_theta, sin_theta = math.cos(theta), math.sin(theta)
+    cos_2phi = 2.0 * cos_phi * cos_phi - 1.0
+    sin_2phi = 2.0 * cos_phi * sin_phi
+    cos_2theta = 2.0 * cos_theta * cos_theta - 1.0
+    sin_2theta = 2.0 * cos_theta * sin_theta
+    ax_x, ax_y, ax_z = sin_theta * cos_phi, sin_theta * sin_phi, cos_theta
+    # initialising accumulators
+    cross_norm_sum = norm_sum = grad_theta_sum = grad_phi_sum = 0.0
+    for momentum in momenta:
+        x, y, z = momentum["x"], momentum["y"], momentum["z"]
+        norm_sum += _three_norm(x, y, z)
+        # magnitude of the cross product
+        cross_x = y * ax_z - z * ax_y
+        cross_y = z * ax_x - x * ax_z
+        cross_z = x * ax_y - y * ax_x
+        cross_norm = _three_norm(cross_x, cross_y, cross_z)
+        cross_norm_sum += cross_norm
+        # accumulate gradient contributions
+        x_sq, y_sq = x * x, y * y
+        cross_norm_recip = 1.0 / cross_norm
+        grad_phi_sum += cross_norm_recip * (
+            0.5
+            * (cos_2theta - 1.0)
+            * ((2.0 * x * y * cos_2phi) - ((x_sq - y_sq) * sin_2phi))
+            - sin_2theta * ((y * z * cos_phi) - (x * z * sin_phi))
+        )
+        grad_theta_sum += cross_norm_recip * (
+            -2.0 * cos_2theta * ((x * y * cos_phi) + (y * z * sin_phi))
+            - 0.5
+            * sin_2theta
+            * (
+                (x_sq + y_sq)
+                + ((x_sq - y_sq) * cos_2phi)
+                - (2.0 * z * z)
+                + (2.0 * x * y * sin_2phi)
+            )
+        )
+    scale_factor = (4.0 / (math.pi * norm_sum)) ** 2
+    spherocity = scale_factor * cross_norm_sum * cross_norm_sum
+    grad_phi = scale_factor * cross_norm_sum * grad_phi_sum
+    grad_theta = scale_factor * cross_norm_sum * grad_theta_sum
+    return spherocity, np.array([grad_phi, grad_theta], dtype=np.float64)
+
+
+@ty.overload
+def spherocity(
+    pmu: "MomentumArray",
+    return_axis: ty.Literal[False],
+    rng_seed: ty.Optional[int],
+) -> float:
+    ...
+
+
+@ty.overload
+def spherocity(pmu: "MomentumArray", return_axis: ty.Literal[False]) -> float:
+    ...
+
+
+@ty.overload
+def spherocity(pmu: "MomentumArray", rng_seed: ty.Optional[int]) -> float:
+    ...
+
+
+@ty.overload
+def spherocity(pmu: "MomentumArray") -> float:
+    ...
+
+
+@ty.overload
+def spherocity(
+    pmu: "MomentumArray",
+    return_axis: ty.Literal[True],
+    rng_seed: ty.Optional[int],
+) -> ty.Tuple[float, base.DoubleVector]:
+    ...
+
+
+@ty.overload
+def spherocity(
+    pmu: "MomentumArray",
+    return_axis: ty.Literal[True],
+) -> ty.Tuple[float, base.DoubleVector]:
+    ...
+
+
+def spherocity(
+    pmu: "MomentumArray",
+    return_axis: bool = False,
+    rng_seed: ty.Optional[int] = None,
+):
+    """Computes the spherocity of an event, from final-state momenta.
+
+    :group: calculate
+
+    .. versionadded:: 0.3.8
+
+    Parameters
+    ----------
+    pmu : MomentumArray
+        Momentum of hadronised particles in the final state of the event
+        record.
+    return_axis : bool
+        If ``True``, will return a tuple with the spherocity, and the
+        axis unit vector which was found to minimize spherocity.
+    rng_seed : int, optional
+        Initial guess for the axis unit vector is sampled from a uniform
+        random distribution, over the surface of a sphere. If passed,
+        will initialise the random number generator with the provided
+        seed, enabling reproducible results.
+
+    Returns
+    -------
+    spherocity : float
+        The spherocity of the event.
+    axis : ndarray[float64], optional
+        The x, y, and z components of the spherocity axis, respectively.
+
+    See Also
+    --------
+    thrust : Computes the thrust from final state momenta.
+    c_parameter : Computes the C-parameter from the final state momenta.
+    """
+    half_pi = 0.5 * math.pi
+    domain = (-half_pi, half_pi)
+    rng = np.random.default_rng(seed=rng_seed)
+    guess = rng.uniform(*domain, size=2)
+    optim = spo.minimize(
+        fun=_spherocity_with_grad,
+        x0=guess,
+        bounds=(domain, domain),
+        jac=True,
+        args=(pmu.data,),
+    )
+    sph_val = optim.fun
+    if return_axis:
+        return sph_val, _angles_to_axis(optim.x)
+    return sph_val
+
+
+@nb.njit(nb.float64(PMU_DTYPE), cache=True)
+def _c_parameter(momenta: base.VoidVector) -> float:
+    output = norm_sum = 0.0
+    for idx_i, pmu_i in enumerate(momenta):
+        x_i, y_i, z_i = pmu_i["x"], pmu_i["y"], pmu_i["z"]
+        norm_i = _three_norm(x_i, y_i, z_i)
+        norm_sum += norm_i
+        for pmu_j in momenta[idx_i:]:
+            x_j, y_j, z_j = pmu_j["x"], pmu_j["y"], pmu_j["z"]
+            norm_j = _three_norm(x_j, y_j, z_j)
+            norm_prod = norm_i * norm_j
+            i_dot_j = (x_i * x_j) + (y_i * y_j) + (z_i * z_j)
+            output += 2.0 * (norm_prod - (i_dot_j * i_dot_j / norm_prod))
+    return 1.5 * output / (norm_sum * norm_sum)
+
+
+def c_parameter(pmu: "MomentumArray") -> float:
+    """Computes the C-parameter for the event, from the final state
+    momenta.
+
+    :group: calculate
+
+    .. versionadded:: 0.3.8
+
+    Parameters
+    ----------
+    pmu : MomentumArray
+        Momentum of hadronised particles in the final state of the event
+        record.
+
+    Returns
+    -------
+    float
+        The C-parameter of the event.
+
+    See Also
+    --------
+    thrust : Computes the thrust from final state momenta.
+    spherocity : Computes the spherocity from final state momenta.
+    """
+    return _c_parameter(pmu.data)
+
+
+@nb.njit(
+    [
+        "float64(bool_[:], bool_[:], Optional(float64[:]))",
+        "float64(bool_[:], bool_[:], Omitted(None))",
+    ],
+    cache=True,
+)
+def _jaccard_distance(
+    u: base.BoolVector,
+    v: base.BoolVector,
+    w: ty.Optional[base.DoubleVector] = None,
+) -> float:
+    """Computes the Jaccard distance for two sets.
+
+    Parameters
+    ----------
+    u, v : ndarray[bool_]
+        Boolean masks, identifying which elements belong
+        respective sets.
+    w : ndarray[float64]
+        Weights associated with each element. If not passed,
+        will assume weights are 1.
+
+    Returns
+    -------
+    float
+        Jaccard distance between sets.
+    """
+    difference_sum = 0.0
+    union_sum = 0.0
+    if w is None:
+        w = np.ones(u.shape, dtype=np.float64)
+    for u_elem, v_elem, weight in zip(u, v, w):
+        nonzero = u_elem | v_elem
+        unequal_nonzero = nonzero & (u_elem != v_elem)
+        union_sum += weight * nonzero
+        difference_sum += weight * unequal_nonzero
+    if union_sum == 0.0:
+        return 0.0
+    return difference_sum / union_sum
+
+
+def jaccard_distance(
+    mask_1: ty.Union[base.MaskBase, base.BoolVector],
+    mask_2: ty.Union[base.MaskBase, base.BoolVector],
+    weights: ty.Optional[base.DoubleVector] = None,
+) -> float:
+    """Computes the Jaccard distance between two sets.
+
+    :group: calculate
+
+    .. versionadded:: 0.3.8
+
+    Parameters
+    ----------
+    mask_1, mask_2 : ndarray[bool_] or MaskBase
+        Boolean masks, identifying which elements belong to the
+        respective sets.
+    weights : ndarray[float64]
+        Weights associated with each element. If not passed,
+        will assume weights are 1.
+
+    Returns
+    -------
+    float
+        Jaccard distance between sets.
+    """
+    if not isinstance(mask_1, np.ndarray):
+        mask_1 = mask_1.data
+    if not isinstance(mask_2, np.ndarray):
+        mask_2 = mask_2.data
+    return _jaccard_distance(mask_1, mask_2, weights)
 
 
 @nb.njit(
