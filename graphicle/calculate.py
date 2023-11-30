@@ -415,7 +415,7 @@ def flow_trace(
     return traces
 
 
-@nb.njit("float64[:](float64[:], float64[:], float64)")
+@nb.njit("float64[:](float64[:], float64[:], float64)", cache=True)
 def _rapidity(
     energy: base.DoubleVector, z: base.DoubleVector, zero_tol: float
 ) -> base.DoubleVector:
@@ -447,7 +447,7 @@ def _rapidity(
     return rap
 
 
-@nb.vectorize("float64(float64, float64)")
+@nb.vectorize("float64(float64, float64)", cache=True)
 def _root_diff_two_squares(
     x1: base.DoubleUfunc, x2: base.DoubleUfunc
 ) -> base.DoubleUfunc:
@@ -484,6 +484,7 @@ def _root_diff_two_squares(
 @nb.njit(
     "float64[:, :](float64[:], float64[:], complex128[:], complex128[:])",
     parallel=True,
+    cache=True,
 )
 def _delta_R(
     rapidity_1: base.DoubleVector,
@@ -522,7 +523,7 @@ def _delta_R(
     return result
 
 
-@nb.njit("float64[:, :](float64[:], complex128[:])", parallel=True)
+@nb.njit("float64[:, :](float64[:], complex128[:])", parallel=True, cache=True)
 def _delta_R_symmetric(
     rapidity: base.DoubleVector, xy_pol: base.ComplexVector
 ) -> base.DoubleVector:
@@ -559,7 +560,7 @@ def _delta_R_symmetric(
     return result
 
 
-@nb.njit("float32[:](bool_[:, :])", parallel=True)
+@nb.njit("float32[:](bool_[:, :])", parallel=True, cache=True)
 def _clust_coeffs(adj: base.BoolVector) -> base.FloatVector:
     num_nodes = adj.shape[0]
     coefs = np.empty(num_nodes, dtype=np.float32)
@@ -652,3 +653,32 @@ def aggregate_momenta(
     pmus = map(fn.partial(op.getitem, pmu), cluster_masks)
     pmu_sums = map(fn.partial(np.sum, axis=0), pmus)
     return momentum_class(list(it.chain.from_iterable(pmu_sums)))
+
+
+@nb.njit(
+    "float64[:, :](float64[:], float64[:], complex128[:], complex128[:])",
+    parallel=True,
+    cache=True,
+)
+def _assignment_cost(
+    rapidity_1: base.DoubleVector,
+    rapidity_2: base.DoubleVector,
+    xy_pol_1: base.ComplexVector,
+    xy_pol_2: base.ComplexVector,
+) -> base.DoubleVector:
+    dist_matrix = _delta_R(rapidity_1, rapidity_2, xy_pol_1, xy_pol_2)
+    pt_2 = rapidity_2  # recycle memory buffer for transverse momenta
+    for pol_idx, pol_val in enumerate(xy_pol_2):
+        pt_2[pol_idx] = abs(pol_val)
+    var_pt_recip = 1.0 / np.var(pt_2)
+    num_partons = dist_matrix.shape[0]
+    for parton_idx in nb.prange(num_partons):
+        row = dist_matrix[parton_idx, :]
+        pt_1_val = abs(xy_pol_1[parton_idx])
+        var_dR_recip = 1.0 / np.var(row)
+        for jet_idx, (dR_val, pt_2_val) in enumerate(zip(row, pt_2)):
+            dpt = pt_1_val - pt_2_val
+            dR_cost = math.expm1(-0.5 * var_dR_recip * dR_val * dR_val)
+            pt_cost = math.expm1(-0.5 * var_pt_recip * dpt * dpt)
+            row[jet_idx] = -(dR_cost + pt_cost)
+    return dist_matrix
