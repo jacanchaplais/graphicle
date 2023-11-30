@@ -1146,3 +1146,32 @@ def jaccard_distance(
     if not isinstance(mask_2, np.ndarray):
         mask_2 = mask_2.data
     return _jaccard_distance(mask_1, mask_2, weights)
+
+
+@nb.njit(
+    "float64[:, :](float64[:], float64[:], complex128[:], complex128[:])",
+    parallel=True,
+    cache=True,
+)
+def _assignment_cost(
+    rapidity_1: base.DoubleVector,
+    rapidity_2: base.DoubleVector,
+    xy_pol_1: base.ComplexVector,
+    xy_pol_2: base.ComplexVector,
+) -> base.DoubleVector:
+    dist_matrix = _delta_R(rapidity_1, rapidity_2, xy_pol_1, xy_pol_2)
+    pt_2 = rapidity_2  # recycle memory buffer for transverse momenta
+    for pol_idx, pol_val in enumerate(xy_pol_2):
+        pt_2[pol_idx] = abs(pol_val)
+    var_pt_recip = 1.0 / np.var(pt_2)
+    num_partons = dist_matrix.shape[0]
+    for parton_idx in nb.prange(num_partons):
+        row = dist_matrix[parton_idx, :]
+        pt_1_val = abs(xy_pol_1[parton_idx])
+        var_dR_recip = 1.0 / np.var(row)
+        for jet_idx, (dR_val, pt_2_val) in enumerate(zip(row, pt_2)):
+            dpt = pt_1_val - pt_2_val
+            dR_cost = math.expm1(-0.5 * var_dR_recip * dR_val * dR_val)
+            pt_cost = math.expm1(-0.5 * var_pt_recip * dpt * dpt)
+            row[jet_idx] = -(dR_cost + pt_cost)
+    return dist_matrix
