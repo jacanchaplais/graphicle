@@ -642,7 +642,9 @@ def _mask_neq(mask1: base.MaskLike, mask2: base.MaskLike) -> MaskArray:
     return MaskArray(np.not_equal(mask1, mask2))
 
 
-_IN_MASK_DICT = ty.OrderedDict[str, ty.Union[MaskArray, base.BoolVector]]
+_IN_MASK_DICT = ty.Mapping[
+    str, ty.Union[MaskArray, base.BoolVector, ty.Iterable[bool]]
+]
 _MASK_DICT = ty.OrderedDict[str, MaskArray]
 
 
@@ -651,6 +653,8 @@ def _mask_dict_convert(masks: _IN_MASK_DICT) -> _MASK_DICT:
     for key, val in masks.items():
         if isinstance(val, MaskArray) or isinstance(val, MaskGroup):
             mask = val
+        elif isinstance(val, cla.Mapping):
+            mask = MaskGroup(_mask_dict_convert(val))
         else:
             mask = MaskArray(val)
         out_masks[key] = mask
