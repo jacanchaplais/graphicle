@@ -661,6 +661,24 @@ def _mask_dict_convert(masks: _IN_MASK_DICT) -> _MASK_DICT:
     return out_masks
 
 
+def _maskgroup_equal(
+    group_1: "MaskGroup", group_2: "MaskGroup", check_order: bool
+) -> bool:
+    key_struct = tuple if check_order else set
+    if key_struct(group_1) != key_struct(group_2):
+        return False
+    for key in group_1:
+        mask_1, mask_2 = group_1[key], group_2[key]
+        if type(mask_1) != type(mask_2):
+            return False
+        if isinstance(mask_1, MaskGroup):
+            if not _maskgroup_equal(mask_1, mask_2, check_order):
+                return False
+        elif not np.array_equal(mask_1.data, mask_2.data):
+            return False
+    return True
+
+
 class MaskAggOp(Enum):
     AND = "and"
     OR = "or"
@@ -983,6 +1001,29 @@ class MaskGroup(base.MaskBase, ty.MutableMapping[str, MaskGeneric]):
         .. versionadded:: 0.3.2
         """
         return {key: val.serialize() for key, val in self._mask_arrays.items()}
+
+    def equal_to(self, other: "MaskGroup", check_order: bool = False) -> bool:
+        """Checks whether this instance is identical to ``other``
+        ``MaskGroup``, comparing keys at all levels of nesting, and
+        boolean array data at the leaf level.
+
+        .. versionadded:: 0.3.9
+
+        Parameters
+        ----------
+        other : MaskGroup
+            Other instance, against which to compare for equality.
+        check_order : bool
+            If ``True``, will check that the ordering of elements is
+            identical. Default is ``False``.
+
+        Returns
+        -------
+        bool
+            ``True`` if instance is identical to ``other``, ``False``
+            otherwise.
+        """
+        return _maskgroup_equal(self, other, check_order)
 
 
 @define(eq=False)
