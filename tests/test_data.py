@@ -7,9 +7,13 @@ methods.
 """
 import cmath
 import dataclasses as dc
+import gzip
+import json
 import math
 import random
 import string
+import typing as ty
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -17,6 +21,7 @@ import pytest
 import graphicle as gcl
 
 ZERO_TOL = 1.0e-10  # absolute tolerance for detecting zero-values
+SCRIPT_DIR = Path(__file__).parent
 
 
 def random_alphanum(length: int) -> str:
@@ -173,3 +178,17 @@ def test_maskgroup_serialize_inverse() -> None:
         )
         invertible &= maskgroup.equal_to(gcl.MaskGroup(maskgroup.serialize()))
     assert invertible, "Serializing MaskGroups is not invertible."
+
+
+def load_graphicle_from_json(file_obj: ty.TextIO) -> gcl.Graphicle:
+    graph_dict = json.load(file_obj)
+    return gcl.Graphicle(
+        adj=graph_dict.pop("adj"),
+        particles=gcl.ParticleSet.from_numpy(**graph_dict),
+    )
+
+
+def test_composite_subscript() -> None:
+    with gzip.open(SCRIPT_DIR / "sample.json.gz", mode="rt") as file_obj:
+        graph = load_graphicle_from_json(file_obj)
+    _ = graph[graph.final]
