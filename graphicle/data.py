@@ -2751,7 +2751,10 @@ class Graphicle:
     @property
     def final(self) -> MaskArray:
         """Boolean array indicating final state in particle set."""
-        return self.particles.final
+        data = self.particles.final
+        if (not data) and self.adj:
+            return self.adj.leaves
+        return data
 
     @property
     def edges(self) -> base.VoidVector:
