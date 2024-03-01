@@ -2748,11 +2748,16 @@ class Graphicle:
         """
         return self.particles.status.hard_mask
 
-    @property
+    @fn.cached_property
     def final(self) -> MaskArray:
         """Boolean array indicating final state in particle set."""
         data = self.particles.final
         if (not data) and self.adj:
+            warnings.warn(
+                "Explicit final mask missing. Computing from adjacency. "
+                "This result will be cached for the Graphicle object, but not "
+                "the underlying ParticleSet."
+            )
             return self.adj.leaves
         return data
 
