@@ -20,7 +20,7 @@ classifiers = [
     "Operating System :: OS Independent"
 ]
 dependencies = [
-    "attrs",
+    "attrs >=23.2.0",
     "numpy >=1.21",
     "scipy >=1.8.0",
     "numba",
