@@ -763,51 +763,11 @@ def _thrust_with_grad(
     return -func_val, -grad_vec
 
 
-@ty.overload
-def thrust(
-    pmu: "MomentumArray",
-    return_axis: ty.Literal[False],
-    rng_seed: ty.Optional[int],
-) -> float:
-    ...
-
-
-@ty.overload
-def thrust(pmu: "MomentumArray", return_axis: ty.Literal[False]) -> float:
-    ...
-
-
-@ty.overload
-def thrust(pmu: "MomentumArray", rng_seed: ty.Optional[int]) -> float:
-    ...
-
-
-@ty.overload
-def thrust(pmu: "MomentumArray") -> float:
-    ...
-
-
-@ty.overload
-def thrust(
-    pmu: "MomentumArray",
-    return_axis: ty.Literal[True],
-    rng_seed: ty.Optional[int],
-) -> ty.Tuple[float, base.DoubleVector]:
-    ...
-
-
-@ty.overload
-def thrust(
-    pmu: "MomentumArray",
-    return_axis: ty.Literal[True],
-) -> ty.Tuple[float, base.DoubleVector]:
-    ...
-
-
 def thrust(
     pmu: "MomentumArray",
     return_axis: bool = False,
     rng_seed: ty.Optional[int] = None,
+    frame: ty.Optional["MomentumArray"] = None,
 ):
     """Computes the thrust of an event, from the final-state momenta.
 
@@ -853,7 +813,7 @@ def thrust(
         jac=True,
         args=(pmu.data,),
     )
-    thrust_val = -optim.fun
+    thrust_val: float = -optim.fun
     if return_axis:
         return thrust_val, _angles_to_axis(optim.x)
     return thrust_val
@@ -936,47 +896,6 @@ def _spherocity_with_grad(
     return spherocity, np.array([grad_phi, grad_theta], dtype=np.float64)
 
 
-@ty.overload
-def spherocity(
-    pmu: "MomentumArray",
-    return_axis: ty.Literal[False],
-    rng_seed: ty.Optional[int],
-) -> float:
-    ...
-
-
-@ty.overload
-def spherocity(pmu: "MomentumArray", return_axis: ty.Literal[False]) -> float:
-    ...
-
-
-@ty.overload
-def spherocity(pmu: "MomentumArray", rng_seed: ty.Optional[int]) -> float:
-    ...
-
-
-@ty.overload
-def spherocity(pmu: "MomentumArray") -> float:
-    ...
-
-
-@ty.overload
-def spherocity(
-    pmu: "MomentumArray",
-    return_axis: ty.Literal[True],
-    rng_seed: ty.Optional[int],
-) -> ty.Tuple[float, base.DoubleVector]:
-    ...
-
-
-@ty.overload
-def spherocity(
-    pmu: "MomentumArray",
-    return_axis: ty.Literal[True],
-) -> ty.Tuple[float, base.DoubleVector]:
-    ...
-
-
 def spherocity(
     pmu: "MomentumArray",
     return_axis: bool = False,
@@ -1025,7 +944,7 @@ def spherocity(
         jac=True,
         args=(pmu.data,),
     )
-    sph_val = optim.fun
+    sph_val: float = optim.fun
     if return_axis:
         return sph_val, _angles_to_axis(optim.x)
     return sph_val
