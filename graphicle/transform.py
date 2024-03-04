@@ -17,7 +17,7 @@ import graphicle as gcl
 _complex_unpack = op.attrgetter("real", "imag")
 
 
-def _cos_sin(angle: float) -> tuple[float, float]:
+def _cos_sin(angle: float) -> ty.Tuple[float, float]:
     """Returns a tuple containing the sine and cosine of an angle."""
     return _complex_unpack(cmath.rect(1.0, angle))
 

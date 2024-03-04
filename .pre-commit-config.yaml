@@ -29,6 +29,18 @@ repos:
     hooks:
       - id: pyupgrade
         args: ["--py38-plus"]
+  - repo: https://github.com/netromdk/vermin
+    rev: v1.6.0
+    hooks:
+      - id: vermin
+        args: [
+          '-t=3.8-',
+          '--violations',
+          '--eval-annotations',
+          '--backports=typing',
+          '--backports=typing_extensions',
+          '--backports=enum',
+          ]
   - repo: https://github.com/PyCQA/autoflake
     rev: v2.1.1
     hooks:
