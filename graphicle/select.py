@@ -1139,7 +1139,7 @@ def clusters(
     signal.
     """
     hier_ = hierarchy(graph)
-    hier = partition_descendants(graph, hier_, -0.1)
+    hier = partition_descendants(graph, hier_, 0.0)
     leaves = leaf_masks(hier)
     color_keys = color_singlets(leaves, graph.status, graph.color, True)
     colored_leaves = map(
