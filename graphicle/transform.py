@@ -18,13 +18,25 @@ _complex_unpack = op.attrgetter("real", "imag")
 
 
 class SphericalAngle(ty.NamedTuple):
-    """Pair of inclination and azimuthal angles, respectively."""
+    """Pair of inclination and azimuthal angles, respectively.
+
+    :group: transform
+
+    .. versionadded:: 0.4.0
+    """
 
     theta: float
     phi: float
 
 
 class SphericalAxis(ty.NamedTuple):
+    """Axis vector in 3D cartesian coordinates.
+
+    :group: transform
+
+    .. versionadded:: 0.4.0
+    """
+
     x: float
     y: float
     z: float
@@ -56,6 +68,10 @@ def soft_hard_axis(momenta: gcl.MomentumArray) -> SphericalAngle:
     """Calculates the axis defined by the plane swept out between the
     hardest and softest particles in ``momenta``.
 
+    :group: transform
+
+    .. versionadded:: 0.4.0
+
     Parameters
     ----------
     momenta : MomentumArray
@@ -79,6 +95,10 @@ def rotation_matrix(
 ) -> npt.NDArray[np.float64]:
     """Computes the matrix operator to rotate a 3D vector with respect
     to an arbitrary ``axis`` by a given ``angle``.
+
+    :group: transform
+
+    .. versionadded:: 0.4.0
 
     Parameters
     ----------
@@ -122,6 +142,10 @@ def split_momentum(
     """Splits the momentum of the given particle into two momenta.
     Energy and 3-momentum is conserved. Hardness and collinearity of the
     split are determined by ``z`` and ``angle``.
+
+    :group: transform
+
+    .. versionadded:: 0.4.0
 
     Parameters
     ----------
@@ -170,6 +194,10 @@ def split_hardest(
     Energy and 3-momentum is conserved over the whole MomentumArray.
     Hardness and collinearity of the split are determined by function
     parameters.
+
+    :group: transform
+
+    .. versionadded:: 0.4.0
 
     Parameters
     ----------
