@@ -2,8 +2,7 @@
 ``graphicle.transform``
 =======================
 
-Utilities for manipulating the graph structure of particle data.
-
+Utilities for mutating particle data.
 """
 import cmath
 import operator as op
