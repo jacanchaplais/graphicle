@@ -2219,7 +2219,13 @@ class ParticleSet(base.ParticleBase):
         return _composite_copy(self)
 
     @classmethod
-    def from_madgraph_table(cls, event_table: str) -> "ParticleSet":
+    def from_lhe_event(cls, event: base.LheEventInterface) -> "ParticleSet":
+        prop_names = ("pdg", "pmu", "color", "helicity", "status")
+        data = cls(**{name: getattr(event, name) for name in prop_names})
+        return data
+
+    @classmethod
+    def _from_lhe_event(cls, event_table: str) -> "ParticleSet":
         schema = {
             "pdg": 0,
             "color": 4,
