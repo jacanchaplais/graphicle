@@ -2219,6 +2219,45 @@ class ParticleSet(base.ParticleBase):
         return _composite_copy(self)
 
     @classmethod
+    def from_madgraph_table(cls, event_table: str) -> "ParticleSet":
+        schema = {
+            "pdg": 0,
+            "color": 4,
+            "anticolor": 5,
+            "x": 6,
+            "y": 7,
+            "z": 8,
+            "e": 9,
+            "helicity": 12,
+        }
+        records = cl.defaultdict(list)
+        lines = event_table.strip().split("\n")[1:]
+        num_pcls = len(lines)
+
+        for line in lines:
+            particle_row = line.split()
+            for key, val in schema.items():
+                records[key].append(float(particle_row[val]))
+        return cls(
+            pdg=PdgArray(records.pop("pdg")),
+            helicity=HelicityArray(records.pop("helicity")),
+            color=ColorArray(
+                np.fromiter(
+                    zip(*op.itemgetter("color", "anticolor")(records)),
+                    dtype=(np.int32, 2),
+                    count=num_pcls,
+                )
+            ),
+            pmu=MomentumArray(
+                np.fromiter(
+                    zip(*op.itemgetter(*"xyze")(records)),
+                    dtype=(np.float64, 4),
+                    count=num_pcls,
+                )
+            ),
+        )
+
+    @classmethod
     def from_numpy(
         cls,
         pdg: ty.Optional[base.IntVector] = None,
