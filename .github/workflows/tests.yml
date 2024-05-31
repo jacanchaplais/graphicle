@@ -19,6 +19,7 @@ jobs:
           create-args: >-
             python=${{ matrix.pyver }}
             pytest>=6.2.5
+            libtool
           init-shell: bash
           cache-environment: true
           post-cleanup: 'all'
