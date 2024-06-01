@@ -1333,6 +1333,84 @@ class MomentumArray(base.ArrayBase):
         self.dtype = np.dtype(list(zip("xyze", it.repeat("<f8"))))
         self._HANDLED_TYPES = (np.ndarray, nm.Number, cla.Sequence)
 
+    @classmethod
+    def from_spherical_uniform(
+        cls,
+        size: int,
+        max_energy: float,
+        massless: float = 0.0,
+        seed: ty.Optional[int] = None,
+    ) -> "MomentumArray":
+        """Returns a ``MomentumArray`` whose elements are sampled from
+        uniform distributions of energy and 3-momentum.
+
+        .. versionadded:: 0.4.0
+
+        Parameters
+        ----------
+        size : int
+            Number of elements.
+        max_energy : float
+            Upper bound for the energy of the momenta.
+        massless : float
+            Probability for any given momentum element to be massless.
+            Default is ``0.0``.
+        seed : int, optional
+            Random number generator seed. Use the same seed for
+            consistent results.
+
+        Returns
+        -------
+        MomentumArray
+            Set of momenta, sampled uniformly in the energy component,
+            and with uniform probability density over the surface of a
+            3-sphere for the spatial components.
+
+        Raises
+        ------
+        ValueError
+            If massless is not within the interval [0.0, 1.0].
+
+        Notes
+        -----
+        Some 'massless' particles may have small, but finite masses.
+        This is due to numerical errors associated with floating point
+        calculations.
+        """
+        if not (0.0 <= massless <= 1.0):
+            raise ValueError(
+                "Probability of massless particles must be in the "
+                "interval [0, 1]."
+            )
+        rng = np.random.default_rng(seed=seed)
+        energy = rng.uniform(0.0, max_energy, size)
+        p_mag = energy
+        if massless == 0.0:
+            mass = rng.uniform(0.0, energy)
+            p_mag = calculate._root_diff_two_squares(energy, mass)
+        elif massless < 1.0:
+            p_mag = p_mag.copy()
+            mask = rng.random(size) < massless
+            masked_e = energy[~mask]
+            mass = rng.uniform(0.0, masked_e)
+            p_mag[~mask] = calculate._root_diff_two_squares(masked_e, mass)
+        theta_polar = p_mag * np.exp(
+            1.0j * np.arccos(1.0 - 2.0 * rng.random(size, dtype=np.float64))
+        )
+        phi_polar = theta_polar.real * np.exp(
+            1.0j * rng.uniform(-np.pi, np.pi, size)
+        )
+        return cls(
+            np.hstack(
+                [
+                    phi_polar.real.reshape(-1, 1),
+                    phi_polar.imag.reshape(-1, 1),
+                    theta_polar.imag.reshape(-1, 1),
+                    energy.reshape(-1, 1),
+                ]
+            )
+        )
+
     @property
     def __array_interface__(self) -> ty.Dict[str, ty.Any]:
         return self._data.__array_interface__
