@@ -178,7 +178,11 @@ def split_momentum(
     parent = _momentum_to_numpy(momentum)
     children = np.tile(parent, (2, 1))
     children[0, :] *= z
-    children[0, :3] @= rotation_matrix(angle, axis).T
+    # backwards compatibility, switched inplace syntax for explicit ufunc
+    # children[0, :3] @= rotation_matrix(angle, axis).T
+    np.matmul(
+        children[0, :3], rotation_matrix(angle, axis).T, out=children[0, :3]
+    )
     children[1, :] -= children[0, :]
     return gcl.MomentumArray(children)
 
