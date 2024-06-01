@@ -1344,6 +1344,8 @@ class MomentumArray(base.ArrayBase):
         """Returns a ``MomentumArray`` whose elements are sampled from
         uniform distributions of energy and 3-momentum.
 
+        .. versionadded:: 0.4.0
+
         Parameters
         ----------
         size : int
