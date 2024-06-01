@@ -67,10 +67,14 @@ def test_momentum_split():
         # invert the split of the first child:
         first_child_inv = children[0].copy()
         first_child_inv /= energy_fraction
-        first_child_inv._data[0, :3] @= gcl.transform.rotation_matrix(
-            -rotation_angle,
-            rotation_axis,
-        ).T
+        np.matmul(
+            first_child_inv._data[0, :3],
+            gcl.transform.rotation_matrix(
+                -rotation_angle,
+                rotation_axis,
+            ).T,
+            out=first_child_inv._data[0, :3],
+        )
         assert np.allclose(parent, first_child_inv)
 
 
