@@ -55,27 +55,22 @@ class LheEventInterface(ty.Protocol):
 
     @property
     def pdg(self) -> IntVector:
-        """PDG ID codes."""
         ...
 
     @property
     def pmu(self) -> AnyVector:
-        """Four-momenta."""
         ...
 
     @property
     def color(self) -> AnyVector:
-        """Color codes."""
         ...
 
     @property
     def helicity(self) -> HalfIntVector:
-        """Spin / helicity."""
         ...
 
     @property
     def status(self) -> HalfIntVector:
-        """Les Houches specific status codes."""
         ...
 
 

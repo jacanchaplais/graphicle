@@ -2298,48 +2298,33 @@ class ParticleSet(base.ParticleBase):
 
     @classmethod
     def from_lhe_event(cls, event: base.LheEventInterface) -> "ParticleSet":
-        prop_names = ("pdg", "pmu", "color", "helicity", "status")
-        data = cls(**{name: getattr(event, name) for name in prop_names})
-        return data
+        """Creates a ParticleSet instance directly from a data structure
+        holding LHE data. This is useful when you want to study the hard
+        process, without needing to shower or hadronize.
 
-    @classmethod
-    def _from_lhe_event(cls, event_table: str) -> "ParticleSet":
-        schema = {
-            "pdg": 0,
-            "color": 4,
-            "anticolor": 5,
-            "x": 6,
-            "y": 7,
-            "z": 8,
-            "e": 9,
-            "helicity": 12,
-        }
-        records = cl.defaultdict(list)
-        lines = event_table.strip().split("\n")[1:]
-        num_pcls = len(lines)
+        .. versionadded:: 0.4.0
 
-        for line in lines:
-            particle_row = line.split()
-            for key, val in schema.items():
-                records[key].append(float(particle_row[val]))
-        return cls(
-            pdg=PdgArray(records.pop("pdg")),
-            helicity=HelicityArray(records.pop("helicity")),
-            color=ColorArray(
-                np.fromiter(
-                    zip(*op.itemgetter("color", "anticolor")(records)),
-                    dtype=(np.int32, 2),
-                    count=num_pcls,
-                )
-            ),
-            pmu=MomentumArray(
-                np.fromiter(
-                    zip(*op.itemgetter(*"xyze")(records)),
-                    dtype=(np.float64, 4),
-                    count=num_pcls,
-                )
-            ),
-        )
+        Parameters
+        ----------
+        event : LheEventInterface
+            A data structure with attributes "pdg", "pmu", "color",
+            "helicity", and "status". These attributes provide access to
+            numpy arrays, which hold the underlying Les Houches event
+            data.
+
+        Returns
+        -------
+        ParticleSet
+            A composite object, wrapping the data provided in Graphicle
+            objects, and providing a unified interface to them.
+        """
+        props = ("pdg", "pmu", "color", "helicity", "status")
+        pcls = cls.from_numpy(**{name: getattr(event, name) for name in props})
+        pcls.final = MaskArray(np.zeros(len(pcls), dtype=np.bool_))
+        status_map = {-1: -21, 1: -23, -2: -22, 2: -22, 3: -22, -9: -12}
+        for old_code, new_code in status_map.items():
+            pcls.status.data[pcls.status.data == old_code] = new_code
+        return pcls
 
     @classmethod
     def from_numpy(
