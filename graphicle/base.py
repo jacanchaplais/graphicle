@@ -45,6 +45,35 @@ DoubleUfunc = ty.TypeVar("DoubleUfunc", DoubleVector, np.float64)
 DataType = ty.TypeVar("DataType")
 
 
+class LheEventInterface(ty.Protocol):
+    """Interface for a generic Les Houches event.
+
+    :group: base
+
+    .. versionadded:: 0.4.0
+    """
+
+    @property
+    def pdg(self) -> IntVector:
+        ...
+
+    @property
+    def pmu(self) -> AnyVector:
+        ...
+
+    @property
+    def color(self) -> AnyVector:
+        ...
+
+    @property
+    def helicity(self) -> HalfIntVector:
+        ...
+
+    @property
+    def status(self) -> HalfIntVector:
+        ...
+
+
 class EventInterface(ty.Protocol):
     """Defines the interface for a generic event object expected by
     graphicle's routines. Attributes are stored as numpy arrays, with

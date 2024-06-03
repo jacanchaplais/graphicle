@@ -2297,6 +2297,36 @@ class ParticleSet(base.ParticleBase):
         return _composite_copy(self)
 
     @classmethod
+    def from_lhe_event(cls, event: base.LheEventInterface) -> "ParticleSet":
+        """Creates a ParticleSet instance directly from a data structure
+        holding LHE data. This is useful when you want to study the hard
+        process, without needing to shower or hadronize.
+
+        .. versionadded:: 0.4.0
+
+        Parameters
+        ----------
+        event : LheEventInterface
+            A data structure with attributes "pdg", "pmu", "color",
+            "helicity", and "status". These attributes provide access to
+            numpy arrays, which hold the underlying Les Houches event
+            data.
+
+        Returns
+        -------
+        ParticleSet
+            A composite object, wrapping the data provided in Graphicle
+            objects, and providing a unified interface to them.
+        """
+        props = ("pdg", "pmu", "color", "helicity", "status")
+        pcls = cls.from_numpy(**{name: getattr(event, name) for name in props})
+        pcls.final = MaskArray(np.zeros(len(pcls), dtype=np.bool_))
+        status_map = {-1: -21, 1: -23, -2: -22, 2: -22, 3: -22, -9: -12}
+        for old_code, new_code in status_map.items():
+            pcls.status.data[pcls.status.data == old_code] = new_code
+        return pcls
+
+    @classmethod
     def from_numpy(
         cls,
         pdg: ty.Optional[base.IntVector] = None,
