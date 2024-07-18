@@ -2647,6 +2647,51 @@ class AdjacencyList(base.AdjacencyBase):
         """
         return tuple(self)
 
+    def to_dot(
+        self,
+        file_obj: ty.TextIO,
+        graph_name="Graph",
+        labels: ty.Optional[ty.Iterable[ty.Any]] = None,
+    ) -> None:
+        """Writes the data represented by the instance in DOT format to
+        the provided ``file_obj`` buffer.
+
+        .. versionadded:: 0.4.1
+
+        Parameters
+        ----------
+        file_obj : TextIO
+            An open file-like object, in "wt" mode, to which the DOT data
+            is written.
+        graph_name : str
+            Label for the whole graph.
+        labels : str
+            Labels for individual edges. If provided, must be the same
+            length as the ``AdjacencyList``.
+
+        Raises
+        ------
+        ValueError
+            If ``labels`` is passed, and a different length to the
+            ``AdjacencyList`` instance.
+        """
+        with file_obj as buffer:
+            buffer.write(f"digraph {graph_name} {{\n")
+            labels_given = labels is not None
+            labels = labels if labels_given else it.repeat(None)
+            zip_equal = mit.zip_equal if labels_given else zip
+            try:
+                for (src, dst), label in zip_equal(self, labels):
+                    if label is None:
+                        buffer.write(f"  {src} -> {dst};\n")
+                        continue
+                    buffer.write(f'  {src} -> {dst} [label="{label}"];\n')
+            except mit.more.UnequalIterablesError as exc:
+                raise ValueError(
+                    "labels must have same length as coo_list."
+                ) from exc
+            buffer.write("}")
+
 
 class GraphicleSerialized(tyx.TypedDict, total=False):
     """Typed dictionary format of a serialized Graphicle instance.
