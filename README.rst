@@ -166,8 +166,7 @@ More information on the API is available in the
 Note on FastJet compatibility
 -----------------------------
 ``graphicle`` offers a function wrapper around ``fastjet`` to cluster
-``MomentumArray`` objects using their optimised generalised-:math:`k_T`
-algorithm.
+``MomentumArray`` objects using their optimised generalised-kT algorithm.
 However, this library cannot build wheels for all systems, including Windows
 and the latest macOS systems using ARM architectures.
 Therefore, in order to use ``graphicle.select.fastjet_clusters()``, you must
