@@ -1239,14 +1239,14 @@ class PdgArray(base.ArrayBase):
         return props  # type: ignore
 
     @property
-    def name(self) -> base.ObjVector:
+    def name(self) -> base.StringVector:
         # 19 is the length of longest name
-        return self.__get_prop("name").astype("<U19")
+        return self.__get_prop("name").astype(np.str_)
 
     @property
-    def latex(self) -> ty.List[str]:
+    def latex(self) -> base.StringVector:
         # 32 is the length of longest name
-        return self.__get_prop("latex").tolist()
+        return self.__get_prop("latex").astype(np.str_)
 
     @property
     def charge(self) -> base.DoubleVector:
@@ -1265,8 +1265,8 @@ class PdgArray(base.ArrayBase):
         return range_arr
 
     @property
-    def quarks(self) -> base.ObjVector:
-        return self.__get_prop("quarks")
+    def quarks(self) -> base.StringVector:
+        return self.__get_prop("quarks").astype(np.str_)
 
     @property
     def width(self) -> base.DoubleVector:
