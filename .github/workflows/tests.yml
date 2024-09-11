@@ -20,7 +20,7 @@ jobs:
             python=${{ matrix.pyver }}
             pytest>=6.2.5
           init-shell: bash
-          cache-environment: false
+          cache-environment: true
           post-cleanup: 'all'
 
       - name: Install graphicle
