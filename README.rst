@@ -163,6 +163,23 @@ wrapped with ``showerpipe``.
 More information on the API is available in the
 `documentation <https://graphicle.readthedocs.io>`__
 
+Note on FastJet compatibility
+-----------------------------
+``graphicle`` offers a function wrapper around ``fastjet`` to cluster
+``MomentumArray`` objects using their optimised generalised-kT algorithm.
+However, this library cannot build wheels for all systems, including Windows
+and the latest macOS systems using ARM architectures.
+Therefore, in order to use ``graphicle.select.fastjet_clusters()``, you must
+install graphicle with ``fastjet`` as an optional dependency.
+This enables users who don't want the ``fastjet`` wrapper to ignore it, and
+still make the most of ``graphicle`` many other features.
+Use the following to get started:
+
+.. code:: bash
+
+   pip install "graphicle[fastjet]"
+
+
 .. |PyPI version| image:: https://img.shields.io/pypi/v/graphicle.svg
    :target: https://pypi.org/project/graphicle/
 .. |Tests| image:: https://github.com/jacanchaplais/graphicle/actions/workflows/tests.yml/badge.svg

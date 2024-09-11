@@ -11,7 +11,6 @@ import operator as op
 import typing as ty
 
 import awkward as ak
-import fastjet as fj
 import numpy as np
 import pandas as pd
 import scipy.optimize as opt
@@ -120,6 +119,8 @@ def fastjet_clusters(
     cause undefined behaviour if you apply views on the underlying data
     in a ``MaskArray`` without copying it.
     """
+    import fastjet as fj
+
     if pt_cut is None:
         pt_cut = 0.0
     elif pt_cut < 0.0:
