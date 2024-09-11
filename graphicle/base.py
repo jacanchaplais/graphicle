@@ -11,6 +11,7 @@ from abc import ABC, abstractmethod
 
 import numpy as np
 import numpy.typing as npt
+import typing_extensions as tyx
 
 __all__ = [
     "DoubleVector",
@@ -31,16 +32,17 @@ __all__ = [
     "NumericalStabilityWarning",
 ]
 
-DoubleVector = npt.NDArray[np.float64]
-FloatVector = npt.NDArray[np.float32]
-ComplexVector = npt.NDArray[np.complex128]
-BoolVector = npt.NDArray[np.bool_]
-IntVector = npt.NDArray[np.int32]
-HalfIntVector = npt.NDArray[np.int16]
-ObjVector = npt.NDArray[np.object_]
-AnyVector = npt.NDArray[ty.Any]
-VoidVector = npt.NDArray[np.void]
-MaskLike = ty.Union["MaskBase", BoolVector]
+DoubleVector: tyx.TypeAlias = npt.NDArray[np.float64]
+FloatVector: tyx.TypeAlias = npt.NDArray[np.float32]
+ComplexVector: tyx.TypeAlias = npt.NDArray[np.complex128]
+BoolVector: tyx.TypeAlias = npt.NDArray[np.bool_]
+IntVector: tyx.TypeAlias = npt.NDArray[np.int32]
+HalfIntVector: tyx.TypeAlias = npt.NDArray[np.int16]
+ObjVector: tyx.TypeAlias = npt.NDArray[np.object_]
+StringVector: tyx.TypeAlias = npt.NDArray[np.str_]
+AnyVector: tyx.TypeAlias = npt.NDArray[ty.Any]
+VoidVector: tyx.TypeAlias = npt.NDArray[np.void]
+MaskLike: tyx.TypeAlias = ty.Union["MaskBase", BoolVector]
 DoubleUfunc = ty.TypeVar("DoubleUfunc", DoubleVector, np.float64)
 DataType = ty.TypeVar("DataType")
 

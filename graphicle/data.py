@@ -1038,6 +1038,9 @@ class PdgArray(base.ArrayBase):
     .. versionchanged:: 0.2.0
        Added internal numpy interfaces for greater interoperability.
 
+    .. versionchanged:: 0.4.1
+       ``name`` property now gives unicode array. latex property added.
+
     Parameters
     ----------
     data : sequence[int]
@@ -1045,7 +1048,7 @@ class PdgArray(base.ArrayBase):
 
     Attributes
     ----------
-    name : ndarray[object]
+    name : ndarray[unicode]
         String representation of particle names.
     charge : ndarray[float64]
         Charge for each particle in elementary units.
@@ -1069,6 +1072,8 @@ class PdgArray(base.ArrayBase):
         Spatial parity for each particle.
     charge_parity : ndarray[float64]
         Charge parity for each particle.
+    latex : list[str]
+        LaTeX compatible representation of particle names.
 
     Methods
     -------
@@ -1234,8 +1239,14 @@ class PdgArray(base.ArrayBase):
         return props  # type: ignore
 
     @property
-    def name(self) -> base.ObjVector:
-        return self.__get_prop("name")
+    def name(self) -> base.StringVector:
+        # 19 is the length of longest name
+        return self.__get_prop("name").astype(np.str_)
+
+    @property
+    def latex(self) -> base.StringVector:
+        # 32 is the length of longest name
+        return self.__get_prop("latex").astype(np.str_)
 
     @property
     def charge(self) -> base.DoubleVector:
@@ -1254,8 +1265,8 @@ class PdgArray(base.ArrayBase):
         return range_arr
 
     @property
-    def quarks(self) -> base.ObjVector:
-        return self.__get_prop("quarks")
+    def quarks(self) -> base.StringVector:
+        return self.__get_prop("quarks").astype(np.str_)
 
     @property
     def width(self) -> base.DoubleVector:
