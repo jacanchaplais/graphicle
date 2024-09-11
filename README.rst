@@ -172,7 +172,7 @@ and the latest macOS systems using ARM architectures.
 Therefore, in order to use ``graphicle.select.fastjet_clusters()``, you must
 install graphicle with ``fastjet`` as an optional dependency.
 This enables users who don't want the ``fastjet`` wrapper to ignore it, and
-still make the most of ``graphicle`` many other features.
+still make the most of the many other features of ``graphicle``.
 Use the following to get started:
 
 .. code:: bash
