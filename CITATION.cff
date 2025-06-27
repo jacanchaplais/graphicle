@@ -1,0 +1,11 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+authors:
+- family-names: "Chaplais"
+  given-names: "Jacan"
+  orcid: "https://orcid.org/0009-0002-4092-1878"
+title: "Graphicle: semantic and heterogeneous data structures for particle physics"
+version: 0.4.3
+doi: 10.5281/zenodo.15753714
+date-released: 2025-06-27
+url: "https://github.com/jacanchaplais/graphicle"
