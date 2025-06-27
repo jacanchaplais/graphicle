@@ -1,11 +1,16 @@
 graphicle
 =========
 
-|PyPI version| |Tests| |Documentation| |License| |pre-commit| |Code style:
+|DOI| |PyPI version| |Tests| |Documentation| |License| |pre-commit| |Code style:
 black|
 
-Utilities for representing high energy physics data as graphs /
-networks.
+Heterogeneous data structures to semantically manipulate high energy physics
+data, with first class support for graph data structures.
+Unify those complex records with multiple fields, including 4-momenta, PDG
+codes, status codes, ancestry data, and more!
+
+Construct composite filters to query over multiple fields in your data at once.
+Tabular string representations make looking at your whole event record easy.
 
 Installation
 ------------
@@ -191,3 +196,5 @@ Use the following to get started:
    :target: https://github.com/pre-commit/pre-commit
 .. |Code style: black| image:: https://img.shields.io/badge/code%20style-black-000000.svg
    :target: https://github.com/psf/black
+.. |DOI| image:: https://zenodo.org/badge/424939048.svg
+  :target: https://doi.org/10.5281/zenodo.15753776
