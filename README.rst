@@ -1,7 +1,7 @@
 graphicle
 =========
 
-|PyPI version| |Tests| |Documentation| |License| |pre-commit| |Code style:
+|DOI| |PyPI version| |Tests| |Documentation| |License| |pre-commit| |Code style:
 black|
 
 Utilities for representing high energy physics data as graphs /
@@ -191,3 +191,5 @@ Use the following to get started:
    :target: https://github.com/pre-commit/pre-commit
 .. |Code style: black| image:: https://img.shields.io/badge/code%20style-black-000000.svg
    :target: https://github.com/psf/black
+.. |DOI| image:: https://zenodo.org/badge/424939048.svg
+  :target: https://doi.org/10.5281/zenodo.15753776
