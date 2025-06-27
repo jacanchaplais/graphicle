@@ -4,6 +4,9 @@ authors:
 - family-names: "Chaplais"
   given-names: "Jacan"
   orcid: "https://orcid.org/0009-0002-4092-1878"
+- family-names: "Cerro"
+  given-names: "Giorgio"
+  orcid: "https://orcid.org/0009-0009-1162-5739"
 title: "Graphicle: semantic and heterogeneous data structures for particle physics"
 version: 0.4.3
 doi: 10.5281/zenodo.15753714
